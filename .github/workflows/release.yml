@@ -1,0 +1,71 @@
+name: Build and publish experimental release
+on:
+  push:
+    branches: [main]
+    paths-ignore: ['**.md']
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: kupopop-release
+  cancel-in-progress: false
+jobs:
+  build:
+    runs-on: windows-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '10.0.x'
+      - name: Get official Dalamud assemblies
+        shell: pwsh
+        run: |
+          $folder = Join-Path $env:RUNNER_TEMP 'dalamud'
+          Invoke-WebRequest 'https://goatcorp.github.io/dalamud-distrib/latest.zip' -OutFile "$env:RUNNER_TEMP/dalamud.zip"
+          Expand-Archive "$env:RUNNER_TEMP/dalamud.zip" $folder
+          "DALAMUD_HOME=$folder" >> $env:GITHUB_ENV
+      - name: Build and run game/protocol tests
+        shell: pwsh
+        run: |
+          dotnet build server/Kupopop.Tests/Kupopop.Tests.csproj -c Release
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          dotnet server/Kupopop.Tests/bin/Release/net10.0/Kupopop.Tests.dll
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+      - name: Build plugin and self-contained servers
+        shell: pwsh
+        run: ./Build-Release.ps1
+      - name: Publish testing release
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          $manifest = Get-Content artifacts/repo.json -Raw | ConvertFrom-Json
+          $tag = 'v' + (($manifest[0].AssemblyVersion -split '\.')[0..2] -join '.')
+          gh release view $tag *> $null
+          if ($LASTEXITCODE -ne 0) {
+            gh release create $tag --target $env:GITHUB_SHA --prerelease --title "Kupopop Draw $tag - experimental" --notes-file RELEASE_NOTES.md
+            if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          }
+          gh release upload $tag artifacts/testing.zip artifacts/repo.json artifacts/Kupopop.Server-win-x64.zip artifacts/Kupopop.Server-linux-x64.zip --clobber
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+      - uses: actions/upload-artifact@v4
+        with:
+          name: kupopop-testing-release
+          path: |
+            artifacts/testing.zip
+            artifacts/repo.json
+            artifacts/Kupopop.Server-*.zip
+  linux-test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '10.0.x'
+      - name: Build and run server tests on Linux
+        run: |
+          dotnet build server/Kupopop.Tests/Kupopop.Tests.csproj -c Release
+          dotnet server/Kupopop.Tests/bin/Release/net10.0/Kupopop.Tests.dll
+          bash -n server/hosting/start-server.sh server/hosting/start-local.sh

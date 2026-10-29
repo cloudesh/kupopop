@@ -1,0 +1,5 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup><TargetFramework>net10.0</TargetFramework><OutputType>Exe</OutputType></PropertyGroup>
+  <ItemGroup><ProjectReference Include="../Kupopop.Server/Kupopop.Server.csproj" /></ItemGroup>
+  <ItemGroup><Compile Include="../../plugin/Kupopop/CredentialVault.cs" Link="CredentialVault.cs" /></ItemGroup>
+</Project>
