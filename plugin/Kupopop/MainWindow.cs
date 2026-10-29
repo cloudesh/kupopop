@@ -45,16 +45,16 @@ public sealed partial class MainWindow : Window, IDisposable
     public bool ShowDebug;
 
     public MainWindow(Plugin plugin, string directory, DiagnosticLog log)
-        : base("Kupopop Draw###Kupopop", ImGuiWindowFlags.NoScrollbar | ImGuiWindowFlags.NoScrollWithMouse)
+        : base("Kupopop Draw###KupopopPaper", ImGuiWindowFlags.NoScrollbar | ImGuiWindowFlags.NoScrollWithMouse)
     {
         this.plugin = plugin;
         this.log = log;
         art = new(log);
         vault = new(directory);
         serverUrl = plugin.Config.ServerUrl;
-        Size = new(1240, 840);
+        Size = new(980, 650);
         SizeCondition = ImGuiCond.FirstUseEver;
-        SizeConstraints = new() { MinimumSize = new(1024, 680), MaximumSize = new(float.MaxValue) };
+        SizeConstraints = new() { MinimumSize = new(820, 540), MaximumSize = new(float.MaxValue) };
         ConfigureClient();
     }
 
