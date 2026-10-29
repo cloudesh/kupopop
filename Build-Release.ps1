@@ -42,7 +42,7 @@ if (-not $SkipPlugin) {
     $taskManifest | Add-Member -NotePropertyName IsHide -NotePropertyValue $false -Force
     $taskManifest | Add-Member -NotePropertyName IsTestingExclusive -NotePropertyValue $false -Force
     $taskManifest | Add-Member -NotePropertyName LastUpdate -NotePropertyValue ([DateTimeOffset]::UtcNow.ToUnixTimeSeconds()) -Force
-    $taskJson = ConvertTo-Json -InputObject @($taskManifest) -Depth 8
+    $taskJson = (ConvertTo-Json -InputObject @($taskManifest) -Depth 8).Replace("`r`n", "`n")
     [IO.File]::WriteAllText((Join-Path $PSScriptRoot 'plugin/releases/repo.json'), $taskJson, (New-Object Text.UTF8Encoding($false)))
     Copy-Item -LiteralPath 'plugin/releases/repo.json' -Destination (Join-Path $taskOutput 'repo.json') -Force
 }

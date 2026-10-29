@@ -3,7 +3,7 @@
 A native Dalamud drawing-and-guessing game for Final Fantasy XIV. Draw with
 friends, race to solve the word, and make a little avatar of your own.
 
-**Experimental 0.1.0 — compiled and automatically tested; in-game testing required.**
+**Experimental 0.1.1 — compiled and automatically tested; in-game testing required.**
 
 ## Try it
 
@@ -15,7 +15,7 @@ Add it under Dalamud Settings -> Experimental -> Custom Plugin Repositories,
 install **Kupopop Draw**, and open **`/kupopop`**. This custom release is not an
 official Dalamud repository submission.
 
-Download the [Windows/Linux server packages](https://github.com/cloudesh/kupopop/releases/tag/v0.1.0).
+Download the [Windows/Linux server packages](https://github.com/cloudesh/kupopop/releases/tag/v0.1.1).
 Windows local testing: extract the Windows server ZIP and double-click
 **Start-Local.cmd**, complete its explicit first-run certificate trust step, then
 use **`https://localhost:7443`** in the plugin. For multiple computers, host the

@@ -23,7 +23,7 @@ public sealed class Plugin : IDalamudPlugin
         Config = PluginInterface.GetPluginConfig() as Configuration ?? new();
         string directory = PluginInterface.GetPluginConfigDirectory();
         diagnostic = new(directory);
-        diagnostic.Write($"plugin.start version=0.1.0.0 api=15 runtime={Environment.Version}");
+        diagnostic.Write($"plugin.start version=0.1.1.0 api=15 runtime={Environment.Version}");
         main = new(this, directory, diagnostic) { IsOpen = true };
         windows.AddWindow(main);
         CommandManager.AddHandler("/kupopop", new CommandInfo((_, args) =>

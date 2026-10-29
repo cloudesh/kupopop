@@ -1,4 +1,4 @@
-Kupopop Draw 0.1.0 is the first experimental build of the native drawing-and-guessing game.
+Kupopop Draw 0.1.1 is the first experimental build of the native drawing-and-guessing game.
 
 - Welcome/account setup, private recovery codes, generated or hand-drawn avatars.
 - Join Room, Make Room, and opt-in Public Rooms.

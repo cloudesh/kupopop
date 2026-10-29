@@ -3,5 +3,6 @@
 *.ps1 text eol=lf
 *.cs text eol=lf
 *.json text eol=lf
+*.yml text eol=lf
 *.md text eol=lf
 *.zip binary

@@ -35,7 +35,7 @@ public sealed class MainWindow : Window, IDisposable
     private string chatInput = "";
     private string screen = "welcome";
     private string status = "";
-    private bool busy, disposed, publicRoom, savedRecovery, revealRecovery, avatarReset, scrollChat;
+    private bool busy, disposed, publicRoom, savedRecovery, revealRecovery, avatarReset, scrollChat, savingProfile;
     private bool reconnect;
     private int seconds = 90, rounds = 2, hints = 30, capacity = 16, retry;
     private long reconnectAt, heartbeatAt, statsAt, lastSync;
@@ -94,6 +94,8 @@ public sealed class MainWindow : Window, IDisposable
             {
                 case "profile":
                     profile = message.Profile;
+                    if (savingProfile)
+                    { savingProfile = false; screen = room is null ? "menu" : "game"; status = "Profile saved."; }
                     if (profile is not null && screen != "profile") displayName = profile.DisplayName;
                     break;
                 case "state" when message.Room is { } state:
@@ -119,11 +121,13 @@ public sealed class MainWindow : Window, IDisposable
                 case "left": room = null; chat.Clear(); screen = "menu"; status = message.Error ?? "You left the room."; break;
                 case "error":
                     status = message.Error ?? "Server rejected the action.";
+                    if (message.RejectedCommand == "profile") savingProfile = false;
                     log.Write("server.action_rejected");
                     if (room is not null && message.RejectedCommand == "draw" && Environment.TickCount64 - lastSync > 1000)
                     { lastSync = Environment.TickCount64; Send(new("sync")); }
                     break;
                 case "disconnected":
+                    savingProfile = false;
                     status = message.Error ?? "Disconnected. Trying to reconnect.";
                     if (reconnect) reconnectAt = Environment.TickCount64 + 3000;
                     break;
@@ -146,7 +150,7 @@ public sealed class MainWindow : Window, IDisposable
     {
         ImGui.TextColored(new Vector4(0.91f, 0.64f, 0.78f, 1), "K U P O P O P   /   D R A W");
         ImGui.SameLine();
-        ImGui.TextDisabled("experimental 0.1.0");
+        ImGui.TextDisabled("experimental 0.1.1");
         ImGui.Separator();
         if (!string.IsNullOrEmpty(status)) Wrapped(status);
         if (ShowDebug || screen == "welcome") ServerSettings();
@@ -387,11 +391,11 @@ public sealed class MainWindow : Window, IDisposable
         avatarEditor.Draw("avatar-canvas", avatar, new Vector2(300, 300), true, op => { avatar.Apply(op); avatarReset = false; });
         if (ImGui.Button("Use my default avatar") && profile is not null)
         { avatar.Load(AvatarGenerator.Generate(profile.AvatarSeed)); avatarReset = true; }
-        using (ImRaii.Disabled(client?.Connected != true || !Protocol.ValidName(displayName)))
+        using (ImRaii.Disabled(savingProfile || client?.Connected != true || !Protocol.ValidName(displayName)))
             if (ImGui.Button("Save profile"))
             {
-                Send(new("profile", Text: displayName, Avatar: avatarReset ? null : (byte[])avatar.Pixels.Clone(), ResetAvatar: avatarReset));
-                screen = room is null ? "menu" : "game";
+                savingProfile = Send(new("profile", Text: displayName, Avatar: avatarReset ? null : (byte[])avatar.Pixels.Clone(), ResetAvatar: avatarReset));
+                if (savingProfile) status = "Saving profile...";
             }
         ImGui.Spacing();
         Wrapped("If you lose your saved recovery code, you can replace it while this device still has access. Replacement invalidates your previous recovery code and signs other devices out.");
