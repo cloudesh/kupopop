@@ -5,6 +5,7 @@
 artifacts/
 server/data/
 server/logs/
+server/local/
 server/host.json
 server/hosting/Caddyfile
 server/hosting/caddy*

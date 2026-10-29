@@ -4,29 +4,13 @@ Set-Location -LiteralPath $PSScriptRoot
 $env:DOTNET_CLI_TELEMETRY_OPTOUT = '1'
 $taskOutput = [IO.Path]::GetFullPath((Join-Path $PSScriptRoot $Output))
 New-Item -ItemType Directory -Path $taskOutput -Force | Out-Null
+. (Join-Path $PSScriptRoot 'server/Server-Tools.ps1')
 
 function Invoke-Dotnet {
     param([string[]]$Arguments)
     & dotnet @Arguments
     if ($LASTEXITCODE -ne 0) { throw "dotnet command failed: $($Arguments[0])" }
 }
-function Zip-Directory {
-    param([string]$Source, [string]$Destination, [switch]$Linux)
-    Add-Type -AssemblyName System.IO.Compression
-    $taskZipStream = [IO.File]::Open($Destination, [IO.FileMode]::Create)
-    $taskZip = New-Object IO.Compression.ZipArchive($taskZipStream, [IO.Compression.ZipArchiveMode]::Create)
-    try {
-        foreach ($taskFile in Get-ChildItem -LiteralPath $Source -File -Recurse) {
-            $taskName = $taskFile.FullName.Substring($Source.Length).TrimStart([IO.Path]::DirectorySeparatorChar, [IO.Path]::AltDirectorySeparatorChar).Replace('\','/')
-            $taskEntry = $taskZip.CreateEntry($taskName, [IO.Compression.CompressionLevel]::Optimal)
-            if ($Linux -and ($taskName.EndsWith('.sh') -or $taskName -eq 'Kupopop.Server')) { $taskEntry.ExternalAttributes = -2115174400 }
-            $taskInput = [IO.File]::OpenRead($taskFile.FullName)
-            $taskDest = $taskEntry.Open()
-            try { $taskInput.CopyTo($taskDest) } finally { $taskInput.Dispose(); $taskDest.Dispose() }
-        }
-    } finally { $taskZip.Dispose(); $taskZipStream.Dispose() }
-}
-
 if (-not $SkipPlugin) {
     Invoke-Dotnet @('build','plugin/Kupopop/Kupopop.csproj','-c','Release','-p:UseSharedCompilation=false','-m:1')
     $taskPackaged = Join-Path $PSScriptRoot 'plugin/Kupopop/bin/Release/Kupopop/latest.zip'

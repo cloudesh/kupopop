@@ -1,10 +1,23 @@
 # Kupopop Draw server: first run
 
 Download and fully extract the Windows x64 or Linux x64 server ZIP from
-https://github.com/cloudesh/kupopop/releases/tag/v0.1.1. The packages include .NET;
+https://github.com/cloudesh/kupopop/releases/tag/v0.2.0. The packages include .NET;
 players and hosts do not need to install an SDK or runtime.
 
 ## Windows: local in-game testing
+
+For this source workspace, use **`Start-My-Server.cmd` in the project root** each
+time. It builds the current source with the installed .NET 10 SDK and starts it
+at `https://localhost:7443`. The build is incremental, so unchanged starts are
+quick. Stop an existing server with Ctrl+C before starting an updated one.
+
+This workspace launcher keeps accounts/certificates in `server/local/data/` and
+logs in `server/local/logs/`, so replacing build output preserves your account.
+It copies existing data from `artifacts/server-win-x64/data/` on first use only
+when the permanent data folder is empty; it keeps the original files. Back up the
+permanent data folder and do not delete it when updating.
+
+For a standalone downloaded server package:
 
 1. Double-click **Start-Local.cmd** in the extracted server folder.
 2. First run generates a localhost-only development certificate. Check its

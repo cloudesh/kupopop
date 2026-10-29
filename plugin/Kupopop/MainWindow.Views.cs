@@ -1,0 +1,597 @@
+using System.Numerics;
+using Dalamud.Bindings.ImGui;
+using Dalamud.Interface;
+using Dalamud.Interface.Utility.Raii;
+using Kupopop.Shared;
+
+namespace Kupopop;
+
+public sealed partial class MainWindow
+{
+    private bool returningArtist, focusChat;
+    private string lastNotice = "";
+    private long noticeUntil;
+    private static string UiVersion => typeof(Plugin).Assembly.GetName().Version?.ToString(3) ?? "dev";
+
+    public override void PreDraw()
+    {
+        var display = ImGui.GetIO().DisplaySize;
+        SizeConstraints = new()
+        {
+            MinimumSize = new(Math.Min(UiTheme.S(1024), Math.Max(640, display.X - 40)), Math.Min(UiTheme.S(680), Math.Max(480, display.Y - 60))),
+            MaximumSize = new(float.MaxValue),
+        };
+    }
+
+    public override void Draw()
+    {
+        DrawHeader();
+        if (newRecovery.Length == 0 && screen != "welcome") Navigation();
+        else UiTheme.Rule();
+        DrawNotice();
+        using (var transparent = ImRaii.PushColor(ImGuiCol.ChildBg, Vector4.Zero))
+        using (var body = ImRaii.Child("page-content", new Vector2(0, Math.Max(UiTheme.S(100), ImGui.GetContentRegionAvail().Y - UiTheme.S(28))), false))
+        {
+            if (body.Success)
+            {
+                if (newRecovery.Length > 0) RecoveryScreen();
+                else if (ShowDebug) ServerSettings();
+                else if (screen == "welcome") Welcome();
+                else if (screen == "profile") ProfileScreen();
+                else if (screen == "game" && room is not null) Game();
+                else if (screen == "public") PublicRooms();
+                else if (screen == "create") CreateRoomScreen();
+                else Menu();
+            }
+        }
+        UiTheme.Caption("A little imagination, kupo.");
+        ImGui.SameLine(Math.Max(ImGui.GetCursorPosX() + UiTheme.S(20), ImGui.GetWindowContentRegionMax().X - UiTheme.S(100)));
+        UiTheme.Caption("Draw / " + UiVersion);
+    }
+
+    private void DrawHeader()
+    {
+        if (!ImGui.BeginTable("brand", 2)) return;
+        try
+        {
+            ImGui.TableSetupColumn("Brand", ImGuiTableColumnFlags.WidthStretch);
+            ImGui.TableSetupColumn("Connection", ImGuiTableColumnFlags.WidthFixed, UiTheme.S(255));
+            ImGui.TableNextColumn();
+            art.Icon(UiAssets.Moogle, 42);
+            ImGui.SameLine();
+            ImGui.BeginGroup();
+            art.Heading("Kupopop");
+            UiTheme.Caption("THE DRAWING ROOM");
+            ImGui.EndGroup();
+            ImGui.TableNextColumn();
+            bool online = client?.Connected == true;
+            ImGui.AlignTextToFramePadding();
+            UiAssets.Glyph(FontAwesomeIcon.Circle, online ? UiTheme.Green : UiTheme.Muted);
+            ImGui.SameLine();
+            ImGui.TextUnformatted(online ? "Connected" : busy ? "Connecting..." : "Offline");
+            ImGui.SameLine();
+            using (ImRaii.Disabled(busy))
+            {
+                if (device is not null && !online)
+                { if (UiTheme.Button("Connect", 0, primary: true)) Connect(); }
+                else if (UiTheme.Button("Connection", 0, quiet: true)) ShowDebug = !ShowDebug;
+            }
+        }
+        finally { ImGui.EndTable(); }
+        UiTheme.Gap(5);
+    }
+
+    private void Navigation()
+    {
+        if (UiTheme.Tab(room is null ? "Play" : "Your room", !ShowDebug && screen != "profile"))
+        { ShowDebug = false; screen = room is null ? "menu" : "game"; }
+        ImGui.SameLine();
+        using (ImRaii.Disabled(profile is null))
+            if (UiTheme.Tab("Profile", !ShowDebug && screen == "profile")) { ShowDebug = false; OpenProfile(); }
+        ImGui.SameLine();
+        if (UiTheme.Tab("Connection", ShowDebug)) ShowDebug = !ShowDebug;
+        UiTheme.Rule();
+    }
+
+    private void DrawNotice()
+    {
+        if (string.IsNullOrWhiteSpace(status)) return;
+        if (status != lastNotice) { lastNotice = status; noticeUntil = Environment.TickCount64 + 7000; }
+        bool error = status.Contains("failed", StringComparison.OrdinalIgnoreCase) ||
+            status.Contains("rejected", StringComparison.OrdinalIgnoreCase) || status.Contains("limit", StringComparison.OrdinalIgnoreCase) ||
+            status.Contains("need", StringComparison.OrdinalIgnoreCase) || status.Contains("full", StringComparison.OrdinalIgnoreCase);
+        if (!error && Environment.TickCount64 > noticeUntil) return;
+        if (newRecovery.Length > 0 && !error) return;
+        UiTheme.Wrapped(status, error ? UiTheme.Rose : UiTheme.Green);
+        UiTheme.Gap(3);
+    }
+
+    private void Welcome()
+    {
+        if (!ImGui.BeginTable("welcome-layout", 2)) return;
+        try
+        {
+            ImGui.TableSetupColumn("Letter", ImGuiTableColumnFlags.WidthStretch, 1.05f);
+            ImGui.TableSetupColumn("Account", ImGuiTableColumnFlags.WidthStretch, 1);
+            ImGui.TableNextColumn();
+            UiTheme.Gap(35);
+            UiTheme.Caption("AN INVITATION TO MAKE SOMETHING");
+            UiTheme.Gap(12);
+            art.Heading("A little imagination.");
+            art.Heading("A lot of kupo.");
+            UiTheme.Gap(16);
+            UiTheme.Wrapped("An empty page, a few friends, and a word worth guessing. Welcome to your little drawing room in Eorzea.", UiTheme.Muted);
+            UiTheme.Gap(24);
+            art.Icon(UiAssets.DeliveryMoogle, 80);
+            UiTheme.Gap(14);
+            UiTheme.Caption("Draw a little. Guess together. Make it yours.");
+            ImGui.TableNextColumn();
+            using var panel = new UiTheme.PaperPanel("welcome-card", Vector2.Zero);
+            if (!panel.Success) return;
+            UiTheme.Caption("FIRST VISIT");
+            art.Heading("Make yourself at home");
+            UiTheme.Gap(7);
+            UiTheme.Wrapped("Choose a name for your Kupopop profile. You can draw your own avatar next.", UiTheme.Muted);
+            UiTheme.Gap(9);
+            using (ImRaii.Disabled(busy || client is null))
+            {
+                UiTheme.Field("Display name", "##new-name", ref displayName, 40, "Your character or artist name");
+                using (ImRaii.Disabled(!Protocol.ValidName(displayName)))
+                    if (UiTheme.Button(busy ? "Creating your profile..." : "Create my profile", ImGui.GetContentRegionAvail().X, primary: true)) CreateAccount(false);
+                UiTheme.Gap(3);
+                UiTheme.Wrapped("Your name is unverified. Players see your chosen name and avatar when you share a room.", UiTheme.Muted);
+                UiTheme.Rule();
+                if (UiTheme.Button(returningArtist ? "Hide account recovery" : "Already have a profile?", ImGui.GetContentRegionAvail().X, quiet: true)) returningArtist = !returningArtist;
+                if (returningArtist)
+                {
+                    UiTheme.Field("Private recovery code", "##recover", ref recoveryInput, 128, "Paste your saved recovery code", ImGuiInputTextFlags.Password);
+                    if (UiTheme.Button("Recover my profile", ImGui.GetContentRegionAvail().X)) CreateAccount(true);
+                }
+            }
+            UiTheme.Gap(8);
+            if (UiTheme.Button("Connection settings", 0, quiet: true)) ShowDebug = true;
+        }
+        finally { ImGui.EndTable(); }
+    }
+
+    private void RecoveryScreen()
+    {
+        using var panel = new UiTheme.PaperPanel("save-recovery", Vector2.Zero);
+        if (!panel.Success) return;
+        UiTheme.Caption("YOUR PROFILE IS READY");
+        art.Heading("Keep your sketchbook safe");
+        UiTheme.Gap(8);
+        UiTheme.Wrapped("Save this private recovery code in your password manager. It is the way back to your account if you lose access to this device.", UiTheme.Muted);
+        UiTheme.Gap(12);
+        ImGui.Checkbox("Show my private code", ref revealRecovery);
+        UiTheme.Field("Recovery code", "##new-recovery", ref newRecovery, 128, "", ImGuiInputTextFlags.ReadOnly |
+            (revealRecovery ? ImGuiInputTextFlags.None : ImGuiInputTextFlags.Password));
+        if (UiTheme.Button("Copy recovery code")) ImGui.SetClipboardText(newRecovery);
+        UiTheme.Wrapped("Anyone with this code can recover your profile. It is not saved in the plugin configuration or diagnostic logs.", UiTheme.Muted);
+        UiTheme.Rule();
+        ImGui.Checkbox("I have saved my code somewhere private", ref savedRecovery);
+        if (profile is not null)
+        {
+            ImGui.Image(avatars.Get(profile).Handle, UiTheme.V(64, 64));
+            ImGui.SameLine(); ImGui.TextUnformatted("A little face to get you started.");
+        }
+        using (ImRaii.Disabled(!savedRecovery))
+        {
+            if (UiTheme.Button("Use this avatar & continue", 0, primary: true)) { newRecovery = ""; screen = room is null ? "menu" : "game"; }
+            ImGui.SameLine();
+            if (UiTheme.Button("Draw my own")) { newRecovery = ""; OpenProfile(); }
+        }
+    }
+
+    private void Menu()
+    {
+        UiTheme.Caption("YOUR NEXT LITTLE MASTERPIECE");
+        art.Heading("There is room for your imagination.");
+        UiTheme.Wrapped("Join a friend, open your own room, or find some company.", UiTheme.Muted);
+        UiTheme.Gap(15);
+        if (!ImGui.BeginTable("play-actions", 3, ImGuiTableFlags.SizingStretchSame)) return;
+        try
+        {
+            ImGui.TableNextColumn();
+            using (var card = new UiTheme.PaperPanel("join-card", new Vector2(0, UiTheme.S(315))))
+            {
+                if (card.Success)
+                {
+                    UiAssets.Glyph(FontAwesomeIcon.Key, UiTheme.Brass);
+                    art.Heading("Join Room");
+                    UiTheme.Wrapped("Have an invitation? There is a seat waiting for you.", UiTheme.Muted);
+                    UiTheme.Gap(10);
+                    UiTheme.Field("Room code", "##room-code", ref joinCode, 12, "Enter your room code");
+                    CardActionPosition();
+                    using (ImRaii.Disabled(client?.Connected != true || string.IsNullOrWhiteSpace(joinCode)))
+                        if (UiTheme.Button("Take a seat", ImGui.GetContentRegionAvail().X, primary: true)) Send(new("join", Text: joinCode));
+                }
+            }
+            ImGui.TableNextColumn();
+            using (var card = new UiTheme.PaperPanel("make-card", new Vector2(0, UiTheme.S(315))))
+            {
+                if (card.Success)
+                {
+                    UiAssets.Glyph(FontAwesomeIcon.PaintBrush, UiTheme.Brass);
+                    art.Heading("Make Room");
+                    UiTheme.Wrapped("Set the pace, send an invitation, and make a little art together.", UiTheme.Muted);
+                    UiTheme.Gap(10);
+                    UiTheme.Caption("90 seconds  /  2 rounds");
+                    UiTheme.Caption("Your room. Your rules.");
+                    UiTheme.Gap(5);
+                    CardActionPosition();
+                    using (ImRaii.Disabled(client?.Connected != true))
+                        if (UiTheme.Button("Set up a room", ImGui.GetContentRegionAvail().X)) screen = "create";
+                }
+            }
+            ImGui.TableNextColumn();
+            using (var card = new UiTheme.PaperPanel("public-card", new Vector2(0, UiTheme.S(315))))
+            {
+                if (card.Success)
+                {
+                    UiAssets.Glyph(FontAwesomeIcon.Users, UiTheme.Brass);
+                    art.Heading("Public Rooms");
+                    UiTheme.Wrapped("A fresh page is better with company. Find a room and say hello.", UiTheme.Muted);
+                    UiTheme.Gap(10);
+                    UiTheme.Caption("Browse open invitations");
+                    UiTheme.Caption("Meet the other artists.");
+                    UiTheme.Gap(5);
+                    CardActionPosition();
+                    using (ImRaii.Disabled(client?.Connected != true))
+                        if (UiTheme.Button("Find a room", ImGui.GetContentRegionAvail().X)) { screen = "public"; Send(new("list")); }
+                }
+            }
+        }
+        finally { ImGui.EndTable(); }
+        UiTheme.Gap(18);
+        if (profile is not null)
+        {
+            ImGui.Image(avatars.Get(profile).Handle, UiTheme.V(42, 42));
+            ImGui.SameLine(); ImGui.BeginGroup();
+            ImGui.TextUnformatted(profile.DisplayName);
+            UiTheme.Caption("Your sketchbook, your signature.");
+            ImGui.EndGroup();
+        }
+        else UiTheme.Wrapped("Connect to your server to load your profile and join the drawing room.", UiTheme.Muted);
+    }
+
+    private void CreateRoomScreen()
+    {
+        UiTheme.Caption("OPEN AN INVITATION"); art.Heading("Make a little room");
+        UiTheme.Wrapped("Choose the pace. Everyone gets a turn at the drawing board.", UiTheme.Muted);
+        UiTheme.Gap(12);
+        using var card = new UiTheme.PaperPanel("room-settings", Vector2.Zero);
+        if (!card.Success) return;
+        UiTheme.Field("Room name", "##room-name", ref roomTitle, 40, "Give your drawing room a name");
+        UiTheme.Gap(3);
+        if (ImGui.BeginTable("room-options", 2, ImGuiTableFlags.SizingStretchSame))
+        {
+            try
+            {
+                ImGui.TableNextColumn(); NumberField("Seconds per drawer", "##duration", ref seconds, 15, 300);
+                ImGui.TableNextColumn(); NumberField("Rounds", "##rounds", ref rounds, 1, 5);
+                ImGui.TableNextColumn(); NumberField("Hint interval in seconds", "##hints", ref hints, 0, 300);
+                UiTheme.Caption("0 keeps the letters hidden.");
+                ImGui.TableNextColumn(); NumberField("Maximum players", "##capacity", ref capacity, 2, 16);
+            }
+            finally { ImGui.EndTable(); }
+        }
+        UiTheme.Rule();
+        ImGui.Checkbox("List this room in Public Rooms", ref publicRoom);
+        UiTheme.Wrapped(publicRoom
+            ? "Anyone on this server can see your room name and player count. Players see your name and avatar after joining."
+            : "A private invitation. Share the room code with the people you want to join.", UiTheme.Muted);
+        UiTheme.Gap(10);
+        using (ImRaii.Disabled(client?.Connected != true || !Protocol.ValidName(roomTitle)))
+            if (UiTheme.Button("Open the room", UiTheme.S(200), primary: true))
+                Send(new("create", Options: new(roomTitle, publicRoom, Math.Clamp(seconds, 15, 300), Math.Clamp(rounds, 1, 5),
+                    Math.Clamp(hints, 0, 300), Math.Clamp(capacity, 2, 16))));
+        ImGui.SameLine(); if (UiTheme.Button("Back", 0, quiet: true)) screen = "menu";
+    }
+
+    private static void CardActionPosition()
+    {
+        float bottom = ImGui.GetWindowSize().Y - UiTheme.S(62);
+        if (ImGui.GetCursorPosY() < bottom) ImGui.SetCursorPosY(bottom);
+    }
+
+    private static void NumberField(string label, string id, ref int value, int minimum, int maximum)
+    {
+        UiTheme.Caption(label); ImGui.SetNextItemWidth(-1); ImGui.InputInt(id, ref value);
+        if (ImGui.IsItemDeactivatedAfterEdit()) value = Math.Clamp(value, minimum, maximum);
+    }
+
+    private void PublicRooms()
+    {
+        UiTheme.Caption("OPEN INVITATIONS"); art.Heading("A little company, kupo?");
+        UiTheme.Wrapped("Find a room on your server. The people are waiting inside.", UiTheme.Muted);
+        UiTheme.Gap(6);
+        if (UiTheme.Button("Refresh rooms", 0, quiet: true)) Send(new("list"));
+        using var panel = new UiTheme.PaperPanel("public-list", Vector2.Zero);
+        if (!panel.Success) return;
+        if (publicRooms.Length == 0)
+        {
+            UiTheme.Gap(20); art.Icon(UiAssets.DeliveryMoogle, 64); UiTheme.Gap(10);
+            art.Heading("The next room could be yours.");
+            UiTheme.Wrapped("No public invitations just yet. Open a room and welcome the next artist.", UiTheme.Muted);
+            if (UiTheme.Button("Make a room", 0, primary: true)) screen = "create";
+            return;
+        }
+        foreach (var listed in publicRooms)
+        {
+            using var id = ImRaii.PushId(listed.Code);
+            if (!ImGui.BeginTable("room", 3)) continue;
+            try
+            {
+                ImGui.TableSetupColumn("Room", ImGuiTableColumnFlags.WidthStretch);
+                ImGui.TableSetupColumn("Players", ImGuiTableColumnFlags.WidthFixed, UiTheme.S(110));
+                ImGui.TableSetupColumn("Join", ImGuiTableColumnFlags.WidthFixed, UiTheme.S(100));
+                ImGui.TableNextColumn();
+                UiTheme.Ellipsis(listed.Title, ImGui.GetContentRegionAvail().X);
+                UiTheme.Caption(listed.Phase == "drawing" || listed.Phase == "intermission" ? "A match is in progress" : "Ready for company");
+                ImGui.TableNextColumn(); ImGui.TextUnformatted($"{listed.Players} / {listed.MaxPlayers} artists");
+                ImGui.TableNextColumn();
+                using (ImRaii.Disabled(client?.Connected != true || listed.Phase is not ("waiting" or "results") || listed.Players >= listed.MaxPlayers))
+                    if (UiTheme.Button("Join", UiTheme.S(80))) Send(new("join", Text: listed.Code));
+            }
+            finally { ImGui.EndTable(); }
+            UiTheme.Rule();
+        }
+    }
+
+    private void Game()
+    {
+        var state = room!;
+        bool host = state.HostId == device?.AccountId;
+        int online = state.Players.Count(p => p.Connected);
+        if (!ImGui.BeginTable("room-caption", 2)) return;
+        try
+        {
+            ImGui.TableSetupColumn("Name", ImGuiTableColumnFlags.WidthStretch);
+            ImGui.TableSetupColumn("Invitation", ImGuiTableColumnFlags.WidthFixed, UiTheme.S(345));
+            ImGui.TableNextColumn(); UiTheme.Ellipsis(state.Options.Title, ImGui.GetContentRegionAvail().X);
+            ImGui.TableNextColumn();
+            UiTheme.Caption("ROOM " + state.Code);
+            ImGui.SameLine(); if (UiTheme.Button("Copy code", 0, quiet: true)) ImGui.SetClipboardText(state.Code);
+            ImGui.SameLine(); if (UiTheme.Button("Leave", 0, quiet: true)) { Send(new("leave")); return; }
+        }
+        finally { ImGui.EndTable(); }
+
+        if (state.Phase is "waiting" or "results")
+        {
+            string title = state.Phase == "results" ? "Every masterpiece starts with a little fun." : "Your drawing room is ready.";
+            UiTheme.Wrapped(title, UiTheme.Rose);
+            if (host)
+            {
+                using (ImRaii.Disabled(online < 2 || client?.Connected != true))
+                    if (UiTheme.Button(state.Phase == "results" ? "Play another match" : "Start drawing", 0, primary: true)) Send(new("start"));
+                ImGui.SameLine(); UiTheme.Caption(online < 2 ? "Invite one more artist to begin." : $"{online} artists are ready.");
+            }
+            else UiTheme.Caption("The host will start the match when everyone is ready.");
+        }
+        else DrawTurnHeader(state);
+        UiTheme.Gap(3);
+
+        if (!ImGui.BeginTable("play-layout", 3, ImGuiTableFlags.Resizable)) return;
+        try
+        {
+            float width = ImGui.GetContentRegionAvail().X;
+            ImGui.TableSetupColumn("Artists", ImGuiTableColumnFlags.WidthFixed, UiTheme.S(width < UiTheme.S(1050) ? 165 : 185));
+            ImGui.TableSetupColumn("The page", ImGuiTableColumnFlags.WidthStretch);
+            ImGui.TableSetupColumn("Conversation", ImGuiTableColumnFlags.WidthFixed, UiTheme.S(width < UiTheme.S(1050) ? 230 : 265));
+            ImGui.TableNextColumn(); DrawPlayers(state);
+            ImGui.TableNextColumn(); DrawBoard(state);
+            ImGui.TableNextColumn(); ChatScreen(state);
+        }
+        finally { ImGui.EndTable(); }
+    }
+
+    private void DrawTurnHeader(RoomView state)
+    {
+        int left = Math.Max(0, (int)Math.Ceiling((state.Deadline - (DateTimeOffset.UtcNow + serverOffset)).TotalSeconds));
+        if (!ImGui.BeginTable("turn-header", 3)) return;
+        try
+        {
+            ImGui.TableSetupColumn("Round", ImGuiTableColumnFlags.WidthFixed, UiTheme.S(160));
+            ImGui.TableSetupColumn("Word", ImGuiTableColumnFlags.WidthStretch);
+            ImGui.TableSetupColumn("Time", ImGuiTableColumnFlags.WidthFixed, UiTheme.S(130));
+            ImGui.TableNextColumn(); UiTheme.Caption("ROUND"); art.Heading($"{state.Round} / {state.Options.Rounds}");
+            ImGui.TableNextColumn(); UiTheme.Caption(state.Phase == "intermission" ? "THE WORD WAS" : state.DrawerId == device?.AccountId ? "YOUR WORD" : "GUESS THE WORD");
+            art.Heading(state.Word ?? string.Join(' ', state.Hint.ToUpperInvariant().ToCharArray()));
+            ImGui.TableNextColumn(); UiTheme.Caption(state.Phase == "intermission" ? "NEXT TURN" : "TIME REMAINING");
+            using (ImRaii.PushColor(ImGuiCol.Text, left <= 15 && state.Phase == "drawing" ? UiTheme.Rose : UiTheme.Ink)) art.Heading(left + "s");
+        }
+        finally { ImGui.EndTable(); }
+    }
+
+    private void DrawPlayers(RoomView state)
+    {
+        using var panel = new UiTheme.PaperPanel("artists", Vector2.Zero);
+        if (!panel.Success) return;
+        UiTheme.Caption($"ARTISTS  /  {state.Players.Length}"); UiTheme.Gap(5);
+        int rank = 0;
+        foreach (var player in state.Players.OrderByDescending(p => p.Score))
+        {
+            var texture = avatars.Get(player.Profile);
+            using var id = ImRaii.PushId(player.Profile.Id.ToString());
+            rank++;
+            ImGui.Image(texture.Handle, UiTheme.V(32, 32));
+            ImGui.SameLine(); ImGui.BeginGroup();
+            UiTheme.Ellipsis(player.Profile.DisplayName, Math.Max(UiTheme.S(55), ImGui.GetContentRegionAvail().X));
+            ImGui.TextColored(player.Solved ? UiTheme.Green : UiTheme.Muted, $"{player.Score:N0} pts");
+            ImGui.EndGroup();
+            string role = !player.Connected ? "Reconnecting" : player.IsDrawer ? "At the drawing board" : player.Solved ? "Guessed it" : player.IsHost ? "Room host" : state.Phase == "results" && rank == 1 ? "First place" : "";
+            if (role.Length > 0) UiTheme.Wrapped(role, UiTheme.Muted);
+            if (player.Profile.Id != device?.AccountId)
+            {
+                if (UiTheme.Button(muted.Contains(player.Profile.Id) ? "Unmute" : "Mute", 0, quiet: true))
+                { if (!muted.Add(player.Profile.Id)) muted.Remove(player.Profile.Id); }
+                if (state.HostId == device?.AccountId)
+                { ImGui.SameLine(); if (UiTheme.Button("Remove", 0, quiet: true)) Send(new("kick", Text: player.Profile.Id.ToString())); }
+            }
+            UiTheme.Rule();
+        }
+    }
+
+    private void DrawBoard(RoomView state)
+    {
+        using var panel = new UiTheme.PaperPanel("drawing-board", Vector2.Zero);
+        if (!panel.Success) return;
+        bool canDraw = client?.Connected == true && state.Phase == "drawing" && state.DrawerId == device?.AccountId;
+        if (canDraw) { art.Icon(UiAssets.Pictomancer, 18); ImGui.SameLine(); }
+        UiTheme.Caption(canDraw ? "YOUR PAGE" : state.Phase == "waiting" ? "A FRESH PAGE" : "THE DRAWING BOARD");
+        using (var tools = ImRaii.Child("board-tools", new Vector2(0, UiTheme.S(90)), false))
+        {
+            if (tools.Success)
+            {
+                if (canDraw) painting.Toolbar("game-tools");
+                else
+                {
+                    UiTheme.Gap(12);
+                    UiTheme.Wrapped(state.Phase == "waiting" ? "A blank page, waiting for the first artist." : state.YouAreDone ? "You guessed it. Enjoy the rest of the drawing." : state.Phase == "intermission" ? "A little pause before the next masterpiece." : state.Phase == "results" ? "That is a wrap, kupo." : "Watch the page. Send your guess in chat.", UiTheme.Muted);
+                }
+            }
+        }
+        painting.Draw("game-canvas", canvas, new Vector2(ImGui.GetContentRegionAvail().X, Math.Max(UiTheme.S(70), ImGui.GetContentRegionAvail().Y - UiTheme.S(26))), canDraw, operation =>
+        {
+            if (Send(new("draw", Draw: operation, TurnId: state.TurnId))) { canvas.Apply(operation); draws++; }
+        });
+        UiTheme.Gap(5);
+        UiTheme.Caption(canDraw ? "Pencil, colour, fill, and a little imagination." : "Every artist gets a turn.");
+    }
+
+    private void ChatScreen(RoomView state)
+    {
+        using var panel = new UiTheme.PaperPanel("chat-panel", Vector2.Zero);
+        if (!panel.Success) return;
+        ImGui.TextUnformatted(state.YouAreDone ? "Done mode" : "Room chat");
+        UiTheme.Wrapped(state.YouAreDone ? "Only the drawer and correct guessers see your messages." : "A conversation, a guess, a little inspiration.", UiTheme.Muted);
+        UiTheme.Rule();
+        using (var messages = ImRaii.Child("messages", new Vector2(0, -UiTheme.S(47)), false))
+        {
+            if (messages.Success)
+            {
+                foreach (var line in chat)
+                {
+                    if (line.System)
+                    { UiTheme.Wrapped(line.Text, UiTheme.Green); UiTheme.Gap(3); continue; }
+                    using (ImRaii.PushColor(ImGuiCol.Text, line.Done ? UiTheme.Rose : UiTheme.Brass)) UiTheme.Ellipsis(line.Name, ImGui.GetContentRegionAvail().X);
+                    UiTheme.Wrapped(line.Text); UiTheme.Gap(4);
+                }
+                if (scrollChat) { ImGui.SetScrollHereY(1); scrollChat = false; }
+            }
+        }
+        using (ImRaii.Disabled(client?.Connected != true))
+        {
+            ImGui.SetNextItemWidth(Math.Max(UiTheme.S(60), ImGui.GetContentRegionAvail().X - UiTheme.S(59)));
+            if (focusChat) { ImGui.SetKeyboardFocusHere(); focusChat = false; }
+            bool enter = ImGui.InputTextWithHint("##message", state.YouAreDone ? "Say something..." : "Talk or guess...", ref chatInput, 300, ImGuiInputTextFlags.EnterReturnsTrue);
+            if (enter) ImGui.SetKeyboardFocusHere(-1);
+            ImGui.SameLine(); bool click = UiTheme.Button("Send", UiTheme.S(50), primary: true);
+            if ((enter || click) && !string.IsNullOrWhiteSpace(chatInput))
+            { Send(new("chat", Text: chatInput, TurnId: state.TurnId)); chatInput = ""; focusChat = true; }
+        }
+    }
+
+    private void OpenProfile()
+    {
+        if (profile is null) { status = "Connect to load your profile first."; return; }
+        displayName = profile.DisplayName;
+        avatar.Load(profile.AvatarPixels ?? AvatarGenerator.Generate(profile.AvatarSeed));
+        avatarReset = profile.AvatarPixels is null;
+        screen = "profile";
+    }
+
+    private void ProfileScreen()
+    {
+        UiTheme.Caption("YOUR SKETCHBOOK"); art.Heading("A little face. Entirely yours.");
+        UiTheme.Wrapped("Draw your own signature character, or keep the face we made for you.", UiTheme.Muted);
+        UiTheme.Gap(10);
+        if (!ImGui.BeginTable("profile-layout", 2)) return;
+        try
+        {
+            ImGui.TableSetupColumn("Portrait", ImGuiTableColumnFlags.WidthStretch, 1.15f);
+            ImGui.TableSetupColumn("Details", ImGuiTableColumnFlags.WidthStretch, 1);
+            ImGui.TableNextColumn();
+            using (var editor = new UiTheme.PaperPanel("portrait-editor", Vector2.Zero))
+            {
+                if (editor.Success)
+                {
+                    UiTheme.Caption("YOUR CANVAS");
+                    avatarEditor.Toolbar("avatar-tools");
+                    avatarEditor.Draw("avatar-canvas", avatar, new Vector2(ImGui.GetContentRegionAvail().X,
+                        Math.Max(UiTheme.S(100), Math.Min(UiTheme.S(285), ImGui.GetContentRegionAvail().Y - UiTheme.S(45)))), true,
+                        operation => { avatar.Apply(operation); avatarReset = false; });
+                    UiTheme.Gap(5);
+                    if (UiTheme.Button("Use my default avatar", 0, quiet: true) && profile is not null)
+                    { avatar.Load(AvatarGenerator.Generate(profile.AvatarSeed)); avatarReset = true; }
+                }
+            }
+            ImGui.TableNextColumn();
+            using var card = new UiTheme.PaperPanel("profile-details", Vector2.Zero);
+            if (!card.Success) return;
+            UiTheme.Caption("A NAME TO REMEMBER");
+            UiTheme.Field("Display name", "##profile-name", ref displayName, 40, "Your artist name");
+            UiTheme.Wrapped("Character unverified. Your name and avatar are shared with the people in your room.", UiTheme.Muted);
+            UiTheme.Gap(6);
+            using (ImRaii.Disabled(savingProfile || client?.Connected != true || !Protocol.ValidName(displayName)))
+                if (UiTheme.Button(savingProfile ? "Saving..." : "Save my profile", ImGui.GetContentRegionAvail().X, primary: true))
+                {
+                    savingProfile = Send(new("profile", Text: displayName, Avatar: avatarReset ? null : (byte[])avatar.Pixels.Clone(), ResetAvatar: avatarReset));
+                    if (savingProfile) status = "Saving profile...";
+                }
+            UiTheme.Rule(); UiTheme.Caption("ACCOUNT RECOVERY");
+            UiTheme.Wrapped("Lost your saved code? Replace it while this device still has access. Your previous code stops working and other devices are signed out.", UiTheme.Muted);
+            using (ImRaii.Disabled(busy || device is null || client?.Connected != true))
+                if (UiTheme.Button("Replace recovery code", ImGui.GetContentRegionAvail().X))
+                {
+                    var activeClient = client!; string token = device!.AccessToken;
+                    Work(async () => await AcceptCredentials(await activeClient.RotateRecoveryAsync(token)), "Replacing recovery code");
+                }
+        }
+        finally { ImGui.EndTable(); }
+    }
+
+    private void ServerSettings()
+    {
+        UiTheme.Caption("A PLACE TO GATHER"); art.Heading("Connection settings");
+        UiTheme.Wrapped("Connect to the server where your friends are drawing. Profiles belong to the server that created them.", UiTheme.Muted);
+        UiTheme.Gap(10);
+        using var card = new UiTheme.PaperPanel("connection-settings", Vector2.Zero);
+        if (!card.Success) return;
+        using (ImRaii.Disabled(busy))
+        {
+            UiTheme.Field("Server address", "##server-url", ref serverUrl, 256, "https://localhost:7443");
+            if (UiTheme.Button("Use this server", 0, primary: true)) ConfigureClient();
+            ImGui.SameLine();
+            if (device is not null && client?.Connected != true)
+            { if (UiTheme.Button("Connect")) Connect(); }
+            else if (client?.Connected == true && UiTheme.Button("Disconnect", 0, quiet: true))
+            { reconnect = false; Work(async () => { if (client is not null) await client.DisconnectAsync(); }, "Disconnecting"); }
+        }
+        UiTheme.Wrapped("For testing on this PC, run Start-My-Server.cmd and use https://localhost:7443. Friends on another PC need your public HTTPS hostname.", UiTheme.Muted);
+        UiTheme.Rule();
+        UiTheme.Caption("DIAGNOSTICS");
+        ImGui.TextUnformatted($"Connection: {(client?.Connected == true ? "online" : "offline")}   /   Events received: {received}   /   Drawing messages: {draws}");
+        UiTheme.Wrapped(log.FilePath, UiTheme.Muted);
+        if (UiTheme.Button("Copy log path")) ImGui.SetClipboardText(log.FilePath);
+        ImGui.SameLine(); using (ImRaii.Disabled(room is null || client?.Connected != true))
+            if (UiTheme.Button("Resync room", 0, quiet: true)) Send(new("sync"));
+        UiTheme.Gap(5);
+        UiTheme.Wrapped("Diagnostics exclude recovery codes, login credentials, answer words, chat text, and drawing contents.", UiTheme.Muted);
+        if (UiTheme.Button(newRecovery.Length > 0 ? "Back" : screen == "welcome" ? "Back to welcome" : "Back to play", 0, quiet: true)) ShowDebug = false;
+    }
+
+    private static string SafeCommand(string? command) => command is "start" or "join" or "create" or "draw" or "profile" or "chat" or "sync" or "kick" or "leave" or "list" ? command : "unknown";
+    private static string SafeReason(string? error) => error switch
+    {
+        "At least two connected players are needed." => "players_required",
+        "Room is full." => "room_full",
+        "Room not found." => "room_not_found",
+        "Slow down; message limit reached." => "rate_limited",
+        "Only the room host can do that." => "host_required",
+        "Drawing is only available during your current turn." => "drawing_not_allowed",
+        "A match is already running." => "match_running",
+        _ => "other",
+    };
+}
