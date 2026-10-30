@@ -136,6 +136,21 @@ public static class UiTheme
         return clicked;
     }
 
+    public static bool NoteButton(string label, float width, Vector4 paper, bool primary = false)
+    {
+        using var normal = ImRaii.PushColor(ImGuiCol.Button, Vector4.Lerp(paper, Ink, 0.055f));
+        using var hover = ImRaii.PushColor(ImGuiCol.ButtonHovered, Vector4.Lerp(paper, Ink, 0.10f));
+        using var active = ImRaii.PushColor(ImGuiCol.ButtonActive, Vector4.Lerp(paper, Ink, 0.16f));
+        using var text = ImRaii.PushColor(ImGuiCol.Text, primary ? Rose : Ink);
+        using var rounding = ImRaii.PushStyle(ImGuiStyleVar.FrameRounding, S(1));
+        bool clicked = ImGui.Button(label, new Vector2(width, S(28)));
+        var a = ImGui.GetItemRectMin(); var b = ImGui.GetItemRectMax();
+        var rule = primary ? Rose : Brass; rule.W = primary ? 0.65f : 0.4f;
+        var draw = ImGui.GetWindowDrawList();
+        draw.AddLine(new Vector2(a.X + S(6), b.Y - S(4)), new Vector2(b.X - S(6), b.Y - S(4)), C(rule), S(1));
+        return clicked;
+    }
+
     public static void Field(string label, string id, ref string value, int maximum, string hint = "", ImGuiInputTextFlags flags = ImGuiInputTextFlags.None)
     {
         Caption(label);
@@ -162,12 +177,13 @@ public static class UiTheme
     {
         private ImRaii.ChildDisposable child;
         public bool Success { get; }
-        public PaperPanel(string id, Vector2 size, bool inset = false, bool compact = false, bool taped = false, Vector4? note = null)
+        public PaperPanel(string id, Vector2 size, bool inset = false, bool compact = false, bool taped = false, Vector4? note = null, bool scrollable = true)
         {
             using var color = ImRaii.PushColor(ImGuiCol.ChildBg, Vector4.Zero);
             using var border = ImRaii.PushColor(ImGuiCol.Border, Vector4.Zero);
             using var padding = ImRaii.PushStyle(ImGuiStyleVar.WindowPadding, compact ? V(10, note.HasValue ? 22 : 10) : V(14, taped || note.HasValue ? 24 : 14));
-            var scope = ImRaii.Child(id, size, true);
+            var flags = scrollable ? ImGuiWindowFlags.None : ImGuiWindowFlags.NoScrollbar;
+            var scope = ImRaii.Child(id, size, true, flags);
             child = scope;
             Success = scope.Success;
             if (Success)
@@ -176,10 +192,16 @@ public static class UiTheme
                 var max = ImGui.GetWindowPos() + ImGui.GetWindowSize() - V(6, 6);
                 var draw = ImGui.GetWindowDrawList();
                 draw.PushClipRect(ImGui.GetWindowPos() + V(1, 1), ImGui.GetWindowPos() + ImGui.GetWindowSize() - V(1, 1), false);
-                SheetEdges(min, max);
                 var surface = note ?? (inset ? Inset : Panel);
+                if (note.HasValue)
+                {
+                    var shadow = Ink; shadow.W = 0.12f;
+                    draw.AddRectFilled(min + V(1, 3), max + V(1, 3), C(shadow));
+                }
+                else SheetEdges(min, max);
                 draw.AddRectFilled(min, max, C(surface), S(1));
-                draw.AddRect(min, max, C(Line), S(1));
+                var outline = note.HasValue ? Vector4.Lerp(surface, Brass, 0.3f) : Line;
+                draw.AddRect(min, max, C(outline), S(1));
                 PaperGrain(min, max, note);
                 if (note.HasValue)
                 {

@@ -15,6 +15,7 @@ public sealed partial class MainWindow
     private long nextLayoutLog;
     private readonly PomMotion pom = new();
     private Vector2? pendingWindowPosition;
+    private bool topDragActive;
     private static string UiVersion => typeof(Plugin).Assembly.GetName().Version?.ToString(3) ?? "dev";
 
     public override void PreDraw()
@@ -46,6 +47,10 @@ public sealed partial class MainWindow
         pom.Step(position.X + position.Y * 0.35f, ImGui.GetIO().DeltaTime, !plugin.Config.ReduceMotion);
         UiStationery.Book(position, position + ImGui.GetWindowSize(), plugin.Config.UseStandardFrame ? ImGui.GetFrameHeight() : 0);
         DrawHeader();
+        var move = UiChrome.EmptyHeaderDrag(position + UiTheme.V(18, 5),
+            new Vector2(position.X + ImGui.GetWindowSize().X - UiTheme.S(18), ImGui.GetCursorScreenPos().Y),
+            ref topDragActive, IsPinned, !plugin.Config.UseStandardFrame);
+        if (move != Vector2.Zero) pendingWindowPosition = position + move;
         UiTheme.Rule();
         DrawNotice();
         using (var transparent = ImRaii.PushColor(ImGuiCol.ChildBg, Vector4.Zero))
@@ -233,7 +238,7 @@ public sealed partial class MainWindow
         try
         {
             ImGui.TableNextColumn();
-            using (var card = new UiTheme.PaperPanel("join-card", new Vector2(0, UiTheme.S(250)), note: UiTheme.StickyYellow))
+            using (var card = new UiTheme.PaperPanel("join-card", new Vector2(0, UiTheme.S(250)), note: UiTheme.StickyYellow, scrollable: false))
             {
                 if (card.Success)
                 {
@@ -244,11 +249,11 @@ public sealed partial class MainWindow
                     UiTheme.Field("Room code", "##room-code", ref joinCode, 12, "Enter your room code");
                     CardActionPosition();
                     using (ImRaii.Disabled(client?.Connected != true || string.IsNullOrWhiteSpace(joinCode)))
-                        if (UiTheme.Button("Take a seat", ImGui.GetContentRegionAvail().X, primary: true)) Send(new("join", Text: joinCode));
+                        if (UiTheme.NoteButton("Take a seat", ImGui.GetContentRegionAvail().X, UiTheme.StickyYellow, primary: true)) Send(new("join", Text: joinCode));
                 }
             }
             ImGui.TableNextColumn();
-            using (var card = new UiTheme.PaperPanel("make-card", new Vector2(0, UiTheme.S(250)), note: UiTheme.StickyRose))
+            using (var card = new UiTheme.PaperPanel("make-card", new Vector2(0, UiTheme.S(250)), note: UiTheme.StickyRose, scrollable: false))
             {
                 if (card.Success)
                 {
@@ -261,11 +266,11 @@ public sealed partial class MainWindow
                     UiTheme.Gap(5);
                     CardActionPosition();
                     using (ImRaii.Disabled(client?.Connected != true))
-                        if (UiTheme.Button("Set up a room", ImGui.GetContentRegionAvail().X)) screen = "create";
+                        if (UiTheme.NoteButton("Set up a room", ImGui.GetContentRegionAvail().X, UiTheme.StickyRose)) screen = "create";
                 }
             }
             ImGui.TableNextColumn();
-            using (var card = new UiTheme.PaperPanel("public-card", new Vector2(0, UiTheme.S(250)), note: UiTheme.StickySage))
+            using (var card = new UiTheme.PaperPanel("public-card", new Vector2(0, UiTheme.S(250)), note: UiTheme.StickySage, scrollable: false))
             {
                 if (card.Success)
                 {
@@ -278,7 +283,7 @@ public sealed partial class MainWindow
                     UiTheme.Gap(5);
                     CardActionPosition();
                     using (ImRaii.Disabled(client?.Connected != true))
-                        if (UiTheme.Button("Find a room", ImGui.GetContentRegionAvail().X)) { screen = "public"; Send(new("list")); }
+                        if (UiTheme.NoteButton("Find a room", ImGui.GetContentRegionAvail().X, UiTheme.StickySage)) { screen = "public"; Send(new("list")); }
                 }
             }
         }
@@ -340,7 +345,7 @@ public sealed partial class MainWindow
 
     private static void CardActionPosition()
     {
-        float bottom = ImGui.GetWindowSize().Y - ImGui.GetStyle().WindowPadding.Y - UiTheme.S(28);
+        float bottom = ImGui.GetCursorPosY() + ImGui.GetContentRegionAvail().Y - UiTheme.S(30);
         if (ImGui.GetCursorPosY() < bottom) ImGui.SetCursorPosY(bottom);
     }
 
@@ -412,10 +417,10 @@ public sealed partial class MainWindow
         else DrawTurnHeader(state);
         float width = ImGui.GetContentRegionAvail().X;
         float height = Math.Max(UiTheme.S(120), ImGui.GetContentRegionAvail().Y - UiTheme.S(6));
-        if (!ImGui.BeginTable("play-layout-compact", 3, ImGuiTableFlags.Resizable | ImGuiTableFlags.SizingFixedFit | ImGuiTableFlags.NoPadOuterX, new Vector2(0, height))) return;
+        if (!ImGui.BeginTable("play-layout-canvas-sheet", 3, ImGuiTableFlags.Resizable | ImGuiTableFlags.SizingFixedFit | ImGuiTableFlags.NoPadOuterX, new Vector2(0, height))) return;
         try
         {
-            ImGui.TableSetupColumn("Artists", ImGuiTableColumnFlags.WidthFixed, UiTheme.S(width < UiTheme.S(1050) ? 132 : 150));
+            ImGui.TableSetupColumn("Artists", ImGuiTableColumnFlags.WidthFixed, UiTheme.S(width < UiTheme.S(1050) ? 172 : 192));
             ImGui.TableSetupColumn("The page", ImGuiTableColumnFlags.WidthStretch);
             ImGui.TableSetupColumn("Conversation", ImGuiTableColumnFlags.WidthFixed, UiTheme.S(width < UiTheme.S(1050) ? 200 : 220));
             ImGui.TableNextColumn(); DrawPlayers(state, height - UiTheme.S(6));
@@ -455,12 +460,12 @@ public sealed partial class MainWindow
             var texture = avatars.Get(player.Profile);
             using var id = ImRaii.PushId(player.Profile.Id.ToString());
             rank++;
-            ImGui.Image(texture.Handle, UiTheme.V(26, 26));
+            ImGui.Image(texture.Handle, UiTheme.V(40, 40));
             ImGui.SameLine(); ImGui.BeginGroup();
             UiTheme.Ellipsis(player.Profile.DisplayName, Math.Max(UiTheme.S(35), ImGui.GetContentRegionAvail().X));
             ImGui.TextColored(player.Solved ? UiTheme.Green : UiTheme.Muted, $"{player.Score:N0} pts");
             ImGui.EndGroup();
-            string role = !player.Connected ? "Reconnecting" : player.IsDrawer ? "At the drawing board" : player.Solved ? "Guessed it" : player.IsHost ? "Room host" : state.Phase == "results" && rank == 1 ? "First place" : "";
+            string role = !player.Connected ? "Reconnecting" : player.IsDrawer ? "Drawing" : player.Solved ? "Guessed it" : state.Phase == "results" && rank == 1 ? "First place" : "";
             if (role.Length > 0) UiTheme.Wrapped(role, UiTheme.Muted);
             if (player.Profile.Id != device?.AccountId)
             {
@@ -475,12 +480,11 @@ public sealed partial class MainWindow
 
     private void DrawBoard(RoomView state, float height)
     {
-        using var panel = new UiTheme.PaperPanel("drawing-board", new Vector2(0, height), compact: true);
-        if (!panel.Success) return;
         bool canDraw = client?.Connected == true && state.Phase == "drawing" && state.DrawerId == device?.AccountId;
+        float top = ImGui.GetCursorScreenPos().Y;
         if (canDraw) painting.Toolbar("game-tools");
-        else UiTheme.Caption(state.Phase == "waiting" ? "THE DRAWING BOARD" : state.YouAreDone ? "You guessed it!" : state.Phase == "intermission" ? "Next artist coming up..." : state.Phase == "results" ? "That is a wrap, kupo." : "Watch the drawing. Guess in chat.");
-        painting.Draw("game-canvas", canvas, ImGui.GetContentRegionAvail(), canDraw, operation =>
+        float toolsHeight = ImGui.GetCursorScreenPos().Y - top;
+        painting.Draw("game-canvas", canvas, new Vector2(ImGui.GetContentRegionAvail().X, Math.Max(UiTheme.S(8), height - toolsHeight)), canDraw, operation =>
         {
             if (Send(new("draw", Draw: operation, TurnId: state.TurnId))) { canvas.Apply(operation); draws++; }
         });
@@ -578,7 +582,7 @@ public sealed partial class MainWindow
             UiTheme.Wrapped("Character unverified. Your name and avatar are shared with the people in your room.", UiTheme.Muted);
             UiTheme.Gap(6);
             using (ImRaii.Disabled(savingProfile || client?.Connected != true || !Protocol.ValidName(displayName)))
-                if (UiTheme.Button(savingProfile ? "Saving..." : "Save my profile", ImGui.GetContentRegionAvail().X, primary: true))
+                if (UiTheme.NoteButton(savingProfile ? "Saving..." : "Save my profile", ImGui.GetContentRegionAvail().X, UiTheme.StickyRose, primary: true))
                 {
                     savingProfile = Send(new("profile", Text: displayName, Avatar: avatarReset ? null : (byte[])avatar.Pixels.Clone(), ResetAvatar: avatarReset));
                     if (savingProfile) status = "Saving profile...";
@@ -586,7 +590,7 @@ public sealed partial class MainWindow
             UiTheme.Rule(); UiTheme.Caption("ACCOUNT RECOVERY");
             UiTheme.Wrapped("Lost your saved code? Replace it while this device still has access. Your previous code stops working and other devices are signed out.", UiTheme.Muted);
             using (ImRaii.Disabled(busy || device is null || client?.Connected != true))
-                if (UiTheme.Button("Replace recovery code", ImGui.GetContentRegionAvail().X))
+                if (UiTheme.NoteButton("Replace recovery code", ImGui.GetContentRegionAvail().X, UiTheme.StickyRose))
                 {
                     var activeClient = client!; string token = device!.AccessToken;
                     Work(async () => await AcceptCredentials(await activeClient.RotateRecoveryAsync(token)), "Replacing recovery code");
@@ -620,7 +624,7 @@ public sealed partial class MainWindow
         bool standardFrame = plugin.Config.UseStandardFrame;
         if (ImGui.Checkbox("Use the standard window frame", ref standardFrame))
         { plugin.Config.UseStandardFrame = standardFrame; plugin.Save(); }
-        UiTheme.Wrapped("Paper mode: drag the moogle/title, use the pin and close buttons, and resize from the edges. The standard frame restores Dalamud's window menu.", UiTheme.Muted);
+        UiTheme.Wrapped("Paper mode: drag near the top of the page, use the pin and close buttons, and resize from the edges. The standard frame restores Dalamud's window menu.", UiTheme.Muted);
         UiTheme.Rule();
         UiTheme.Caption("DIAGNOSTICS");
         ImGui.TextUnformatted($"Connection: {(client?.Connected == true ? "online" : "offline")}   /   Events received: {received}   /   Drawing messages: {draws}");

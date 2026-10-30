@@ -1,13 +1,13 @@
-Kupopop Draw 0.3.1 adds sticky notes and a frameless paper silhouette.
+Kupopop Draw 0.3.2 cleans up the canvas and sticky-note controls.
 
-- The native title bar and rectangular background are hidden by default, exposing the paper border and transparent corners.
-- Drag the moogle/title area to move the book. Integrated pin/close controls and native resizing remain available. Connection can restore the standard frame and its usual window menu.
-- Menu cards use yellow, rose and sage sticky notes; artists, chat and profile panels have matching pastel notes with adhesive bands and curled corners.
-- Backing sheets rotate in opposing directions around the window, panels and canvas, rather than all stepping down/right. Drawing pixels and interactive controls stay square.
-- Paper colors remain visible through the texture. Menu actions respect the notes' bottom padding, and window minimum sizes no longer apply UI scale twice.
-- Native component rendering at 980/820 pixels wide and input simulation checked header click/drag and pinned movement.
+- The central drawing area is one canvas sheet, without an outer panel, extra padding, or Drawing board heading. Drawing proportions and server coordinates remain unchanged.
+- Wider artists panel, larger 40-unit portraits, and no Room host text row.
+- Front-page notes have no scrollbars. Button anchors use the actual content region, eliminating the tiny overflow at their lower edge.
+- Sticky notes use matching-color edges and soft shadows instead of cream backing sheets. Their actions use paper-tinted strips and ink rules, including the profile actions.
+- Empty space near the top of the page now drags the book. Header controls retain click priority, and pinned books stay still.
+- Native menu previews at 980/820 pixels wide reported zero horizontal/vertical overflow. Native input checks cover empty-top dragging and header-button clicks.
 
 Requires Dalamud API 15 and a running Kupopop server. Protocol 1 remains compatible with the previous server; account data and custom avatars are preserved.
-Compiled and automatically tested; in-game rendering, window controls and input still require testing.
+Compiled and automatically tested; in-game rendering and input still require testing.
 
 See TESTING.md, UI_DESIGN.md, and server/HOSTING.md for usage, appearance, logs, and hosting.
