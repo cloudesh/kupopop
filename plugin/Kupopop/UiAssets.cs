@@ -45,7 +45,7 @@ public sealed class UiAssets : IDisposable
         ImGui.Dummy(UiTheme.V(size, size));
     }
 
-    public static bool PaperTexture(Vector2 min, Vector2 max)
+    public static bool PaperTexture(Vector2 min, Vector2 max, Vector4? tint = null)
     {
         if (paperUnavailable) return false;
         try
@@ -58,7 +58,8 @@ public sealed class UiAssets : IDisposable
             }
             if (!paperReady) { paperReady = true; paperLog?.Write($"ui.paper_ready size={texture.Width}x{texture.Height}"); }
             var draw = ImGui.GetWindowDrawList();
-            uint tint = UiTheme.C(new Vector4(1, 1, 1, 0.68f));
+            var material = tint ?? Vector4.One; material.W = tint.HasValue ? 0.48f : 0.68f;
+            uint color = UiTheme.C(material);
             float tile = UiTheme.S(144);
             // Sample the flat notebook interior, excluding rules, binding, and
             // the radial shading on the separate small paper decoration.
@@ -68,7 +69,7 @@ public sealed class UiAssets : IDisposable
                     var end = Vector2.Min(new Vector2(x + tile, y + tile), max);
                     var uvStart = new Vector2(0.40f, 0.44f);
                     var uvEnd = uvStart + (end - new Vector2(x, y)) / tile * 0.18f;
-                    draw.AddImage(texture.Handle, new Vector2(x, y), end, uvStart, uvEnd, tint);
+                    draw.AddImage(texture.Handle, new Vector2(x, y), end, uvStart, uvEnd, color);
                 }
             return true;
         }

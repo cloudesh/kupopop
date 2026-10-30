@@ -14,14 +14,28 @@ public sealed partial class MainWindow
     private Vector2 lastCanvasSize;
     private long nextLayoutLog;
     private readonly PomMotion pom = new();
+    private Vector2? pendingWindowPosition;
     private static string UiVersion => typeof(Plugin).Assembly.GetName().Version?.ToString(3) ?? "dev";
 
     public override void PreDraw()
     {
         var display = ImGui.GetIO().DisplaySize;
+        Flags = ImGuiWindowFlags.NoScrollbar | ImGuiWindowFlags.NoScrollWithMouse;
+        if (!plugin.Config.UseStandardFrame)
+            Flags |= ImGuiWindowFlags.NoTitleBar | ImGuiWindowFlags.NoBackground | ImGuiWindowFlags.NoMove;
+        AllowBackgroundBlur = plugin.Config.UseStandardFrame;
+        AllowClickthrough = plugin.Config.UseStandardFrame;
+        if (plugin.Config.PaperPinned is null) { plugin.Config.PaperPinned = IsPinned; plugin.Save(); }
+        if (!plugin.Config.UseStandardFrame) IsPinned = plugin.Config.PaperPinned.Value;
+        else if (plugin.Config.PaperPinned != IsPinned) { plugin.Config.PaperPinned = IsPinned; plugin.Save(); }
+        Position = !IsPinned && !plugin.Config.UseStandardFrame ? pendingWindowPosition : null;
+        PositionCondition = ImGuiCond.Always;
+        pendingWindowPosition = null;
+        // WindowSystem applies UI scale to these logical dimensions itself.
+        var logicalDisplay = display / UiTheme.Scale;
         SizeConstraints = new()
         {
-            MinimumSize = new(Math.Min(UiTheme.S(820), Math.Max(640, display.X - 40)), Math.Min(UiTheme.S(540), Math.Max(420, display.Y - 60))),
+            MinimumSize = new(Math.Min(820, Math.Max(640, logicalDisplay.X - 40)), Math.Min(540, Math.Max(420, logicalDisplay.Y - 60))),
             MaximumSize = new(float.MaxValue),
         };
     }
@@ -30,7 +44,7 @@ public sealed partial class MainWindow
     {
         var position = ImGui.GetWindowPos();
         pom.Step(position.X + position.Y * 0.35f, ImGui.GetIO().DeltaTime, !plugin.Config.ReduceMotion);
-        UiStationery.Book(position, position + ImGui.GetWindowSize(), ImGui.GetFrameHeight());
+        UiStationery.Book(position, position + ImGui.GetWindowSize(), plugin.Config.UseStandardFrame ? ImGui.GetFrameHeight() : 0);
         DrawHeader();
         UiTheme.Rule();
         DrawNotice();
@@ -56,21 +70,26 @@ public sealed partial class MainWindow
 
     private void DrawHeader()
     {
-        if (!ImGui.BeginTable("brand-compact", 3, ImGuiTableFlags.NoPadOuterX)) return;
+        bool framed = plugin.Config.UseStandardFrame;
+        if (!ImGui.BeginTable("brand-paper-controls", framed ? 3 : 4, ImGuiTableFlags.NoPadOuterX)) return;
         try
         {
             ImGui.TableSetupColumn("Brand", ImGuiTableColumnFlags.WidthFixed, UiTheme.S(188));
             ImGui.TableSetupColumn("Navigation", ImGuiTableColumnFlags.WidthStretch);
-            ImGui.TableSetupColumn("Connection", ImGuiTableColumnFlags.WidthFixed, UiTheme.S(132));
+            ImGui.TableSetupColumn("Connection", ImGuiTableColumnFlags.WidthFixed, UiTheme.S(114));
+            if (!framed) ImGui.TableSetupColumn("Paper controls", ImGuiTableColumnFlags.WidthFixed, UiTheme.S(64));
             ImGui.TableNextColumn();
             var face = ImGui.GetCursorScreenPos();
-            ImGui.Dummy(UiTheme.V(43, 45));
+            var move = UiChrome.DragHandle(UiTheme.V(184, 45), IsPinned, !framed);
+            if (move != Vector2.Zero) pendingWindowPosition = ImGui.GetWindowPos() + move;
+            var afterBrand = ImGui.GetCursorScreenPos();
             UiStationery.Moogle(face + UiTheme.V(20, 30), UiTheme.S(14), pom.Angle);
-            ImGui.SameLine();
+            ImGui.SetCursorScreenPos(face + UiTheme.V(49, 0));
             ImGui.BeginGroup();
             art.Heading("Kupopop");
             UiTheme.Caption("THE LITTLE ART BOOK");
             ImGui.EndGroup();
+            ImGui.SetCursorScreenPos(afterBrand);
             ImGui.TableNextColumn();
             UiTheme.Gap(6);
             if (newRecovery.Length == 0 && screen != "welcome") Navigation();
@@ -90,6 +109,14 @@ public sealed partial class MainWindow
                     if (UiTheme.Button(online ? "Connected" : busy ? "Connecting..." : "Offline", 0, quiet: true)) ShowDebug = !ShowDebug;
                     if (ImGui.IsItemHovered()) ImGui.SetTooltip("Connection settings");
                 }
+            }
+            if (!framed)
+            {
+                ImGui.TableNextColumn(); UiTheme.Gap(6);
+                if (ToolAction(FontAwesomeIcon.Thumbtack, IsPinned ? "Unpin book" : "Pin book", IsPinned))
+                { IsPinned = !IsPinned; plugin.Config.PaperPinned = IsPinned; plugin.Save(); }
+                ImGui.SameLine();
+                if (ToolAction(FontAwesomeIcon.Times, "Close book")) IsOpen = false;
             }
         }
         finally { ImGui.EndTable(); }
@@ -206,7 +233,7 @@ public sealed partial class MainWindow
         try
         {
             ImGui.TableNextColumn();
-            using (var card = new UiTheme.PaperPanel("join-card", new Vector2(0, UiTheme.S(238)), taped: true))
+            using (var card = new UiTheme.PaperPanel("join-card", new Vector2(0, UiTheme.S(250)), note: UiTheme.StickyYellow))
             {
                 if (card.Success)
                 {
@@ -221,7 +248,7 @@ public sealed partial class MainWindow
                 }
             }
             ImGui.TableNextColumn();
-            using (var card = new UiTheme.PaperPanel("make-card", new Vector2(0, UiTheme.S(238)), taped: true))
+            using (var card = new UiTheme.PaperPanel("make-card", new Vector2(0, UiTheme.S(250)), note: UiTheme.StickyRose))
             {
                 if (card.Success)
                 {
@@ -238,7 +265,7 @@ public sealed partial class MainWindow
                 }
             }
             ImGui.TableNextColumn();
-            using (var card = new UiTheme.PaperPanel("public-card", new Vector2(0, UiTheme.S(238)), taped: true))
+            using (var card = new UiTheme.PaperPanel("public-card", new Vector2(0, UiTheme.S(250)), note: UiTheme.StickySage))
             {
                 if (card.Success)
                 {
@@ -298,7 +325,7 @@ public sealed partial class MainWindow
                 }
             }
             ImGui.TableNextColumn();
-            using var note = new UiTheme.PaperPanel("room-invitation-note", new Vector2(0, UiTheme.S(275)), taped: true);
+            using var note = new UiTheme.PaperPanel("room-invitation-note", new Vector2(0, UiTheme.S(275)), note: UiTheme.StickyYellow);
             if (!note.Success) return;
             UiStationery.PageMark("a note from Mog");
             var spot = ImGui.GetCursorScreenPos();
@@ -313,7 +340,7 @@ public sealed partial class MainWindow
 
     private static void CardActionPosition()
     {
-        float bottom = ImGui.GetWindowSize().Y - UiTheme.S(38);
+        float bottom = ImGui.GetWindowSize().Y - ImGui.GetStyle().WindowPadding.Y - UiTheme.S(28);
         if (ImGui.GetCursorPosY() < bottom) ImGui.SetCursorPosY(bottom);
     }
 
@@ -419,7 +446,7 @@ public sealed partial class MainWindow
 
     private void DrawPlayers(RoomView state, float height)
     {
-        using var panel = new UiTheme.PaperPanel("artists", new Vector2(0, height), compact: true);
+        using var panel = new UiTheme.PaperPanel("artists", new Vector2(0, height), compact: true, note: UiTheme.StickyYellow);
         if (!panel.Success) return;
         UiTheme.Caption($"ARTISTS / {state.Players.Length}");
         int rank = 0;
@@ -467,7 +494,7 @@ public sealed partial class MainWindow
 
     private void ChatScreen(RoomView state, float height)
     {
-        using var panel = new UiTheme.PaperPanel("chat-panel", new Vector2(0, height), compact: true);
+        using var panel = new UiTheme.PaperPanel("chat-panel", new Vector2(0, height), compact: true, note: UiTheme.StickyBlue);
         if (!panel.Success) return;
         ImGui.TextUnformatted(state.YouAreDone ? "Done mode" : "Room chat");
         if (ImGui.IsItemHovered()) ImGui.SetTooltip(state.YouAreDone ? "Only the drawer and correct guessers see your messages." : "Talk and guess in the same chat.");
@@ -498,11 +525,13 @@ public sealed partial class MainWindow
         }
     }
 
-    private static bool ToolAction(FontAwesomeIcon icon, string label)
+    private static bool ToolAction(FontAwesomeIcon icon, string label, bool selected = false)
     {
         bool clicked;
         using (Plugin.PluginInterface.UiBuilder.IconFontFixedWidthHandle.Push())
-            clicked = UiTheme.Button(icon.ToIconString() + "##" + label, UiTheme.S(28), quiet: true);
+        using (ImRaii.PushColor(ImGuiCol.Button, selected ? UiTheme.RoseTint : Vector4.Zero))
+        using (ImRaii.PushColor(ImGuiCol.Text, selected ? UiTheme.Rose : UiTheme.Ink))
+            clicked = ImGui.Button(icon.ToIconString() + "##" + label, UiTheme.V(28, 28));
         if (ImGui.IsItemHovered() || ImGui.IsItemFocused()) ImGui.SetTooltip(label);
         return clicked;
     }
@@ -542,7 +571,7 @@ public sealed partial class MainWindow
                 }
             }
             ImGui.TableNextColumn();
-            using var card = new UiTheme.PaperPanel("profile-details", Vector2.Zero);
+            using var card = new UiTheme.PaperPanel("profile-details", Vector2.Zero, note: UiTheme.StickyRose);
             if (!card.Success) return;
             UiTheme.Caption("A NAME TO REMEMBER");
             UiTheme.Field("Display name", "##profile-name", ref displayName, 40, "Your artist name");
@@ -588,6 +617,10 @@ public sealed partial class MainWindow
         bool reduceMotion = plugin.Config.ReduceMotion;
         if (ImGui.Checkbox("Reduce decorative motion", ref reduceMotion)) { plugin.Config.ReduceMotion = reduceMotion; plugin.Save(); }
         UiTheme.Caption("Keep the moogle pom still while moving the book.");
+        bool standardFrame = plugin.Config.UseStandardFrame;
+        if (ImGui.Checkbox("Use the standard window frame", ref standardFrame))
+        { plugin.Config.UseStandardFrame = standardFrame; plugin.Save(); }
+        UiTheme.Wrapped("Paper mode: drag the moogle/title, use the pin and close buttons, and resize from the edges. The standard frame restores Dalamud's window menu.", UiTheme.Muted);
         UiTheme.Rule();
         UiTheme.Caption("DIAGNOSTICS");
         ImGui.TextUnformatted($"Connection: {(client?.Connected == true ? "online" : "offline")}   /   Events received: {received}   /   Drawing messages: {draws}");

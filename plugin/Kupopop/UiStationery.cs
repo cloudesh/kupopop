@@ -10,32 +10,45 @@ public static class UiStationery
     {
         var draw = ImGui.GetWindowDrawList();
         draw.PushClipRect(new Vector2(min.X + 1, min.Y + titleHeight), max - Vector2.One, false);
-        min += UiTheme.V(6, 0) + new Vector2(0, titleHeight);
-        max -= UiTheme.V(5, 5);
-        draw.AddRectFilled(min + UiTheme.V(4, 5), max, UiTheme.C(UiTheme.Inset), UiTheme.S(3));
-        draw.AddRect(min + UiTheme.V(4, 5), max, UiTheme.C(UiTheme.Brass), UiTheme.S(3));
-        for (int sheet = 3; sheet >= 1; sheet--)
-        {
-            var offset = UiTheme.V(sheet * 2, sheet * 2);
-            draw.AddRectFilled(min + offset, max - UiTheme.V(6 - sheet * 2, 6 - sheet * 2), UiTheme.C(sheet % 2 == 0 ? UiTheme.Panel : UiTheme.Paper), UiTheme.S(2));
-            draw.AddRect(min + offset, max - UiTheme.V(6 - sheet * 2, 6 - sheet * 2), UiTheme.C(UiTheme.Line), UiTheme.S(2));
-        }
-        var pageMax = max - UiTheme.V(7, 7);
+        min += UiTheme.V(18, 11) + new Vector2(0, titleHeight);
+        max -= UiTheme.V(18, 12);
+        // Opposing rotations expose leaves on every side, inside the transparent
+        // window margins. The uppermost page stays square for precise controls.
+        PaperLeaf(min - UiTheme.V(2, 1), max + UiTheme.V(2, 1), -0.85f, UiTheme.V(-2, 1), UiTheme.Inset);
+        PaperLeaf(min, max, 0.65f, UiTheme.V(2, -1), UiTheme.Panel);
+        PaperLeaf(min, max, -0.32f, UiTheme.V(-1, 2), UiTheme.Paper);
+        var pageMax = max;
         draw.AddRectFilled(min, pageMax, UiTheme.C(UiTheme.Paper), UiTheme.S(2));
         UiTheme.PaperGrain(min, pageMax);
-        draw.AddLine(min + UiTheme.V(16, 4), new Vector2(min.X + UiTheme.S(16), pageMax.Y - UiTheme.S(4)), UiTheme.C(UiTheme.Line));
+        draw.AddLine(min + UiTheme.V(8, 4), new Vector2(min.X + UiTheme.S(8), pageMax.Y - UiTheme.S(4)), UiTheme.C(UiTheme.Line));
         var margin = UiTheme.Rose; margin.W = 0.15f;
-        draw.AddLine(min + UiTheme.V(21, 6), new Vector2(min.X + UiTheme.S(21), pageMax.Y - UiTheme.S(6)), UiTheme.C(margin));
+        draw.AddLine(min + UiTheme.V(10, 6), new Vector2(min.X + UiTheme.S(10), pageMax.Y - UiTheme.S(6)), UiTheme.C(margin));
         for (float y = min.Y + UiTheme.S(38); y < pageMax.Y - UiTheme.S(18); y += UiTheme.S(52))
         {
-            draw.AddCircleFilled(new Vector2(min.X + UiTheme.S(9), y), UiTheme.S(3), UiTheme.C(UiTheme.Brass));
-            draw.AddLine(new Vector2(min.X - UiTheme.S(3), y), new Vector2(min.X + UiTheme.S(9), y), UiTheme.C(UiTheme.Ink), UiTheme.S(2));
-            draw.AddLine(new Vector2(min.X - UiTheme.S(3), y - UiTheme.S(1)), new Vector2(min.X + UiTheme.S(9), y - UiTheme.S(1)), UiTheme.C(UiTheme.Line));
+            draw.AddCircleFilled(new Vector2(min.X + UiTheme.S(3), y), UiTheme.S(2), UiTheme.C(UiTheme.Brass));
+            draw.AddLine(new Vector2(min.X - UiTheme.S(5), y), new Vector2(min.X + UiTheme.S(3), y), UiTheme.C(UiTheme.Ink), UiTheme.S(2));
+            draw.AddLine(new Vector2(min.X - UiTheme.S(5), y - UiTheme.S(1)), new Vector2(min.X + UiTheme.S(3), y - UiTheme.S(1)), UiTheme.C(UiTheme.Line));
         }
-        // Exposed page edges on the right/bottom, with short irregular leaf marks.
-        for (float y = min.Y + UiTheme.S(20); y < pageMax.Y; y += UiTheme.S(17))
-            draw.AddLine(new Vector2(pageMax.X + UiTheme.S(2), y), new Vector2(pageMax.X + UiTheme.S(5), y + UiTheme.S(2)), UiTheme.C(UiTheme.Line));
         draw.PopClipRect();
+    }
+
+    public static void PaperLeaf(Vector2 min, Vector2 max, float degrees, Vector2 offset, Vector4 color)
+    {
+        var center = (min + max) / 2;
+        float angle = degrees * (MathF.PI / 180), cosine = MathF.Cos(angle), sine = MathF.Sin(angle);
+        Vector2 Rotate(Vector2 point)
+        {
+            var p = point - center;
+            return center + new Vector2(p.X * cosine - p.Y * sine, p.X * sine + p.Y * cosine) + offset;
+        }
+        var a = Rotate(min); var b = Rotate(new Vector2(max.X, min.Y));
+        var c = Rotate(max); var d = Rotate(new Vector2(min.X, max.Y));
+        var draw = ImGui.GetWindowDrawList();
+        var shadow = UiTheme.Ink; shadow.W = 0.12f;
+        var drop = UiTheme.V(1, 2);
+        draw.AddQuadFilled(a + drop, b + drop, c + drop, d + drop, UiTheme.C(shadow));
+        draw.AddQuadFilled(a, b, c, d, UiTheme.C(color));
+        draw.AddQuad(a, b, c, d, UiTheme.C(UiTheme.Line), UiTheme.S(1));
     }
 
     public static void Tape(Vector2 top, float width, bool rose = false)

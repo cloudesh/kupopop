@@ -14,6 +14,10 @@ public static class UiTheme
     public static readonly Vector4 Inset = Hex(0xDED0B4);
     public static readonly Vector4 Cover = Hex(0xB89A91);
     public static readonly Vector4 Tape = Hex(0xE3C990);
+    public static readonly Vector4 StickyYellow = Hex(0xF5E7AD);
+    public static readonly Vector4 StickyRose = Hex(0xEECFD3);
+    public static readonly Vector4 StickySage = Hex(0xDCE7C9);
+    public static readonly Vector4 StickyBlue = Hex(0xD7E6EC);
     public static readonly Vector4 Ink = Hex(0x372E39);
     public static readonly Vector4 Muted = Hex(0x70626B);
     public static readonly Vector4 Line = Hex(0xCFBEA1);
@@ -51,7 +55,8 @@ public static class UiTheme
             Color(ImGuiCol.ScrollbarGrabHovered, Brass); Color(ImGuiCol.ScrollbarGrabActive, Rose);
             Color(ImGuiCol.TextSelectedBg, RoseTint); Color(ImGuiCol.TableHeaderBg, Inset);
             Color(ImGuiCol.TableBorderLight, Line); Color(ImGuiCol.TableBorderStrong, Line);
-            Style(ImGuiStyleVar.WindowPadding, V(30, 14)); Style(ImGuiStyleVar.FramePadding, V(8, 5));
+            Color(ImGuiCol.ResizeGrip, Vector4.Zero); Color(ImGuiCol.ResizeGripHovered, Brass); Color(ImGuiCol.ResizeGripActive, Rose);
+            Style(ImGuiStyleVar.WindowPadding, V(34, 18)); Style(ImGuiStyleVar.FramePadding, V(8, 5));
             Style(ImGuiStyleVar.ItemSpacing, V(6, 6)); Style(ImGuiStyleVar.ItemInnerSpacing, V(5, 4));
             Style(ImGuiStyleVar.CellPadding, V(4, 3));
             Style(ImGuiStyleVar.WindowRounding, S(6)); Style(ImGuiStyleVar.ChildRounding, S(2));
@@ -79,12 +84,12 @@ public static class UiTheme
 
     // Deterministic native geometry, not a generated or downloaded bitmap. Keep it
     // sparse and stationary, and keep the synchronized drawing pixels untouched.
-    public static void PaperGrain(Vector2 min, Vector2 max)
+    public static void PaperGrain(Vector2 min, Vector2 max, Vector4? tint = null)
     {
-        if (UiAssets.PaperTexture(min, max)) return;
+        if (UiAssets.PaperTexture(min, max, tint)) return;
         var draw = ImGui.GetWindowDrawList();
-        var tint = Brass; tint.W = 0.10f;
-        uint color = C(tint);
+        var fiber = Brass; fiber.W = 0.10f;
+        uint color = C(fiber);
         float step = S(16);
         int rows = Math.Min(70, (int)((max.Y - min.Y) / step));
         int columns = Math.Min(90, (int)((max.X - min.X) / step));
@@ -99,11 +104,10 @@ public static class UiTheme
 
     public static void SheetEdges(Vector2 min, Vector2 max)
     {
-        var draw = ImGui.GetWindowDrawList();
-        draw.AddRectFilled(min + V(6, 7), max + V(6, 7), C(Inset), S(1));
-        draw.AddRect(min + V(6, 7), max + V(6, 7), C(Brass), S(1));
-        draw.AddRectFilled(min + V(3, 3), max + V(3, 3), C(Panel), S(1));
-        draw.AddRect(min + V(3, 3), max + V(3, 3), C(Line), S(1));
+        float extent = Math.Max(max.X - min.X, max.Y - min.Y);
+        float degrees = Math.Min(1.7f, MathF.Atan2(S(4), extent / 2) * (180 / MathF.PI));
+        UiStationery.PaperLeaf(min, max, -degrees, V(-1, 2), Inset);
+        UiStationery.PaperLeaf(min, max, degrees * 0.7f, V(2, -1), Panel);
     }
 
     public static bool Button(string label, float width = 0, bool primary = false, bool quiet = false)
@@ -158,26 +162,35 @@ public static class UiTheme
     {
         private ImRaii.ChildDisposable child;
         public bool Success { get; }
-        public PaperPanel(string id, Vector2 size, bool inset = false, bool compact = false, bool taped = false)
+        public PaperPanel(string id, Vector2 size, bool inset = false, bool compact = false, bool taped = false, Vector4? note = null)
         {
             using var color = ImRaii.PushColor(ImGuiCol.ChildBg, Vector4.Zero);
             using var border = ImRaii.PushColor(ImGuiCol.Border, Vector4.Zero);
-            using var padding = ImRaii.PushStyle(ImGuiStyleVar.WindowPadding, compact ? V(8, 8) : V(14, taped ? 22 : 14));
+            using var padding = ImRaii.PushStyle(ImGuiStyleVar.WindowPadding, compact ? V(10, note.HasValue ? 22 : 10) : V(14, taped || note.HasValue ? 24 : 14));
             var scope = ImRaii.Child(id, size, true);
             child = scope;
             Success = scope.Success;
             if (Success)
             {
-                var min = ImGui.GetWindowPos() + V(1, 1);
+                var min = ImGui.GetWindowPos() + V(6, 6);
                 var max = ImGui.GetWindowPos() + ImGui.GetWindowSize() - V(6, 6);
                 var draw = ImGui.GetWindowDrawList();
                 draw.PushClipRect(ImGui.GetWindowPos() + V(1, 1), ImGui.GetWindowPos() + ImGui.GetWindowSize() - V(1, 1), false);
                 SheetEdges(min, max);
-                draw.AddRectFilled(min, max, C(inset ? Inset : Panel), S(1));
+                var surface = note ?? (inset ? Inset : Panel);
+                draw.AddRectFilled(min, max, C(surface), S(1));
                 draw.AddRect(min, max, C(Line), S(1));
-                PaperGrain(min, max);
+                PaperGrain(min, max, note);
+                if (note.HasValue)
+                {
+                    var glue = Ink; glue.W = 0.035f;
+                    draw.AddRectFilled(min, new Vector2(max.X, min.Y + S(13)), C(glue));
+                    var edge = Brass; edge.W = 0.18f;
+                    draw.AddLine(min + V(1, 13), new Vector2(max.X - S(1), min.Y + S(13)), C(edge));
+                }
                 if (taped) UiStationery.Tape(new Vector2(min.X + (max.X - min.X) * 0.5f - S(25), min.Y + S(2)), S(50));
-                draw.AddTriangleFilled(max - V(12, 0), max - V(0, 12), max, C(Inset));
+                var curl = note.HasValue ? Vector4.Lerp(surface, Inset, 0.4f) : Inset;
+                draw.AddTriangleFilled(max - V(12, 0), max - V(0, 12), max, C(curl));
                 draw.AddLine(max - V(12, 0), max - V(0, 12), C(Line));
                 draw.PopClipRect();
             }

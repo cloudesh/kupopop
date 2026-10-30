@@ -1,7 +1,7 @@
 # Kupopop Draw server: first run
 
 Download and fully extract the Windows x64 or Linux x64 server ZIP from
-https://github.com/cloudesh/kupopop/releases/tag/v0.3.0. The packages include .NET;
+https://github.com/cloudesh/kupopop/releases/tag/v0.3.1. The packages include .NET;
 players and hosts do not need to install an SDK or runtime.
 
 ## Windows: local in-game testing
