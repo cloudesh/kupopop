@@ -3,7 +3,7 @@
     "Author": "cloudesh",
     "Name": "Kupopop Draw",
     "InternalName": "Kupopop",
-    "AssemblyVersion": "0.3.0.0",
+    "AssemblyVersion": "0.3.1.0",
     "Description": "A native multiplayer drawing and guessing game with private/public rooms and custom drawn avatars. Experimental: requires a separately hosted Kupopop server. No Kupo-Points yet.",
     "ApplicableVersion": "any",
     "RepoUrl": "https://github.com/cloudesh/kupopop",
@@ -20,11 +20,11 @@
     "LoadPriority": 0,
     "Punchline": "Draw, guess, and share a little Kupo creativity.",
     "AcceptsFeedback": true,
-    "DownloadLinkInstall": "https://github.com/cloudesh/kupopop/releases/download/v0.3.0/testing.zip",
-    "DownloadLinkUpdate": "https://github.com/cloudesh/kupopop/releases/download/v0.3.0/testing.zip",
-    "DownloadLinkTesting": "https://github.com/cloudesh/kupopop/releases/download/v0.3.0/testing.zip",
+    "DownloadLinkInstall": "https://github.com/cloudesh/kupopop/releases/download/v0.3.1/testing.zip",
+    "DownloadLinkUpdate": "https://github.com/cloudesh/kupopop/releases/download/v0.3.1/testing.zip",
+    "DownloadLinkTesting": "https://github.com/cloudesh/kupopop/releases/download/v0.3.1/testing.zip",
     "IsHide": false,
     "IsTestingExclusive": false,
-    "LastUpdate": 1793347605
+    "LastUpdate": 1793349262
   }
 ]
