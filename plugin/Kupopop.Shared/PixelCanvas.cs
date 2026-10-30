@@ -117,18 +117,54 @@ public static class AvatarGenerator
     {
         var canvas = new PixelCanvas(Protocol.AvatarSize, Protocol.AvatarSize);
         var random = new Random(seed);
-        byte body = (byte)random.Next(4, 16), eyes = 1;
-        canvas.Apply(new("fill", 0, 0, 0, 0, (byte)random.Next(2, 16)));
-        for (int y = 8; y < 59; y++)
-            for (int x = 7; x < 57; x++)
-                if ((x - 32) * (x - 32) + (y - 33) * (y - 33) < 24 * 24)
-                    canvas.Pixels[y * 64 + x] = body;
-        int eyeY = random.Next(24, 31);
-        canvas.Apply(new("pencil", 22, eyeY, 22, eyeY + 2, eyes, 4));
-        canvas.Apply(new("pencil", 42, eyeY, 42, eyeY + 2, eyes, 4));
-        int expression = random.Next(3);
-        canvas.Apply(new("pencil", 23, 40, 32, expression == 0 ? 46 : 40, eyes, 2));
-        canvas.Apply(new("pencil", 32, expression == 0 ? 46 : 40, 41, expression == 2 ? 44 : 40, eyes, 2));
+        byte accent = new byte[] { 4, 6, 7, 12, 13, 15 }[random.Next(6)];
+        int expression = random.Next(4), eyeY = random.Next(34, 38), pomX = random.Next(35, 45);
+        // White paper, pencil outlines, pointed ears and a colored pom. These are
+        // deterministic native avatar shapes, editable with the ordinary tools.
+        Triangle(11, 16, 13, 39, 29, 28, 2);
+        Triangle(53, 16, 51, 39, 35, 28, 2);
+        Triangle(14, 20, 16, 34, 25, 28, 0);
+        Triangle(50, 20, 48, 34, 39, 28, 0);
+        Triangle(16, 23, 17, 31, 23, 28, 15);
+        Triangle(48, 23, 47, 31, 41, 28, 15);
+        Ellipse(32, 42, 24, 19, 2);
+        Ellipse(32, 41, 23, 18, 0);
+        Line(31, 24, 33, 18, 2);
+        Line(33, 18, pomX, 13, 2);
+        Ellipse(pomX, 9, 7, 7, 2);
+        Ellipse(pomX, 9, 6, 6, accent);
+        Ellipse(pomX - 2, 7, 2, 2, 0);
+        if (expression == 0 || expression == 3)
+        {
+            Line(17, eyeY + 2, 22, eyeY - 1, 1); Line(22, eyeY - 1, 26, eyeY + 2, 1);
+        }
+        else Line(22, eyeY, 22, eyeY + 3, 1, 3);
+        if (expression == 0 || expression == 2)
+        { Line(38, eyeY + 2, 42, eyeY - 1, 1); Line(42, eyeY - 1, 47, eyeY + 2, 1); }
+        else Line(42, eyeY, 42, eyeY + 3, 1, 3);
+        Ellipse(32, 44, 4, 3, 15);
+        Line(32, 47, 28, 50, 2); Line(32, 47, 36, 50, 2);
+        Line(9, 42, 16, 44, 3); Line(48, 44, 55, 42, 3);
+        if (random.Next(2) == 0) { Ellipse(17, 46, 3, 1, 15); Ellipse(47, 46, 3, 1, 15); }
         return canvas.Pixels;
+
+        void Line(int x1, int y1, int x2, int y2, byte color, int size = 1) => canvas.Apply(new("pencil", x1, y1, x2, y2, color, size));
+        void Ellipse(int cx, int cy, int rx, int ry, byte color)
+        {
+            for (int y = Math.Max(0, cy - ry); y <= Math.Min(63, cy + ry); y++)
+                for (int x = Math.Max(0, cx - rx); x <= Math.Min(63, cx + rx); x++)
+                    if ((x - cx) * (x - cx) * ry * ry + (y - cy) * (y - cy) * rx * rx <= rx * rx * ry * ry)
+                        canvas.Pixels[y * 64 + x] = color;
+        }
+        void Triangle(int ax, int ay, int bx, int by, int cx, int cy, byte color)
+        {
+            int Cross(int px, int py, int x1, int y1, int x2, int y2) => (px - x2) * (y1 - y2) - (x1 - x2) * (py - y2);
+            for (int y = Math.Min(ay, Math.Min(by, cy)); y <= Math.Max(ay, Math.Max(by, cy)); y++)
+                for (int x = Math.Min(ax, Math.Min(bx, cx)); x <= Math.Max(ax, Math.Max(bx, cx)); x++)
+                {
+                    int a = Cross(x, y, ax, ay, bx, by), b = Cross(x, y, bx, by, cx, cy), c = Cross(x, y, cx, cy, ax, ay);
+                    if (!((a < 0 || b < 0 || c < 0) && (a > 0 || b > 0 || c > 0))) canvas.Pixels[y * 64 + x] = color;
+                }
+        }
     }
 }

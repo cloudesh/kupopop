@@ -27,8 +27,9 @@ if (-not $SkipPlugin) {
     $taskManifest | Add-Member -NotePropertyName IsTestingExclusive -NotePropertyValue $false -Force
     $taskManifest | Add-Member -NotePropertyName LastUpdate -NotePropertyValue ([DateTimeOffset]::UtcNow.ToUnixTimeSeconds()) -Force
     $taskJson = (ConvertTo-Json -InputObject @($taskManifest) -Depth 8).Replace("`r`n", "`n")
-    [IO.File]::WriteAllText((Join-Path $PSScriptRoot 'plugin/releases/repo.json'), $taskJson, (New-Object Text.UTF8Encoding($false)))
-    Copy-Item -LiteralPath 'plugin/releases/repo.json' -Destination (Join-Path $taskOutput 'repo.json') -Force
+    # The live feed is promoted only after GitHub has uploaded and verified the
+    # matching ZIP. Advertising a still-building release caused installer 404s.
+    [IO.File]::WriteAllText((Join-Path $taskOutput 'repo.json'), $taskJson, (New-Object Text.UTF8Encoding($false)))
 }
 if (-not $SkipServers) {
     foreach ($taskRuntime in @('win-x64','linux-x64')) {

@@ -15,7 +15,9 @@ public sealed class UiAssets : IDisposable
     private bool mascotUnavailable;
     private bool mascotReady;
     private static bool paperUnavailable;
-    public UiAssets(DiagnosticLog log) => this.log = log;
+    private static bool paperReady;
+    private static DiagnosticLog? paperLog;
+    public UiAssets(DiagnosticLog log) { this.log = log; paperLog = log; }
 
     public void Heading(string text)
     {
@@ -48,22 +50,29 @@ public sealed class UiAssets : IDisposable
         if (paperUnavailable) return false;
         try
         {
-            var texture = Plugin.TextureProvider.GetFromGame("ui/uld/MoogleColectionPaper_hr1.tex").GetWrapOrDefault();
-            if (texture is null) return false;
+            var shared = Plugin.TextureProvider.GetFromGame("ui/uld/MoogleColectionlWindow_hr1.tex");
+            if (!shared.TryGetWrap(out var texture, out var error))
+            {
+                if (error is not null) { paperUnavailable = true; paperLog?.Write("ui.paper_unavailable", error); }
+                return false;
+            }
+            if (!paperReady) { paperReady = true; paperLog?.Write($"ui.paper_ready size={texture.Width}x{texture.Height}"); }
             var draw = ImGui.GetWindowDrawList();
-            uint tint = UiTheme.C(new Vector4(1, 1, 1, 0.25f));
-            float tile = UiTheme.S(96);
-            // Tile only the grain inside the game's paper sheet, excluding its rim.
+            uint tint = UiTheme.C(new Vector4(1, 1, 1, 0.68f));
+            float tile = UiTheme.S(144);
+            // Sample the flat notebook interior, excluding rules, binding, and
+            // the radial shading on the separate small paper decoration.
             for (float y = min.Y; y < max.Y; y += tile)
                 for (float x = min.X; x < max.X; x += tile)
                 {
                     var end = Vector2.Min(new Vector2(x + tile, y + tile), max);
-                    var uvEnd = new Vector2(0.18f) + (end - new Vector2(x, y)) / tile * 0.64f;
-                    draw.AddImage(texture.Handle, new Vector2(x, y), end, new Vector2(0.18f), uvEnd, tint);
+                    var uvStart = new Vector2(0.40f, 0.44f);
+                    var uvEnd = uvStart + (end - new Vector2(x, y)) / tile * 0.18f;
+                    draw.AddImage(texture.Handle, new Vector2(x, y), end, uvStart, uvEnd, tint);
                 }
             return true;
         }
-        catch (Exception ex) { paperUnavailable = true; Plugin.Log.Debug(ex, "Kupopop paper texture unavailable; using native grain."); return false; }
+        catch (Exception ex) { paperUnavailable = true; paperLog?.Write("ui.paper_unavailable", ex); return false; }
     }
 
     public static void Glyph(FontAwesomeIcon icon, Vector4? color = null)

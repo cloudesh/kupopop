@@ -77,7 +77,7 @@ public sealed class CanvasWidget : IDisposable
         }
         float ratio = (float)canvas.Width / canvas.Height;
         // Reserve only the few pixels occupied by the two sheets underneath.
-        available = Vector2.Max(new Vector2(8), available - UiTheme.V(6, 6));
+        available = Vector2.Max(new Vector2(8), available - UiTheme.V(9, 10));
         float width = Math.Max(8, Math.Min(available.X, available.Y * ratio));
         var size = new Vector2(width, width / ratio);
         RenderSize = size;

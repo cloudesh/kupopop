@@ -34,6 +34,27 @@ Check(canvas.Pixels[20 * 64 + 20] == 0, "eraser restores canvas white");
 Check(!canvas.Apply(new("fill", -1, 0, 0, 0)) && !canvas.Apply(new("pencil", 0, 0, 0, 0, 99)), "invalid drawing coordinates and palette entries rejected");
 Check(AvatarGenerator.Generate(123).SequenceEqual(AvatarGenerator.Generate(123)) &&
     !AvatarGenerator.Generate(123).SequenceEqual(AvatarGenerator.Generate(456)), "default avatars are stable per seed and vary across seeds");
+var generatedFaces = Enumerable.Range(0, 128).Select(AvatarGenerator.Generate).ToArray();
+Check(generatedFaces.All(face => face.Length == Protocol.AvatarSize * Protocol.AvatarSize && face.All(color => color < Palette.Colors.Length)) &&
+    generatedFaces.Select(Convert.ToHexString).Distinct().Count() > 80, "moogle-like defaults remain valid editable avatars with varied faces and pom colors");
+var pom = new PomMotion();
+pom.Step(100, 1f / 60, true);
+Check(pom.Angle == 0, "decorative pom stays still until the window moves");
+pom.Step(160, 1f / 60, true);
+Check(pom.Angle < 0 && MathF.Abs(pom.Angle) <= 0.62f, "window movement gives the pom a bounded opposing swing");
+bool boundedPom = true;
+for (int i = 0; i < 1200; i++)
+{
+    pom.Step(i % 2 == 0 ? -10000 : 10000, i % 3 == 0 ? 0.1f : 1f / 144, true);
+    boundedPom &= float.IsFinite(pom.Angle) && MathF.Abs(pom.Angle) <= 0.62f;
+}
+Check(boundedPom, "pom remains finite and bounded during abrupt movement and uneven frame times");
+for (int i = 0; i < 600; i++) pom.Step(10000, 1f / 60, true);
+Check(pom.Angle == 0, "pom settles fully after movement stops");
+pom.Step(100, 1f / 60, true); pom.Step(100, 1f / 60, false);
+bool reducedPom = pom.Angle == 0;
+pom.Step(200, 1f / 60, true); pom.Step(200, 1, true);
+Check(reducedPom && pom.Angle == 0, "reduced motion and long frame pauses reset decorative movement");
 if (OperatingSystem.IsWindows())
 {
     var vault = new CredentialVault(Path.Combine(working, "vault"));
