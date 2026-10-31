@@ -43,7 +43,17 @@ public sealed class WordBank
             .Where(w => !w.Equals(previous, StringComparison.OrdinalIgnoreCase)).Distinct(StringComparer.OrdinalIgnoreCase).ToArray();
         return pool[RandomNumberGenerator.GetInt32(pool.Length)];
     }
-    public static WordBank Starter() => new([new("starter", "FFXIV Starter", true, false, ["Moogle", "Chocobo", "Cactuar"])]);
+    public string[] Choices(string[]? selected, string previous)
+    {
+        string[] ids = Selection(selected);
+        var pool = lists.Where(l => ids.Contains(l.Id)).SelectMany(l => l.Words).Distinct(StringComparer.OrdinalIgnoreCase).ToArray();
+        if (pool.Length < 4) throw new ArgumentException("Select lists with at least four distinct words.");
+        RandomNumberGenerator.Shuffle(pool.AsSpan());
+        // Avoid the previous answer when there are enough alternatives.
+        var alternatives = pool.Where(w => !w.Equals(previous, StringComparison.OrdinalIgnoreCase)).ToArray();
+        return (alternatives.Length >= 4 ? alternatives : pool).Take(4).ToArray();
+    }
+    public static WordBank Starter() => new([new("starter", "FFXIV Starter", true, false, ["Moogle", "Chocobo", "Cactuar", "Spriggan"])]);
     public static WordBank Open(string directory)
     {
         string path = Path.Combine(directory, "word-lists.json");
@@ -57,7 +67,19 @@ public sealed class WordBank
             return initial;
         }
         if (new FileInfo(path).Length > 2 * 1024 * 1024) throw new InvalidDataException("Word-list file exceeds limit.");
-        return new(JsonSerializer.Deserialize<ServerWordList[]>(File.ReadAllBytes(path), Protocol.Json)
-            ?? throw new InvalidDataException("Word-list file is empty."));
+        var source = JsonSerializer.Deserialize<ServerWordList[]>(File.ReadAllBytes(path), Protocol.Json)
+            ?? throw new InvalidDataException("Word-list file is empty.");
+        // Upgrade only our untouched three-word starter, preserving custom and
+        // maintained banks. Four distinct offers require one additional entry.
+        if (source is [{ Id: "starter", Name: "FFXIV Starter", DefaultEnabled: true, Complex: false, Words: { Length: 3 } old }] &&
+            old.ToHashSet(StringComparer.Ordinal).SetEquals(new[] { "Moogle", "Chocobo", "Cactuar" }))
+        {
+            source = Starter().lists;
+            string temp = path + ".tmp";
+            File.WriteAllBytes(temp, JsonSerializer.SerializeToUtf8Bytes(source, Protocol.Json));
+            if (!OperatingSystem.IsWindows()) File.SetUnixFileMode(temp, UnixFileMode.UserRead | UnixFileMode.UserWrite);
+            File.Move(temp, path, true);
+        }
+        return new(source);
     }
 }

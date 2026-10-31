@@ -11,7 +11,13 @@ public static class Palette
         0xFF60BE5B, 0xFF5A7C2A, 0xFFD8BD43, 0xFFE58B41,
         0xFFD8578A, 0xFFAC54D6, 0xFF95625B, 0xFF82B3E8,
         0x00000000,
+        0xFF303065, 0xFF5860B8, 0xFF85A7DC, 0xFF89C9F2,
+        0xFF4F7A94, 0xFF486B54, 0xFF9ACA87, 0xFFCAF0BB,
+        0xFF756E32, 0xFFB59A63, 0xFFF0CCA0, 0xFFE9E0CB,
+        0xFF6E3D4F, 0xFFAE789E, 0xFFE2B6D0, 0xFFE9D8EB,
     ];
+    public static bool Valid(byte color, bool transparency) => color < Colors.Length && (transparency || color != Transparent);
+    public static readonly byte[] Opaque = Enumerable.Range(0, Colors.Length).Where(i => i != Transparent).Select(i => (byte)i).ToArray();
 }
 
 public sealed class PixelCanvas
@@ -33,7 +39,7 @@ public sealed class PixelCanvas
 
     public void Load(byte[] pixels)
     {
-        if (pixels.Length != Pixels.Length || pixels.Any(p => p >= (Transparency ? Palette.Colors.Length : Palette.Transparent)))
+        if (pixels.Length != Pixels.Length || pixels.Any(p => !Palette.Valid(p, Transparency)))
             throw new InvalidDataException("Invalid canvas.");
         Pixels = (byte[])pixels.Clone();
         Revision++;
@@ -41,30 +47,60 @@ public sealed class PixelCanvas
 
     public void Clear() { Array.Fill(Pixels, Transparency ? Palette.Transparent : (byte)0); Revision++; }
 
-    public bool Valid(DrawOperation op) => op.Tool is "pencil" or "eraser" or "fill"
-        && op.Color < (Transparency ? Palette.Colors.Length : Palette.Transparent) && op.Size is >= 1 and <= 20
+    public bool Valid(DrawOperation op) => DrawingTools.Valid(op.Tool)
+        && Palette.Valid(op.Color, Transparency) && op.Size is >= 1 and <= 20
         && Inside(op.X1, op.Y1) && Inside(op.X2, op.Y2);
 
     public bool Apply(DrawOperation op)
     {
         if (!Valid(op)) return false;
+        op = DrawingTools.Constrain(op);
         byte color = op.Tool == "eraser" ? (Transparency ? Palette.Transparent : (byte)0) : op.Color;
         if (op.Tool == "fill") Fill(op.X2, op.Y2, color);
-        else
+        else if (op.Tool is "rectangle" or "square")
         {
-            int x = op.X1, y = op.Y1, dx = Math.Abs(op.X2 - x), dy = -Math.Abs(op.Y2 - y);
-            int sx = x < op.X2 ? 1 : -1, sy = y < op.Y2 ? 1 : -1, error = dx + dy;
-            while (true)
-            {
-                Dot(x, y, color, op.Size);
-                if (x == op.X2 && y == op.Y2) break;
-                int twice = 2 * error;
-                if (twice >= dy) { error += dy; x += sx; }
-                if (twice <= dx) { error += dx; y += sy; }
-            }
+            Stroke(op.X1, op.Y1, op.X2, op.Y1, color, op.Size);
+            Stroke(op.X2, op.Y1, op.X2, op.Y2, color, op.Size);
+            Stroke(op.X2, op.Y2, op.X1, op.Y2, color, op.Size);
+            Stroke(op.X1, op.Y2, op.X1, op.Y1, color, op.Size);
         }
+        else if (op.Tool is "ellipse" or "circle") Ellipse(op, color);
+        else Stroke(op.X1, op.Y1, op.X2, op.Y2, color, op.Size);
         Revision++;
         return true;
+    }
+
+    private void Stroke(int x, int y, int endX, int endY, byte color, int size)
+    {
+        int dx = Math.Abs(endX - x), dy = -Math.Abs(endY - y);
+        int sx = x < endX ? 1 : -1, sy = y < endY ? 1 : -1, error = dx + dy;
+        while (true)
+        {
+            Dot(x, y, color, size);
+            if (x == endX && y == endY) break;
+            int twice = 2 * error;
+            if (twice >= dy) { error += dy; x += sx; }
+            if (twice <= dx) { error += dx; y += sy; }
+        }
+    }
+
+    private void Ellipse(DrawOperation op, byte color)
+    {
+        int left = Math.Min(op.X1, op.X2), right = Math.Max(op.X1, op.X2);
+        int top = Math.Min(op.Y1, op.Y2), bottom = Math.Max(op.Y1, op.Y2);
+        double rx = (right - left) / 2.0, ry = (bottom - top) / 2.0;
+        double cx = (left + right) / 2.0, cy = (top + bottom) / 2.0;
+        if (rx == 0 || ry == 0) { Stroke(left, top, right, bottom, color, op.Size); return; }
+        for (int x = left; x <= right; x++)
+        {
+            double distance = ry * Math.Sqrt(Math.Max(0, 1 - Math.Pow((x - cx) / rx, 2)));
+            Dot(x, (int)Math.Round(cy - distance), color, op.Size); Dot(x, (int)Math.Round(cy + distance), color, op.Size);
+        }
+        for (int y = top; y <= bottom; y++)
+        {
+            double distance = rx * Math.Sqrt(Math.Max(0, 1 - Math.Pow((y - cy) / ry, 2)));
+            Dot((int)Math.Round(cx - distance), y, color, op.Size); Dot((int)Math.Round(cx + distance), y, color, op.Size);
+        }
     }
 
     public byte[] Rgba()

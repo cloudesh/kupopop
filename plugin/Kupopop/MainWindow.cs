@@ -22,6 +22,10 @@ public sealed partial class MainWindow : Window, IDisposable
     private WordListInfo[] wordLists = [];
     private readonly HashSet<string> selectedWordLists = [];
     private bool wordListsChosen, undoPending, canUndoDrawing;
+    private readonly ToastQueue toasts = new();
+    private readonly UpdateChecker updates = new();
+    private bool updateCheckPending;
+    private long nextUpdateCheck, remoteCursorAt;
     private readonly AvatarTextures avatars;
     private readonly UiAssets art;
     private readonly List<ChatLine> chat = [];
@@ -118,6 +122,9 @@ public sealed partial class MainWindow : Window, IDisposable
                     if (state.ResetCanvas || newTurn) canvas.Clear();
                     if (state.Canvas is { } pixels) canvas.Load(pixels);
                     if (newTurn || state.Canvas is not null) { undoPending = false; canUndoDrawing = state.CanUndo; }
+                    if (newTurn || state.Phase != "drawing") painting.RemoteCursor = null;
+                    if (state.Cursor is { } brush && state.DrawerId != device?.AccountId)
+                    { painting.RemoteCursor = brush; remoteCursorAt = Environment.TickCount64; }
                     room = state;
                     serverOffset = state.ServerTime - DateTimeOffset.UtcNow;
                     if (screen != "profile") screen = "game";
@@ -128,6 +135,9 @@ public sealed partial class MainWindow : Window, IDisposable
                     break;
                 case "canvas" when message.Canvas is { } restored && room?.TurnId == message.TurnId:
                     canvas.Load(restored); undoPending = false; canUndoDrawing = message.CanUndo;
+                    break;
+                case "cursor" when message.Cursor is { } pointer && room?.TurnId == message.TurnId && message.ActorId == room.DrawerId && message.ActorId != device?.AccountId:
+                    painting.RemoteCursor = pointer; remoteCursorAt = Environment.TickCount64;
                     break;
                 case "wordlists":
                     wordLists = message.WordLists ?? [];
@@ -153,6 +163,7 @@ public sealed partial class MainWindow : Window, IDisposable
                 case "disconnected":
                     savingProfile = false;
                     undoPending = false;
+                    painting.RemoteCursor = null;
                     sessionReady = serviceAvailable = false;
                     connectionStatus = "Connection interrupted. Rejoining your drawing room automatically...";
                     if (connectionRetry.Due(Environment.TickCount64)) connectionRetry.Failed(Environment.TickCount64);
@@ -160,6 +171,25 @@ public sealed partial class MainWindow : Window, IDisposable
             }
         }
         long now = Environment.TickCount64;
+        if (now - remoteCursorAt > 2000) painting.RemoteCursor = null;
+        if (!updateCheckPending && now >= nextUpdateCheck)
+        {
+            updateCheckPending = true; nextUpdateCheck = now + 600000;
+            _ = Task.Run(async () =>
+            {
+                try
+                {
+                    var newer = await updates.CheckAsync(typeof(Plugin).Assembly.GetName().Version ?? new Version(0, 0));
+                    if (newer is not null) actions.Enqueue(() =>
+                    {
+                        if (plugin.Config.DismissedUpdate != newer.ToString())
+                            toasts.Show("update:" + newer, "An update is available", $"Kupo Skribbl {(newer.Build >= 0 ? newer.ToString(3) : newer.ToString())} is ready. Update through the Dalamud plugin installer.");
+                    });
+                }
+                catch (Exception ex) { if (!disposed) log.Write("update.check_failed", ex); }
+                finally { actions.Enqueue(() => updateCheckPending = false); }
+            });
+        }
         if (client?.Connected == true)
         {
             if (!sessionReady && !busy && now >= sessionDeadline)
@@ -283,6 +313,7 @@ public sealed partial class MainWindow : Window, IDisposable
     {
         disposed = true;
         client?.Dispose();
+        updates.Dispose();
         painting.Dispose(); avatarEditor.Dispose(); avatars.Dispose(); art.Dispose();
         newRecovery = ""; recoveryInput = "";
     }

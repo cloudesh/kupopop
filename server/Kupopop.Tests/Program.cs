@@ -99,6 +99,7 @@ Check(await RejectHealthResponse("{\"service\":\"not the game\"}"), "connection 
 
 var accounts = new AccountStore(Path.Combine(working, "accounts"));
 FeatureChecks.Run(working, Check);
+RoundFlowChecks.Run(working, Check);
 var credentials = Enumerable.Range(0, 18).Select(i => accounts.Create("Artist " + i)).ToArray();
 string accountFile = File.ReadAllText(Path.Combine(working, "accounts", "accounts.json"));
 Check(!accountFile.Contains(credentials[0].AccessToken) && !accountFile.Contains(credentials[0].RecoveryCode), "account persistence contains credential verifiers, not bearer secrets");
@@ -122,6 +123,7 @@ Check(peers[16].Events.Last().Type == "error", "seventeenth player rejected");
 engine.Handle(peers[1], new("start"));
 Check(peers[1].Events.Last().Type == "error", "non-host cannot start a match");
 engine.Handle(peers[0], new("start"));
+engine.Handle(peers[0], new("choose-word", Text: peers[0].State.WordChoices![0], TurnId: peers[0].State.TurnId));
 string word = peers[0].State.Word!;
 Check(!string.IsNullOrEmpty(word) && peers.Skip(1).Take(15).All(p => p.State.Word is null), "active answer is delivered to the drawer, not guessers");
 engine.Handle(peers[1], new("draw", Draw: new("pencil", 0, 0, 4, 4), TurnId: peers[0].State.TurnId));
@@ -163,6 +165,7 @@ match.Attach(a); match.Attach(b);
 match.Handle(a, new("create", Options: new("Full match", IsPublic: true)));
 match.Handle(b, new("join", Text: a.State.Code));
 match.Handle(a, new("start"));
+match.Handle(a, new("choose-word", Text: a.State.WordChoices![0], TurnId: a.State.TurnId));
 var drawers = new List<Guid>();
 for (int turn = 0; turn < 4; turn++)
 {
@@ -171,7 +174,12 @@ for (int turn = 0; turn < 4; turn++)
     drawers.Add(drawer.Id);
     match.Handle(solver, new("chat", Text: drawer.State.Word));
     Check(a.State.Phase == "intermission", "all solved ends drawing early, turn " + (turn + 1));
-    matchTime.Advance(4.1); match.Tick();
+    matchTime.Advance(6.1); match.Tick();
+    if (a.State.Phase == "choosing")
+    {
+        var chooser = a.State.DrawerId == a.Id ? a : b;
+        match.Handle(chooser, new("choose-word", Text: chooser.State.WordChoices![0], TurnId: chooser.State.TurnId));
+    }
 }
 Check(a.State.Phase == "results" && drawers.Count(d => d == a.Id) == 2 && drawers.Count(d => d == b.Id) == 2,
     "two rounds give every player exactly two drawing turns before results");
@@ -180,6 +188,7 @@ var listing = b.Events.Last(e => e.Type == "rooms");
 string publicJson = Encoding.UTF8.GetString(Protocol.Encode(listing));
 Check(listing.Rooms!.Length == 1 && !publicJson.Contains(a.Id.ToString()) && !publicJson.Contains("displayName"), "public listings expose rooms and counts without participant profiles");
 match.Handle(a, new("start"));
+match.Handle(a, new("choose-word", Text: a.State.WordChoices![0], TurnId: a.State.TurnId));
 matchTime.Advance(91);
 var expiredSolver = a.State.DrawerId == a.Id ? b : a;
 var expiredDrawer = ReferenceEquals(expiredSolver, a) ? b : a;
@@ -354,6 +363,8 @@ static async Task<ServerEvent> WaitEvent(RemoteClient client, Func<ServerEvent, 
         while (client.TryRead(out var message))
         {
             if (message?.Type == "error") throw new Exception("Integration command rejected: " + message.Error);
+            if (message?.Room is { Phase: "choosing", WordChoices: { Length: > 0 } choices } choosing)
+                client.Send(new("choose-word", Text: choices[0], TurnId: choosing.TurnId));
             if (message is not null && predicate(message)) return message;
         }
         await Task.Delay(10);

@@ -17,10 +17,15 @@ public sealed class CanvasWidget : IDisposable
     private int x, y;
     private long sentAt;
     private Guid stroke;
+    private int anchorX, anchorY;
+    private BrushCursor? lastPointer;
+    private long pointerAt;
     public string Tool = "pencil";
     public byte Color = 1;
     public int Size = 3;
     public Vector2 RenderSize { get; private set; }
+    public Vector2 RenderOrigin { get; private set; }
+    public BrushCursor? RemoteCursor;
 
     public void Toolbar(string id, bool transparency = false, Action? undo = null, bool canUndo = false)
     {
@@ -28,7 +33,7 @@ public sealed class CanvasWidget : IDisposable
         try
         {
             float available = ImGui.GetContentRegionAvail().X;
-            float brushWidth = Math.Min(UiTheme.S(110), Math.Max(UiTheme.S(60), available - UiTheme.S(164)));
+            float brushWidth = Math.Min(UiTheme.S(90), Math.Max(UiTheme.S(50), available - UiTheme.S(270)));
             foreach (string tool in new[] { "pencil", "fill", "eraser" })
             {
                 if (tool != "pencil") ImGui.SameLine();
@@ -40,7 +45,15 @@ public sealed class CanvasWidget : IDisposable
                 if (ImGui.IsItemHovered() || ImGui.IsItemFocused())
                     ImGui.SetTooltip(tool == "pencil" ? "Pencil" : tool == "fill" ? "Fill bucket" : transparency ? "Erase to transparent" : "Eraser");
             }
-            ImGui.SameLine(); ImGui.SetNextItemWidth(brushWidth);
+            ImGui.SameLine(); ImGui.SetNextItemWidth(UiTheme.S(70));
+            if (ImGui.BeginCombo("##shapes", DrawingTools.Shape(Tool) ? char.ToUpperInvariant(Tool[0]) + Tool[1..] : "Shapes"))
+            {
+                foreach (string shape in new[] { "line", "rectangle", "square", "ellipse", "circle" })
+                    if (ImGui.Selectable(char.ToUpperInvariant(shape[0]) + shape[1..], Tool == shape)) Tool = shape;
+                ImGui.EndCombo();
+            }
+            if (available >= UiTheme.S(300)) ImGui.SameLine();
+            ImGui.SetNextItemWidth(brushWidth);
             ImGui.SliderInt("##brush-size", ref Size, 1, 20, "%d px");
             if (ImGui.IsItemHovered() || ImGui.IsItemFocused()) ImGui.SetTooltip("Brush size");
             ImGui.SameLine();
@@ -48,34 +61,13 @@ public sealed class CanvasWidget : IDisposable
             using (Plugin.PluginInterface.UiBuilder.IconFontFixedWidthHandle.Push())
                 if (ImGui.Button(FontAwesomeIcon.Undo.ToIconString() + "##undo", UiTheme.V(28, 28))) { dragging = false; undo?.Invoke(); }
             if (ImGui.IsItemHovered() || ImGui.IsItemFocused()) ImGui.SetTooltip("Undo last stroke");
-            int colours = transparency ? Palette.Colors.Length : Palette.Transparent;
-            float swatch = Math.Min(UiTheme.S(20), (available - UiTheme.S(2) * (colours - 1)) / colours);
-            for (byte i = 0; i < colours; i++)
-            {
-                if (i != 0) ImGui.SameLine(0, UiTheme.S(2));
-                ImGui.PushID(i);
-                ImGui.InvisibleButton("colour", new Vector2(swatch, UiTheme.S(20)));
-                var centre = (ImGui.GetItemRectMin() + ImGui.GetItemRectMax()) / 2;
-                uint c = Palette.Colors[i];
-                var colour = new Vector4((c & 255) / 255f, ((c >> 8) & 255) / 255f, ((c >> 16) & 255) / 255f, 1);
-                if (i == Palette.Transparent) colour = UiTheme.Paper;
-                var draw = ImGui.GetWindowDrawList();
-                draw.AddCircleFilled(centre, swatch * 0.32f, UiTheme.C(colour));
-                if (i == Palette.Transparent)
-                    draw.AddLine(centre - new Vector2(swatch * 0.23f), centre + new Vector2(swatch * 0.23f), UiTheme.C(UiTheme.Rose), UiTheme.S(1.5f));
-                draw.AddCircle(centre, swatch * 0.32f, UiTheme.C(UiTheme.Line));
-                if (Color == i) draw.AddCircle(centre, swatch * 0.46f, UiTheme.C(UiTheme.Ink), 0, UiTheme.S(1.5f));
-                if (ImGui.IsItemClicked()) Color = i;
-                if (ImGui.IsItemHovered() || ImGui.IsItemFocused()) ImGui.SetTooltip(ColourNames[i]);
-                ImGui.PopID();
-            }
+            ImGui.SameLine(); UiPalette.Button(ref Color, transparency);
         }
         finally { ImGui.PopID(); }
     }
 
-    private static readonly string[] ColourNames = ["White", "Ink", "Graphite", "Silver", "Rose", "Scarlet", "Amber", "Sunshine", "Moss", "Forest", "Aqua", "Sky", "Violet", "Plum", "Clay", "Peach", "Transparent"];
 
-    public void Draw(string id, PixelCanvas canvas, Vector2 available, bool writable, Action<DrawOperation> submit)
+    public void Draw(string id, PixelCanvas canvas, Vector2 available, bool writable, Action<DrawOperation> submit, Action<BrushCursor>? pointer = null)
     {
         long now = Environment.TickCount64;
         if (texture is null || (revision != canvas.Revision && now - textureAt >= 40))
@@ -93,6 +85,7 @@ public sealed class CanvasWidget : IDisposable
         RenderSize = size;
         ImGui.SetCursorPosX(ImGui.GetCursorPosX() + Math.Max(0, (available.X - size.X) / 2));
         Vector2 top = ImGui.GetCursorScreenPos();
+        RenderOrigin = top;
         ImGui.InvisibleButton(id, size);
         UiTheme.SheetEdges(top, top + size);
         if (canvas.Transparency)
@@ -108,19 +101,71 @@ public sealed class CanvasWidget : IDisposable
         ImGui.GetWindowDrawList().AddImage(texture.Handle, top, top + size);
         ImGui.GetWindowDrawList().AddRect(top - UiTheme.V(1, 1), top + size + UiTheme.V(1, 1), UiTheme.C(UiTheme.Line));
         bool down = writable && ImGui.IsItemActive() && ImGui.IsMouseDown(ImGuiMouseButton.Left);
+        Vector2 mouse = ImGui.GetMousePos() - top;
+        int nx = Math.Clamp((int)(mouse.X / size.X * canvas.Width), 0, canvas.Width - 1);
+        int ny = Math.Clamp((int)(mouse.Y / size.Y * canvas.Height), 0, canvas.Height - 1);
+        var cursor = new BrushCursor(nx, ny, Tool, Color, Size, writable && (ImGui.IsItemHovered() || down));
+        bool pointerChanged = cursor.Visible ? lastPointer != cursor : lastPointer?.Visible == true;
+        if (pointer is not null && (pointerChanged && now - pointerAt >= 60 || now - pointerAt >= 1000 && cursor.Visible))
+        { pointer(cursor); lastPointer = cursor; pointerAt = now; }
         if (down)
         {
-            Vector2 mouse = ImGui.GetMousePos() - top;
-            int nx = Math.Clamp((int)(mouse.X / size.X * canvas.Width), 0, canvas.Width - 1);
-            int ny = Math.Clamp((int)(mouse.Y / size.Y * canvas.Height), 0, canvas.Height - 1);
-            if (!dragging || (Tool != "fill" && now - sentAt >= 33 && (nx != x || ny != y)))
+            if (!dragging) { stroke = Guid.NewGuid(); anchorX = nx; anchorY = ny; }
+            if (DrawingTools.Shape(Tool))
+                Preview(DrawingTools.Constrain(new(Tool, anchorX, anchorY, nx, ny, Color, Size)), top, size, canvas);
+            else if (!dragging || (Tool != "fill" && now - sentAt >= 33 && (nx != x || ny != y)))
             {
-                if (!dragging) stroke = Guid.NewGuid();
                 submit(new(Tool, dragging ? x : nx, dragging ? y : ny, nx, ny, Color, Size, stroke));
                 x = nx; y = ny; sentAt = now;
             }
         }
+        else if (dragging && writable && ImGui.IsMouseReleased(ImGuiMouseButton.Left))
+        {
+            if (DrawingTools.Shape(Tool)) submit(new(Tool, anchorX, anchorY, nx, ny, Color, Size, stroke));
+            else if (Tool != "fill" && (nx != x || ny != y)) submit(new(Tool, x, y, nx, ny, Color, Size, stroke));
+        }
+        if (RemoteCursor is { Visible: true } remote) DrawCursor(remote, top, size, canvas);
         dragging = down;
+    }
+
+    private static void Preview(DrawOperation op, Vector2 origin, Vector2 size, PixelCanvas canvas)
+    {
+        var scale = size / new Vector2(canvas.Width, canvas.Height);
+        Vector2 a = origin + new Vector2(op.X1, op.Y1) * scale, b = origin + new Vector2(op.X2, op.Y2) * scale;
+        var draw = ImGui.GetWindowDrawList();
+        uint color = op.Color == Palette.Transparent ? UiTheme.C(UiTheme.Rose) : Palette.Colors[op.Color];
+        float thickness = Math.Max(1, op.Size * scale.X);
+        draw.PushClipRect(origin, origin + size, true);
+        if (op.Tool == "line") draw.AddLine(a, b, color, thickness);
+        else if (op.Tool is "rectangle" or "square") draw.AddRect(Vector2.Min(a, b), Vector2.Max(a, b), color, 0, 0, thickness);
+        else
+        {
+            Vector2 center = (a + b) / 2, radius = Vector2.Abs(b - a) / 2;
+            Vector2 previous = center + new Vector2(radius.X, 0);
+            for (int i = 1; i <= 64; i++)
+            {
+                float angle = i * MathF.Tau / 64;
+                Vector2 next = center + new Vector2(MathF.Cos(angle), MathF.Sin(angle)) * radius;
+                draw.AddLine(previous, next, color, thickness); previous = next;
+            }
+        }
+        draw.PopClipRect();
+    }
+
+    private static void DrawCursor(BrushCursor cursor, Vector2 origin, Vector2 size, PixelCanvas canvas)
+    {
+        var draw = ImGui.GetWindowDrawList();
+        Vector2 point = origin + new Vector2(cursor.X + 0.5f, cursor.Y + 0.5f) * size / new Vector2(canvas.Width, canvas.Height);
+        float radius = Math.Max(UiTheme.S(4), cursor.Size * size.X / canvas.Width / 2);
+        draw.PushClipRect(origin, origin + size, true);
+        draw.AddCircle(point, radius + 1, UiTheme.C(UiTheme.Ink), 24, UiTheme.S(2));
+        draw.AddCircle(point, radius, Palette.Colors[cursor.Color], 24, UiTheme.S(1.5f));
+        var icon = cursor.Tool switch { "fill" => FontAwesomeIcon.FillDrip, "eraser" => FontAwesomeIcon.Eraser,
+            "circle" or "ellipse" => FontAwesomeIcon.Circle, "square" or "rectangle" => FontAwesomeIcon.Square,
+            "line" => FontAwesomeIcon.Slash, _ => FontAwesomeIcon.PencilAlt };
+        using (Plugin.PluginInterface.UiBuilder.IconFontFixedWidthHandle.Push())
+            draw.AddText(point + UiTheme.V(10, 6), UiTheme.C(UiTheme.Rose), icon.ToIconString());
+        draw.PopClipRect();
     }
 
     public void Dispose() { texture?.Dispose(); texture = null; }

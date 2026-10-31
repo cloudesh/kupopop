@@ -1,10 +1,14 @@
-Kupo Skribbl 0.4.0 adds transparent portraits, drawing undo, word-list choices and drawer voting.
+Kupo Skribbl 0.5.0 adds word choice, clearer turn presentation and a larger drawing toolkit.
 
-- Profile editor supports transparent pixels, transparent fill and erasing, with a checkerboard preview. Default reset now loads a truly transparent background; existing custom white pixels remain unchanged.
-- Choose seven editable moogle presets or 22 job emblems from the portrait drop-down. Emblems load from the installed game; only a preset ID is shared.
-- Undo removes the last complete stroke/fill on both canvases. Gameplay undo is validated on the server and synchronized to everyone; history is bounded to 24 actions and resets each turn.
-- Room creation offers a multi-select Word Lists drop-down showing List name - amount. The maintained service has 19 private lists with 511 entries, with 15 normal lists enabled and four advanced lists disabled by default.
-- Full word banks stay in private server data and are not shipped in plugin/server release binaries or GitHub source. Clients receive only metadata and answers permitted by game state. Players can still learn words by playing; this is not a guarantee against collecting previously seen answers.
-- Removes Mute. Vote to kick appears on the current drawer. Fewer than five connected players require all other players; five or more require 70% of the other players rounded up. Ballots last 30 seconds, fix eligibility/threshold at creation, allow one vote per person, and expire/reset with the turn.
-- Protocol 2 requires plugin and server 0.4.0. Profiles, credentials and certificates are preserved; deploying the server ends active rooms. Self-hosted fresh installs receive a small starter bank and can import private lists.
+- Drawers privately choose from four words within 15 seconds. The server auto-picks on timeout; the full configured drawing timer starts after selection. Unused choices never go to other players.
+- Larger clock/timer at the canvas top right. Hints reveal randomized positions, retaining previously revealed letters.
+- Six-second turn recaps dim the plugin and show the answer plus up to three earliest guessers and their awarded points. Solve order stays correct if a solver leaves.
+- Artists show only portrait, name and points. Room leaders right-click a row to kick; this includes the current drawer. Vote Kick and Vote Skip are small controls in the lower-right canvas area. Skip uses the same frozen eligibility/threshold rules, ending the turn without removing its drawer.
+- Compact, individually boxed chat messages. Game/server cards have an information icon.
+- Shared drawer cursor shows canvas position, selected tool, brush size and color. Cursor data is ephemeral, canvas-bounded, drawer-authorized and rate-limited; it is not persisted or logged.
+- Line, rectangle, square, ellipse and circle tools preview locally and commit on release as one undo action.
+- A Color button opens 32 colors, with transparency additionally available in the portrait editor. Existing palette indexes and saved avatar colors are preserved.
+- Reusable notifications appear inside the plugin's bottom-right corner. Update checks read bounded public feed metadata on startup and every ten minutes. New-version notices are dismissible per version; updates remain manual through Dalamud.
+
+Protocol 3 requires updating both plugin and server. Deployment restarts active rooms while preserving profiles, credentials, certificates and private word banks. Stock three-word starter banks upgrade to four; custom selections need at least four distinct words.
 

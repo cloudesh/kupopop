@@ -11,6 +11,7 @@ namespace Kupopop;
 public sealed class UiAssets : IDisposable
 {
     private readonly IFontHandle title = Plugin.PluginInterface.UiBuilder.FontAtlas.NewGameFontHandle(new GameFontStyle(GameFontFamilyAndSize.Jupiter23));
+    private readonly IFontHandle large = Plugin.PluginInterface.UiBuilder.FontAtlas.NewGameFontHandle(new GameFontStyle(GameFontFamilyAndSize.Axis36));
     private readonly DiagnosticLog log;
     private bool mascotUnavailable;
     private bool mascotReady;
@@ -23,6 +24,17 @@ public sealed class UiAssets : IDisposable
     {
         using var font = title.Push();
         ImGui.TextUnformatted(text);
+    }
+
+    public void LargeText(string text, bool wrap = false)
+    {
+        using var font = large.Push();
+        if (wrap) ImGui.TextWrapped(text); else ImGui.TextUnformatted(text);
+    }
+    public Vector2 MeasureLarge(string text, float width)
+    {
+        using var font = large.Push();
+        return ImGui.CalcTextSize(text, false, width);
     }
 
     public void Mascot(float size)
@@ -82,5 +94,5 @@ public sealed class UiAssets : IDisposable
         ImGui.TextColored(color ?? UiTheme.Muted, icon.ToIconString());
     }
 
-    public void Dispose() => title.Dispose();
+    public void Dispose() { title.Dispose(); large.Dispose(); }
 }

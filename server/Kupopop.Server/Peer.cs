@@ -17,7 +17,7 @@ public sealed class Peer(Guid id, WebSocket socket) : IGamePeer
 {
     private readonly Channel<byte[]> queue = Channel.CreateBounded<byte[]>(128);
     private DateTimeOffset window = DateTimeOffset.UtcNow;
-    private int commands, drawing, fills;
+    private int commands, drawing, fills, cursors, shapes;
     private int queuedBytes;
     private DateTimeOffset profileAt;
     public Guid Id { get; } = id;
@@ -39,7 +39,9 @@ public sealed class Peer(Guid id, WebSocket socket) : IGamePeer
             profileAt = DateTimeOffset.UtcNow;
         }
         if ((DateTimeOffset.UtcNow - window).TotalSeconds >= 1)
-        { window = DateTimeOffset.UtcNow; commands = drawing = fills = 0; }
+        { window = DateTimeOffset.UtcNow; commands = drawing = fills = cursors = shapes = 0; }
+        if (type == "cursor") return ++cursors <= 25;
+        if (type == "shape") return ++shapes <= 4;
         if (type == "draw") return ++drawing <= 90;
         if (type == "fill") return ++fills <= 4;
         return ++commands <= 8;

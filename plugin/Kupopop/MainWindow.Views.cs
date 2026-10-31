@@ -72,6 +72,8 @@ public sealed partial class MainWindow
         UiTheme.Caption(room is not null && screen == "game" ? "a page shared is a memory made" : "made for little masterpieces, kupo.");
         ImGui.SameLine(Math.Max(ImGui.GetCursorPosX() + UiTheme.S(20), ImGui.GetWindowContentRegionMax().X - UiTheme.S(100)));
         UiTheme.Caption("vol. " + UiVersion);
+        if (ConnectionReady && screen == "game" && room?.Phase == "intermission") DrawTurnReveal(room);
+        DrawToasts();
     }
 
     private void DrawHeader()
@@ -402,7 +404,7 @@ public sealed partial class MainWindow
                 ImGui.TableSetupColumn("Join", ImGuiTableColumnFlags.WidthFixed, UiTheme.S(100));
                 ImGui.TableNextColumn();
                 UiTheme.Ellipsis(listed.Title, ImGui.GetContentRegionAvail().X);
-                UiTheme.Caption(listed.Phase == "drawing" || listed.Phase == "intermission" ? "A match is in progress" : "Ready for company");
+                UiTheme.Caption(listed.Phase is "drawing" or "intermission" or "choosing" ? "A match is in progress" : "Ready for company");
                 ImGui.TableNextColumn(); ImGui.TextUnformatted($"{listed.Players} / {listed.MaxPlayers} artists");
                 ImGui.TableNextColumn();
                 using (ImRaii.Disabled(client?.Connected != true || listed.Phase is not ("waiting" or "results") || listed.Players >= listed.MaxPlayers))
@@ -441,7 +443,6 @@ public sealed partial class MainWindow
             }
             else UiTheme.Caption("The host will start the match when everyone is ready.");
         }
-        else DrawTurnHeader(state);
         float width = ImGui.GetContentRegionAvail().X;
         float height = Math.Max(UiTheme.S(120), ImGui.GetContentRegionAvail().Y - UiTheme.S(6));
         if (!ImGui.BeginTable("play-layout-canvas-sheet", 3, ImGuiTableFlags.Resizable | ImGuiTableFlags.SizingFixedFit | ImGuiTableFlags.NoPadOuterX, new Vector2(0, height))) return;
@@ -460,18 +461,17 @@ public sealed partial class MainWindow
     private void DrawTurnHeader(RoomView state)
     {
         int left = Math.Max(0, (int)Math.Ceiling((state.Deadline - (DateTimeOffset.UtcNow + serverOffset)).TotalSeconds));
-        if (!ImGui.BeginTable("turn-header-compact", 3, ImGuiTableFlags.NoPadOuterX)) return;
+        if (!ImGui.BeginTable("turn-header-compact", 2, ImGuiTableFlags.NoPadOuterX)) return;
         try
         {
-            ImGui.TableSetupColumn("Round", ImGuiTableColumnFlags.WidthFixed, UiTheme.S(132));
             ImGui.TableSetupColumn("Word", ImGuiTableColumnFlags.WidthStretch);
-            ImGui.TableSetupColumn("Time", ImGuiTableColumnFlags.WidthFixed, UiTheme.S(100));
-            ImGui.TableNextColumn(); ImGui.AlignTextToFramePadding(); UiTheme.Caption($"Round {state.Round} / {state.Options.Rounds}");
-            ImGui.TableNextColumn();
-            art.Heading(state.Word ?? string.Join(' ', state.Hint.ToUpperInvariant().ToCharArray()));
+            ImGui.TableSetupColumn("Time", ImGuiTableColumnFlags.WidthFixed, UiTheme.S(114));
+            ImGui.TableNextColumn(); UiTheme.Caption($"ROUND {state.Round} / {state.Options.Rounds}");
+            art.Heading(state.Phase == "choosing" ? "Choosing a word..." : state.Word ?? state.Hint);
             if (ImGui.IsItemHovered()) ImGui.SetTooltip(state.Phase == "intermission" ? "The word was" : state.DrawerId == device?.AccountId ? "Your word to draw" : "Guess the word");
-            ImGui.TableNextColumn(); ImGui.AlignTextToFramePadding();
-            ImGui.TextColored(left <= 15 && state.Phase == "drawing" ? UiTheme.Rose : UiTheme.Ink, (state.Phase == "intermission" ? "Next: " : "") + left + "s");
+            ImGui.TableNextColumn();
+            UiAssets.Glyph(FontAwesomeIcon.Clock, UiTheme.Brass); ImGui.SameLine();
+            using (ImRaii.PushColor(ImGuiCol.Text, left <= 15 && state.Phase == "drawing" ? UiTheme.Rose : UiTheme.Ink)) art.LargeText(left + "s");
         }
         finally { ImGui.EndTable(); }
     }
@@ -481,33 +481,22 @@ public sealed partial class MainWindow
         using var panel = new UiTheme.PaperPanel("artists", new Vector2(0, height), compact: true, note: UiTheme.StickyYellow);
         if (!panel.Success) return;
         UiTheme.Caption($"ARTISTS / {state.Players.Length}");
-        int rank = 0;
         foreach (var player in state.Players.OrderByDescending(p => p.Score))
         {
             var texture = avatars.Get(player.Profile);
             using var id = ImRaii.PushId(player.Profile.Id.ToString());
-            rank++;
+            ImGui.BeginGroup();
             ImGui.Image(texture.Handle, UiTheme.V(40, 40));
             ImGui.SameLine(); ImGui.BeginGroup();
             UiTheme.Ellipsis(player.Profile.DisplayName, Math.Max(UiTheme.S(35), ImGui.GetContentRegionAvail().X));
             ImGui.TextColored(player.Solved ? UiTheme.Green : UiTheme.Muted, $"{player.Score:N0} pts");
             ImGui.EndGroup();
-            string role = !player.Connected ? "Reconnecting" : player.IsDrawer ? "Drawing" : player.Solved ? "Guessed it" : state.Phase == "results" && rank == 1 ? "First place" : "";
-            if (role.Length > 0) UiTheme.Wrapped(role, UiTheme.Muted);
-            if (player.Profile.Id != device?.AccountId)
+            ImGui.EndGroup();
+            if (state.HostId == device?.AccountId && player.Profile.Id != device?.AccountId && ImGui.BeginPopupContextItem("artist-actions"))
             {
-                if (player.IsDrawer && state.Phase == "drawing")
-                {
-                    using (ImRaii.Disabled(state.KickVote?.YouVoted == true))
-                        if (UiTheme.Button(state.KickVote?.YouVoted == true ? "Vote counted" : "Vote to kick", 0, quiet: true))
-                            Send(new("vote-kick", TurnId: state.TurnId));
-                    if (ImGui.IsItemHovered()) ImGui.SetTooltip("Fewer than 5 artists: unanimous. Otherwise 70% of other connected artists, rounded up. Voting lasts 30 seconds.");
-                }
-                else if (state.HostId == device?.AccountId)
-                { if (ToolAction(FontAwesomeIcon.UserMinus, "Remove from room")) Send(new("kick", Text: player.Profile.Id.ToString())); }
+                if (ImGui.MenuItem("Kick from room")) Send(new("kick", Text: player.Profile.Id.ToString()));
+                ImGui.EndPopup();
             }
-            if (player.IsDrawer && state.KickVote is { } vote)
-                UiTheme.Wrapped($"Votes {vote.Votes}/{vote.Required} / {Math.Max(0, (int)(vote.ExpiresAt - (DateTimeOffset.UtcNow + serverOffset)).TotalSeconds)}s", UiTheme.Rose);
             UiTheme.Rule();
         }
     }
@@ -516,12 +505,15 @@ public sealed partial class MainWindow
     {
         bool canDraw = client?.Connected == true && state.Phase == "drawing" && state.DrawerId == device?.AccountId;
         float top = ImGui.GetCursorScreenPos().Y;
+        if (state.Phase is "choosing" or "drawing" or "intermission") DrawTurnHeader(state);
         if (canDraw) painting.Toolbar("game-tools", undo: () => { if (Send(new("undo", TurnId: state.TurnId))) undoPending = true; }, canUndo: canUndoDrawing && !undoPending);
         float toolsHeight = ImGui.GetCursorScreenPos().Y - top;
         painting.Draw("game-canvas", canvas, new Vector2(ImGui.GetContentRegionAvail().X, Math.Max(UiTheme.S(8), height - toolsHeight)), canDraw && !undoPending, operation =>
         {
             if (Send(new("draw", Draw: operation, TurnId: state.TurnId))) { canvas.Apply(operation); draws++; canUndoDrawing = true; }
-        });
+        }, canDraw ? pointer => Send(new("cursor", TurnId: state.TurnId, Cursor: pointer)) : null);
+        if (state.Phase == "choosing") DrawWordChoices(state);
+        if (state.Phase == "drawing" && state.DrawerId != device?.AccountId) DrawCanvasVotes(state);
         var size = new Vector2(MathF.Round(painting.RenderSize.X), MathF.Round(painting.RenderSize.Y));
         if (size != lastCanvasSize && Environment.TickCount64 >= nextLayoutLog)
         {
@@ -541,12 +533,10 @@ public sealed partial class MainWindow
         {
             if (messages.Success)
             {
+                using var spacing = ImRaii.PushStyle(ImGuiStyleVar.ItemSpacing, UiTheme.V(4, 2));
                 foreach (var line in chat)
                 {
-                    if (line.System)
-                    { UiTheme.Wrapped(line.Text, UiTheme.Green); UiTheme.Gap(3); continue; }
-                    using (ImRaii.PushColor(ImGuiCol.Text, line.Done ? UiTheme.Rose : UiTheme.Brass)) UiTheme.Ellipsis(line.Name, ImGui.GetContentRegionAvail().X);
-                    UiTheme.Wrapped(line.Text); UiTheme.Gap(4);
+                    DrawChatCard(line);
                 }
                 if (scrollChat) { ImGui.SetScrollHereY(1); scrollChat = false; }
             }
@@ -687,7 +677,7 @@ public sealed partial class MainWindow
         finally { ImGui.EndCombo(); }
     }
 
-    private static string SafeCommand(string? command) => command is "start" or "join" or "create" or "draw" or "undo" or "vote-kick" or "profile" or "chat" or "sync" or "kick" or "leave" or "list" ? command : "unknown";
+    private static string SafeCommand(string? command) => command is "start" or "join" or "create" or "draw" or "undo" or "vote-kick" or "vote-skip" or "choose-word" or "cursor" or "profile" or "chat" or "sync" or "kick" or "leave" or "list" ? command : "unknown";
     private static string SafeReason(string? error) => error switch
     {
         "At least two connected players are needed." => "players_required",

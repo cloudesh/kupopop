@@ -53,13 +53,13 @@ static class FeatureChecks
 
         var bank = new WordBank([
             new("normal", "Normal test", true, false, ["Private alpha", "Private beta"]),
-            new("complex", "Complex test", false, true, ["Hidden gamma", "Hidden delta"])]);
+            new("complex", "Complex test", false, true, ["Hidden gamma", "Hidden delta", "Hidden epsilon", "Hidden zeta"])]);
         check(bank.Selection(null).SequenceEqual(new[] { "normal" }) && bank.Catalog[1].Complex && !bank.Catalog[1].DefaultEnabled,
             "standard lists default on and complex lists default off");
         string metadata = Encoding.UTF8.GetString(Protocol.Encode(new ServerEvent("wordlists", WordLists: bank.Catalog)));
         check(!metadata.Contains("Private alpha") && !metadata.Contains("Hidden gamma") && bank.Catalog[0].Count == 2,
             "catalog protocol reveals list metadata/counts without any answer bank");
-        check(Enumerable.Range(0, 50).All(_ => bank.Choose(["complex"], "Hidden gamma") == "Hidden delta"),
+        check(Enumerable.Range(0, 50).All(_ => bank.Choose(["complex"], "Hidden gamma").StartsWith("Hidden ") && bank.Choose(["complex"], "Hidden gamma") != "Hidden gamma"),
             "selected lists constrain server words and immediate repeats are avoided");
         foreach (var selection in new[] { Array.Empty<string>(), new[] { "unknown" }, new[] { "normal", "normal" } })
         {
@@ -80,6 +80,7 @@ static class FeatureChecks
             engine.Handle(peers[0], new("create", Options: new("Feature room", WordLists: ["complex"])));
             for (int i = 1; i < count; i++) engine.Handle(peers[i], new("join", Text: peers[0].State.Code));
             engine.Handle(peers[0], new("start"));
+            engine.Handle(peers[0], new("choose-word", Text: peers[0].State.WordChoices![0], TurnId: peers[0].State.TurnId));
             return (engine, time, peers);
         }
         var undo = Room(3); var drawer = undo.peers[0]; Guid turn = drawer.State.TurnId;
