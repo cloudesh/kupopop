@@ -18,12 +18,15 @@ function Initialize-LocalServerState {
 
 function Zip-Directory {
     param([string]$Source, [string]$Destination, [switch]$Linux)
+    # Resolve literal input before deriving entry names so relative paths cannot
+    # break archive-root exclusions for private runtime folders.
+    $taskSourceRoot = (Get-Item -LiteralPath $Source -ErrorAction Stop).FullName
     Add-Type -AssemblyName System.IO.Compression
     $taskZipStream = [IO.File]::Open($Destination, [IO.FileMode]::Create)
     $taskZip = New-Object IO.Compression.ZipArchive($taskZipStream, [IO.Compression.ZipArchiveMode]::Create)
     try {
-        foreach ($taskFile in Get-ChildItem -LiteralPath $Source -File -Recurse) {
-            $taskName = $taskFile.FullName.Substring($Source.Length).TrimStart([IO.Path]::DirectorySeparatorChar, [IO.Path]::AltDirectorySeparatorChar).Replace('\','/')
+        foreach ($taskFile in Get-ChildItem -LiteralPath $taskSourceRoot -File -Recurse) {
+            $taskName = $taskFile.FullName.Substring($taskSourceRoot.Length).TrimStart([IO.Path]::DirectorySeparatorChar, [IO.Path]::AltDirectorySeparatorChar).Replace('\','/')
             # Never ship a running host's state, credentials, TLS keys, logs, or proxy cache.
             if ($taskName -match '^(data|logs|local|caddy-download)(/|$)' -or
                 $taskName -match '(^|/)(accounts\.json(?:\.tmp)?|hostname\.txt|Caddyfile)$' -or

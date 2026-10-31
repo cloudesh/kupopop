@@ -15,7 +15,7 @@ $env:KUPOPOP_ROOT = $taskState
 $env:KUPOPOP_PORT = '7443'
 $env:DOTNET_CLI_TELEMETRY_OPTOUT = '1'
 $env:MSBuildEnableWorkloadResolver = 'false'
-Write-Host 'Kupopop - My Local Server'
+Write-Host 'Kupo Skribbl - My Local Server'
 Write-Host 'Plugin server address: https://localhost:7443'
 Write-Host "Profiles and certificates: $(Join-Path $taskState 'data')"
 Write-Host "Logs: $(Join-Path $taskState 'logs')"

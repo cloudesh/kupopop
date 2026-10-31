@@ -26,15 +26,17 @@ public sealed class Plugin : IDalamudPlugin
         diagnostic.Write($"plugin.start version={typeof(Plugin).Assembly.GetName().Version} api=15 runtime={Environment.Version}");
         main = new(this, directory, diagnostic) { IsOpen = true };
         windows.AddWindow(main);
-        CommandManager.AddHandler("/kupopop", new CommandInfo((_, args) =>
+        var openCommand = new CommandInfo((_, args) =>
         {
             main.IsOpen = true;
             if (args.Trim().Equals("debug", StringComparison.OrdinalIgnoreCase)) main.ShowDebug = !main.ShowDebug;
-        }) { HelpMessage = "Open Kupopop Draw. Use /kupopop debug to show diagnostic information." });
+        }) { HelpMessage = "Open Kupo Skribbl. Use /kuposkribbl debug for appearance preferences and file diagnostics." };
+        CommandManager.AddHandler("/kuposkribbl", openCommand);
+        CommandManager.AddHandler("/kupopop", openCommand);
         PluginInterface.UiBuilder.Draw += Draw;
         PluginInterface.UiBuilder.OpenMainUi += Open;
         PluginInterface.UiBuilder.OpenConfigUi += OpenSettings;
-        Log.Information("Kupopop Draw loaded. Diagnostics: {Path}", diagnostic.FilePath);
+        Log.Information("Kupo Skribbl loaded. Diagnostics: {Path}", diagnostic.FilePath);
     }
 
     internal void Save() => PluginInterface.SavePluginConfig(Config);
@@ -56,6 +58,7 @@ public sealed class Plugin : IDalamudPlugin
         PluginInterface.UiBuilder.OpenMainUi -= Open;
         PluginInterface.UiBuilder.OpenConfigUi -= OpenSettings;
         CommandManager.RemoveHandler("/kupopop");
+        CommandManager.RemoveHandler("/kuposkribbl");
         windows.RemoveAllWindows();
         main.Dispose();
         diagnostic.Write("plugin.stop");

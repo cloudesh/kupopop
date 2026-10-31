@@ -37,6 +37,28 @@ Check(AvatarGenerator.Generate(123).SequenceEqual(AvatarGenerator.Generate(123))
 var generatedFaces = Enumerable.Range(0, 128).Select(AvatarGenerator.Generate).ToArray();
 Check(generatedFaces.All(face => face.Length == Protocol.AvatarSize * Protocol.AvatarSize && face.All(color => color < Palette.Colors.Length)) &&
     generatedFaces.Select(Convert.ToHexString).Distinct().Count() > 80, "moogle-like defaults remain valid editable avatars with varied faces and pom colors");
+var portraits = Enumerable.Range(0, 128).Select(AvatarGenerator.Rgba).ToArray();
+Check(portraits.All(p => p[3] == 0 && p[(63 * 64 + 63) * 4 + 3] == 0 &&
+    p[(34 * 64 + 32) * 4 + 3] == 255 && p[(34 * 64 + 32) * 4] == 255),
+    "default portrait exterior blends into paper while the white moogle face stays opaque across seeds");
+canvas.Load(AvatarGenerator.Generate(123));
+byte[] customPortrait = canvas.Rgba();
+Check(Enumerable.Range(0, 64 * 64).All(i => customPortrait[i * 4 + 3] == 255),
+    "editable/custom portrait conversion retains every background pixel and its opacity");
+var retrySchedule = new ConnectionRetry();
+bool delaysBounded = retrySchedule.Due(0);
+long retryTime = 0;
+for (int i = 0; i < 100; i++)
+{
+    retrySchedule.Failed(retryTime);
+    delaysBounded &= !retrySchedule.Due(retrySchedule.NextAttempt - 1) && retrySchedule.Due(retrySchedule.NextAttempt) &&
+        retrySchedule.NextAttempt - retryTime is >= 2000 and <= 30000;
+    retryTime = retrySchedule.NextAttempt;
+}
+Check(delaysBounded, "automatic reconnection continues beyond eight failures without hammering the service");
+retrySchedule.Connected();
+retrySchedule.Failed(100);
+Check(retrySchedule.Attempts == 1 && retrySchedule.NextAttempt == 2100, "successful sign-in resets retry backoff for the next outage");
 var pom = new PomMotion();
 pom.Step(100, 1f / 60, true);
 Check(pom.Angle == 0, "decorative pom stays still until the window moves");
@@ -72,6 +94,8 @@ foreach (string bad in new[] { "http://example.com", "https://127.0.0.1", "https
     try { using var _ = new RemoteClient(new Uri(bad)); } catch (ArgumentException) { rejected = true; }
     Check(rejected, "unsafe endpoint rejected: " + new Uri(bad).GetLeftPart(UriPartial.Path).Replace("user:secret@", ""));
 }
+Check(await RejectHealthResponse("{\"protocol\":999}"), "connection gate rejects an incompatible service protocol");
+Check(await RejectHealthResponse("{\"service\":\"not the game\"}"), "connection gate rejects a response without the game protocol");
 
 var accounts = new AccountStore(Path.Combine(working, "accounts"));
 var credentials = Enumerable.Range(0, 18).Select(i => accounts.Create("Artist " + i)).ToArray();
@@ -189,6 +213,8 @@ try
     }
     if (!ready) throw new Exception("Integration server did not start: " + output);
     using var first = new RemoteClient(http.BaseAddress!, allowTestHttp: true);
+    await first.CheckHealthAsync();
+    Check(true, "automatic connection validates the live service protocol before account setup or sign-in");
     using var second = new RemoteClient(http.BaseAddress!, allowTestHttp: true);
     using var third = new RemoteClient(http.BaseAddress!, allowTestHttp: true);
     var one = await first.CreateAsync("Live One");
@@ -323,6 +349,26 @@ static async Task<ServerEvent> WaitEvent(RemoteClient client, Func<ServerEvent, 
         await Task.Delay(10);
     }
     throw new TimeoutException("Expected protocol event did not arrive.");
+}
+
+static async Task<bool> RejectHealthResponse(string body)
+{
+    using var listener = new TcpListener(IPAddress.Loopback, 0);
+    listener.Start();
+    int port = ((IPEndPoint)listener.LocalEndpoint).Port;
+    var serve = Task.Run(async () =>
+    {
+        using var peer = await listener.AcceptTcpClientAsync();
+        using var stream = peer.GetStream();
+        using var reader = new StreamReader(stream, Encoding.ASCII, leaveOpen: true);
+        while (await reader.ReadLineAsync() is { Length: > 0 }) { }
+        byte[] response = Encoding.UTF8.GetBytes($"HTTP/1.1 200 OK\r\nContent-Type: application/json\r\nContent-Length: {Encoding.UTF8.GetByteCount(body)}\r\nConnection: close\r\n\r\n{body}");
+        await stream.WriteAsync(response);
+    });
+    using var client = new RemoteClient(new Uri($"http://localhost:{port}"), allowTestHttp: true);
+    try { await client.CheckHealthAsync(); return false; }
+    catch (InvalidDataException) { return true; }
+    finally { await serve; }
 }
 
 static string ReadShared(string path)

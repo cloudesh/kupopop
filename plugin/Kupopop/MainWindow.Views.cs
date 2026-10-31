@@ -52,14 +52,15 @@ public sealed partial class MainWindow
             ref topDragActive, IsPinned, !plugin.Config.UseStandardFrame);
         if (move != Vector2.Zero) pendingWindowPosition = position + move;
         UiTheme.Rule();
-        DrawNotice();
+        if (ConnectionReady) DrawNotice();
         using (var transparent = ImRaii.PushColor(ImGuiCol.ChildBg, Vector4.Zero))
         using (var body = ImRaii.Child("page-content", new Vector2(0, Math.Max(UiTheme.S(100), ImGui.GetContentRegionAvail().Y - ImGui.GetTextLineHeightWithSpacing() - UiTheme.S(2))), false))
         {
             if (body.Success)
             {
-                if (newRecovery.Length > 0) RecoveryScreen();
-                else if (ShowDebug) ServerSettings();
+                if (!ConnectionReady) ConnectingScreen();
+                else if (newRecovery.Length > 0) RecoveryScreen();
+                else if (ShowDebug) Preferences();
                 else if (screen == "welcome") Welcome();
                 else if (screen == "profile") ProfileScreen();
                 else if (screen == "game" && room is not null) Game();
@@ -79,42 +80,33 @@ public sealed partial class MainWindow
         if (!ImGui.BeginTable("brand-paper-controls", framed ? 3 : 4, ImGuiTableFlags.NoPadOuterX)) return;
         try
         {
-            ImGui.TableSetupColumn("Brand", ImGuiTableColumnFlags.WidthFixed, UiTheme.S(188));
+            ImGui.TableSetupColumn("Brand", ImGuiTableColumnFlags.WidthFixed, UiTheme.S(215));
             ImGui.TableSetupColumn("Navigation", ImGuiTableColumnFlags.WidthStretch);
-            ImGui.TableSetupColumn("Connection", ImGuiTableColumnFlags.WidthFixed, UiTheme.S(114));
+            ImGui.TableSetupColumn("Service status", ImGuiTableColumnFlags.WidthFixed, UiTheme.S(114));
             if (!framed) ImGui.TableSetupColumn("Paper controls", ImGuiTableColumnFlags.WidthFixed, UiTheme.S(64));
             ImGui.TableNextColumn();
             var face = ImGui.GetCursorScreenPos();
-            var move = UiChrome.DragHandle(UiTheme.V(184, 45), IsPinned, !framed);
+            var move = UiChrome.DragHandle(UiTheme.V(211, 45), IsPinned, !framed);
             if (move != Vector2.Zero) pendingWindowPosition = ImGui.GetWindowPos() + move;
             var afterBrand = ImGui.GetCursorScreenPos();
             UiStationery.Moogle(face + UiTheme.V(20, 30), UiTheme.S(14), pom.Angle);
             ImGui.SetCursorScreenPos(face + UiTheme.V(49, 0));
             ImGui.BeginGroup();
-            art.Heading("Kupopop");
+            art.Heading("Kupo Skribbl");
             UiTheme.Caption("THE LITTLE ART BOOK");
             ImGui.EndGroup();
             ImGui.SetCursorScreenPos(afterBrand);
             ImGui.TableNextColumn();
             UiTheme.Gap(6);
-            if (newRecovery.Length == 0 && screen != "welcome") Navigation();
+            if (ConnectionReady && newRecovery.Length == 0 && screen != "welcome") Navigation();
             else { ImGui.AlignTextToFramePadding(); UiTheme.Caption("THE DRAWING ROOM"); }
             ImGui.TableNextColumn();
-            bool online = client?.Connected == true;
+            bool online = ConnectionReady;
             UiTheme.Gap(6);
             ImGui.AlignTextToFramePadding();
-            using (ImRaii.Disabled(busy))
-            {
-                if (device is not null && !online)
-                { if (UiTheme.Button(busy ? "Connecting..." : "Connect", 0, primary: true)) Connect(); }
-                else
-                {
-                    UiAssets.Glyph(FontAwesomeIcon.Circle, online ? UiTheme.Green : UiTheme.Muted);
-                    ImGui.SameLine();
-                    if (UiTheme.Button(online ? "Connected" : busy ? "Connecting..." : "Offline", 0, quiet: true)) ShowDebug = !ShowDebug;
-                    if (ImGui.IsItemHovered()) ImGui.SetTooltip("Connection settings");
-                }
-            }
+            UiAssets.Glyph(FontAwesomeIcon.Circle, online ? UiTheme.Green : UiTheme.Muted);
+            ImGui.SameLine();
+            ImGui.TextUnformatted(online ? "Connected" : "Connecting...");
             if (!framed)
             {
                 ImGui.TableNextColumn(); UiTheme.Gap(6);
@@ -134,8 +126,20 @@ public sealed partial class MainWindow
         ImGui.SameLine();
         using (ImRaii.Disabled(profile is null))
             if (UiTheme.Tab("Profile", !ShowDebug && screen == "profile")) { ShowDebug = false; OpenProfile(); }
-        ImGui.SameLine();
-        if (UiTheme.Tab("Connection", ShowDebug)) ShowDebug = !ShowDebug;
+    }
+
+    private void ConnectingScreen()
+    {
+        UiTheme.Gap(40);
+        UiStationery.PageMark("opening your sketchbook");
+        art.Heading("Trying to connect");
+        UiTheme.Gap(10);
+        UiTheme.Wrapped(connectionStatus, UiTheme.Muted);
+        if (!busy && client is not null && connectionRetry.Attempts > 0)
+        {
+            int remaining = (int)Math.Max(1, (connectionRetry.NextAttempt - Environment.TickCount64 + 999) / 1000);
+            UiTheme.Caption($"Next attempt in {remaining}s. You will continue automatically once connected.");
+        }
     }
 
     private void DrawNotice()
@@ -193,8 +197,6 @@ public sealed partial class MainWindow
                     if (UiTheme.Button("Recover my profile", ImGui.GetContentRegionAvail().X)) CreateAccount(true);
                 }
             }
-            UiTheme.Gap(8);
-            if (UiTheme.Button("Connection settings", 0, quiet: true)) ShowDebug = true;
         }
         finally { ImGui.EndTable(); }
     }
@@ -297,7 +299,7 @@ public sealed partial class MainWindow
             UiTheme.Caption("Your sketchbook, your signature.");
             ImGui.EndGroup();
         }
-        else UiTheme.Wrapped("Connect to your server to load your profile and join the drawing room.", UiTheme.Muted);
+        else UiTheme.Wrapped("Your profile will appear here when it has loaded.", UiTheme.Muted);
     }
 
     private void CreateRoomScreen()
@@ -599,25 +601,12 @@ public sealed partial class MainWindow
         finally { ImGui.EndTable(); }
     }
 
-    private void ServerSettings()
+    private void Preferences()
     {
-        UiStationery.PageMark("the back cover"); art.Heading("Connection settings");
-        UiTheme.Wrapped("Connect to the server where your friends are drawing. Profiles belong to the server that created them.", UiTheme.Muted);
+        UiStationery.PageMark("the back cover"); art.Heading("Your sketchbook");
         UiTheme.Gap(10);
-        using var card = new UiTheme.PaperPanel("connection-settings", Vector2.Zero);
+        using var card = new UiTheme.PaperPanel("sketchbook-preferences", Vector2.Zero);
         if (!card.Success) return;
-        using (ImRaii.Disabled(busy))
-        {
-            UiTheme.Field("Server address", "##server-url", ref serverUrl, 256, "https://localhost:7443");
-            if (UiTheme.Button("Use this server", 0, primary: true)) ConfigureClient();
-            ImGui.SameLine();
-            if (device is not null && client?.Connected != true)
-            { if (UiTheme.Button("Connect")) Connect(); }
-            else if (client?.Connected == true && UiTheme.Button("Disconnect", 0, quiet: true))
-            { reconnect = false; Work(async () => { if (client is not null) await client.DisconnectAsync(); }, "Disconnecting"); }
-        }
-        UiTheme.Wrapped("For testing on this PC, run Start-My-Server.cmd and use https://localhost:7443. Friends on another PC need your public HTTPS hostname.", UiTheme.Muted);
-        UiTheme.Rule();
         bool reduceMotion = plugin.Config.ReduceMotion;
         if (ImGui.Checkbox("Reduce decorative motion", ref reduceMotion)) { plugin.Config.ReduceMotion = reduceMotion; plugin.Save(); }
         UiTheme.Caption("Keep the moogle pom still while moving the book.");

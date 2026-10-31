@@ -9,6 +9,9 @@ server/local/
 server/host.json
 server/hosting/Caddyfile
 server/hosting/caddy*
+server/deploy/Caddyfile
+server/deploy/Kupopop.Server
+server/deploy/backups/
 *.user
 *.pfx
 *.cer

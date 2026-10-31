@@ -1,9 +1,9 @@
 <Project Sdk="Dalamud.NET.Sdk/15.0.0">
   <PropertyGroup>
     <Author>cloudesh</Author>
-    <Name>Kupopop Draw</Name>
+    <Name>Kupo Skribbl</Name>
     <Punchline>Draw, guess, and share a little Kupo creativity.</Punchline>
-    <Description>A native multiplayer drawing and guessing game with private/public rooms and custom drawn avatars. Experimental: requires a separately hosted Kupopop server. No Kupo-Points yet.</Description>
+    <Description>A native multiplayer drawing and guessing game with private/public rooms and custom drawn avatars. Automatically connects to the shared Kupo Skribbl server. No Kupo-Points yet.</Description>
     <RepoUrl>https://github.com/cloudesh/kupopop</RepoUrl>
     <Tags>drawing;game;multiplayer;social</Tags>
     <Use_Dalamud_FFXIVClientStructs>false</Use_Dalamud_FFXIVClientStructs>

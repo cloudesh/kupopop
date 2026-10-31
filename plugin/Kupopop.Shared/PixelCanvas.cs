@@ -113,9 +113,26 @@ public sealed class PixelCanvas
 
 public static class AvatarGenerator
 {
-    public static byte[] Generate(int seed)
+    // Track the painted silhouette rather than flood-filling white: one-pixel
+    // sketch outlines can have gaps, while white face/ear/highlight pixels must
+    // remain opaque. Saved custom avatars never pass through this conversion.
+    public static byte[] Rgba(int seed)
+    {
+        int size = Protocol.AvatarSize;
+        var canvas = new PixelCanvas(size, size);
+        canvas.Load(Generate(seed, out var silhouette));
+        byte[] rgba = canvas.Rgba();
+        for (int p = 0; p < silhouette.Length; p++)
+            if (silhouette[p] == 0) rgba[p * 4 + 3] = 0;
+        return rgba;
+    }
+
+    public static byte[] Generate(int seed) => Generate(seed, out _);
+
+    private static byte[] Generate(int seed, out byte[] silhouette)
     {
         var canvas = new PixelCanvas(Protocol.AvatarSize, Protocol.AvatarSize);
+        var mask = new PixelCanvas(Protocol.AvatarSize, Protocol.AvatarSize);
         var random = new Random(seed);
         byte accent = new byte[] { 4, 6, 7, 12, 13, 15 }[random.Next(6)];
         int expression = random.Next(4), eyeY = random.Next(34, 38), pomX = random.Next(35, 45);
@@ -146,15 +163,20 @@ public static class AvatarGenerator
         Line(32, 47, 28, 50, 2); Line(32, 47, 36, 50, 2);
         Line(9, 42, 16, 44, 3); Line(48, 44, 55, 42, 3);
         if (random.Next(2) == 0) { Ellipse(17, 46, 3, 1, 15); Ellipse(47, 46, 3, 1, 15); }
+        silhouette = mask.Pixels;
         return canvas.Pixels;
 
-        void Line(int x1, int y1, int x2, int y2, byte color, int size = 1) => canvas.Apply(new("pencil", x1, y1, x2, y2, color, size));
+        void Line(int x1, int y1, int x2, int y2, byte color, int size = 1)
+        {
+            canvas.Apply(new("pencil", x1, y1, x2, y2, color, size));
+            mask.Apply(new("pencil", x1, y1, x2, y2, 1, size));
+        }
         void Ellipse(int cx, int cy, int rx, int ry, byte color)
         {
             for (int y = Math.Max(0, cy - ry); y <= Math.Min(63, cy + ry); y++)
                 for (int x = Math.Max(0, cx - rx); x <= Math.Min(63, cx + rx); x++)
                     if ((x - cx) * (x - cx) * ry * ry + (y - cy) * (y - cy) * rx * rx <= rx * rx * ry * ry)
-                        canvas.Pixels[y * 64 + x] = color;
+                    { canvas.Pixels[y * 64 + x] = color; mask.Pixels[y * 64 + x] = 1; }
         }
         void Triangle(int ax, int ay, int bx, int by, int cx, int cy, byte color)
         {
@@ -163,7 +185,8 @@ public static class AvatarGenerator
                 for (int x = Math.Min(ax, Math.Min(bx, cx)); x <= Math.Max(ax, Math.Max(bx, cx)); x++)
                 {
                     int a = Cross(x, y, ax, ay, bx, by), b = Cross(x, y, bx, by, cx, cy), c = Cross(x, y, cx, cy, ax, ay);
-                    if (!((a < 0 || b < 0 || c < 0) && (a > 0 || b > 0 || c > 0))) canvas.Pixels[y * 64 + x] = color;
+                    if (!((a < 0 || b < 0 || c < 0) && (a > 0 || b > 0 || c > 0)))
+                    { canvas.Pixels[y * 64 + x] = color; mask.Pixels[y * 64 + x] = 1; }
                 }
         }
     }

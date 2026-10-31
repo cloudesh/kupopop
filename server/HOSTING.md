@@ -1,8 +1,12 @@
-# Kupopop Draw server: first run
+# Kupo Skribbl server: first run
 
 Download and fully extract the Windows x64 or Linux x64 server ZIP from
-https://github.com/cloudesh/kupopop/releases/tag/v0.3.2. The packages include .NET;
+https://github.com/cloudesh/kupopop/releases/tag/v0.3.3. The packages include .NET;
 players and hosts do not need to install an SDK or runtime.
+
+The maintained service is **https://play.kupopop.com**. Regular players connect
+automatically; they do not need these self-hosting tools. For unattended Linux
+hosting, see [the Docker Compose deployment](deploy/README.md).
 
 ## Windows: local in-game testing
 
@@ -24,7 +28,9 @@ For a standalone downloaded server package:
    displayed fingerprint, then type `TRUST` if you want to install that certificate
    in your Windows user's trusted certificate store. No administrator access is
    normally required. Subsequent starts reuse it without asking again.
-3. Keep the console open. In the plugin, use `https://localhost:7443`.
+3. Keep the console open. A source-built plugin can use `https://localhost:7443`
+   by changing `OfficialService.Origin` before building. Release clients always
+   use the maintained service and have no connection settings.
 
 Only the machine running this server can use its localhost address. Other PCs
 must use a publicly trusted DNS endpoint as described below. No certificate

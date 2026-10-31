@@ -16,8 +16,9 @@ public sealed class AvatarTextures : IDisposable
              (old.Source is not null && profile.AvatarPixels is not null && old.Source.AsSpan().SequenceEqual(profile.AvatarPixels))))
             return old.Texture;
         var canvas = new PixelCanvas(64, 64);
-        canvas.Load(profile.AvatarPixels ?? AvatarGenerator.Generate(profile.AvatarSeed));
-        var texture = Plugin.TextureProvider.CreateFromRaw(RawImageSpecification.Rgba32(64, 64), canvas.Rgba(), "Kupopop avatar");
+        if (profile.AvatarPixels is { } custom) canvas.Load(custom);
+        byte[] rgba = profile.AvatarPixels is null ? AvatarGenerator.Rgba(profile.AvatarSeed) : canvas.Rgba();
+        var texture = Plugin.TextureProvider.CreateFromRaw(RawImageSpecification.Rgba32(64, 64), rgba, "Kupopop avatar");
         old?.Texture.Dispose();
         cache[profile.Id] = new(profile.AvatarSeed, profile.AvatarPixels, texture);
         if (cache.Count > 64)

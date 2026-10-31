@@ -10,7 +10,7 @@ $taskHostFile = Join-Path $PSScriptRoot 'hostname.txt'
 $taskHostname = ''
 if (Test-Path -LiteralPath $taskHostFile) { $taskHostname = ([IO.File]::ReadAllText($taskHostFile)).Trim() }
 if (-not $taskHostname) {
-    Write-Host 'Kupopop Draw server - Windows x64'
+    Write-Host 'Kupo Skribbl server - Windows x64'
     Write-Host 'For public hosting, point a DNS hostname here and allow inbound TCP ports 80 and 443.'
     $taskHostname = Read-Host 'Public DNS hostname (press Enter for local testing only)'
     if (-not $taskHostname) { & $taskServer --local --trust-local; exit $LASTEXITCODE }

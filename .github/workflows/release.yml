@@ -54,7 +54,7 @@ jobs:
           $tag = 'v' + (($manifest[0].AssemblyVersion -split '\.')[0..2] -join '.')
           gh release view $tag *> $null
           if ($LASTEXITCODE -ne 0) {
-            gh release create $tag --target $env:GITHUB_SHA --prerelease --title "Kupopop Draw $tag - experimental" --notes-file RELEASE_NOTES.md
+            gh release create $tag --target $env:GITHUB_SHA --prerelease --title "Kupo Skribbl $tag - experimental" --notes-file RELEASE_NOTES.md
             if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
           }
           gh release upload $tag artifacts/testing.zip artifacts/repo.json artifacts/Kupopop.Server-win-x64.zip artifacts/Kupopop.Server-linux-x64.zip --clobber
@@ -75,7 +75,7 @@ jobs:
             if (-not $entry) { throw 'Published ZIP has no plugin manifest.' }
             $reader = [IO.StreamReader]::new($entry.Open())
             try { $published = $reader.ReadToEnd() | ConvertFrom-Json } finally { $reader.Dispose() }
-            if ($published.AssemblyVersion -ne $manifest.AssemblyVersion -or $published.DalamudApiLevel -ne $manifest.DalamudApiLevel) { throw 'Published ZIP does not match the feed.' }
+            if ($published.AssemblyVersion -ne $manifest.AssemblyVersion -or $published.DalamudApiLevel -ne $manifest.DalamudApiLevel -or $published.Name -ne $manifest.Name -or $published.InternalName -ne $manifest.InternalName) { throw 'Published ZIP does not match the feed.' }
           } finally { $archive.Dispose() }
           $endpoint = "repos/$env:GITHUB_REPOSITORY/contents/plugin/releases/repo.json"
           $current = gh api $endpoint | ConvertFrom-Json

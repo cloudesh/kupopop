@@ -11,7 +11,7 @@ fi
 hostname=''
 if [[ -f hostname.txt ]]; then hostname="$(cat hostname.txt)"; fi
 if [[ -z "$hostname" ]]; then
-  echo 'Kupopop Draw server - Linux x64'
+  echo 'Kupo Skribbl server - Linux x64'
   echo 'Point a public DNS hostname here. Allow inbound TCP 80 and 443.'
   read -r -p 'Public DNS hostname: ' hostname
 fi

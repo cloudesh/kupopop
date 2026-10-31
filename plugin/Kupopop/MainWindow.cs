@@ -27,7 +27,6 @@ public sealed partial class MainWindow : Window, IDisposable
     private RoomView? room;
     private RoomSummary[] publicRooms = [];
     private Uri? endpoint;
-    private string serverUrl;
     private string displayName = "";
     private string recoveryInput = "";
     private string newRecovery = "";
@@ -37,21 +36,23 @@ public sealed partial class MainWindow : Window, IDisposable
     private string screen = "welcome";
     private string status = "";
     private bool busy, disposed, publicRoom, savedRecovery, revealRecovery, avatarReset, scrollChat, savingProfile;
-    private bool reconnect;
-    private int seconds = 90, rounds = 2, hints = 30, capacity = 16, retry;
-    private long reconnectAt, heartbeatAt, statsAt, lastSync;
+    private bool serviceAvailable, sessionReady;
+    private readonly ConnectionRetry connectionRetry = new();
+    private string connectionStatus = "Finding the drawing room...";
+    private long sessionDeadline;
+    private int seconds = 90, rounds = 2, hints = 30, capacity = 16;
+    private long heartbeatAt, statsAt, lastSync;
     private int received, draws;
     private TimeSpan serverOffset;
     public bool ShowDebug;
 
     public MainWindow(Plugin plugin, string directory, DiagnosticLog log)
-        : base("Kupopop Draw###KupopopPaper", ImGuiWindowFlags.NoScrollbar | ImGuiWindowFlags.NoScrollWithMouse)
+        : base("Kupo Skribbl###KupopopPaper", ImGuiWindowFlags.NoScrollbar | ImGuiWindowFlags.NoScrollWithMouse)
     {
         this.plugin = plugin;
         this.log = log;
         art = new(log);
         vault = new(directory);
-        serverUrl = plugin.Config.ServerUrl;
         Size = new(980, 650);
         SizeCondition = ImGuiCond.FirstUseEver;
         SizeConstraints = new() { MinimumSize = new(820, 540), MaximumSize = new(float.MaxValue) };
@@ -61,25 +62,28 @@ public sealed partial class MainWindow : Window, IDisposable
     private void ConfigureClient()
     {
         client?.Dispose();
-        client = null; device = null; profile = null; room = null; reconnect = false;
+        client = null; device = null; profile = null; room = null;
+        serviceAvailable = sessionReady = false;
         newRecovery = "";
         chat.Clear();
         try
         {
-            endpoint = new Uri(serverUrl.Trim().TrimEnd('/') + "/");
+            endpoint = new Uri(OfficialService.Origin.TrimEnd('/') + "/");
             client = new(endpoint, log.Write);
-            device = vault.Load(endpoint);
+            try { device = vault.Load(endpoint); }
+            catch (Exception ex)
+            {
+                log.Write("client.credential_unavailable", ex);
+                status = "This device could not open its saved sign-in. Use your private recovery code to recover your profile.";
+                returningArtist = true;
+            }
             screen = device is null ? "welcome" : "menu";
-            status = device is null ? "" : "Account found on this device. Connect when ready.";
-            plugin.Config.ServerUrl = endpoint.GetLeftPart(UriPartial.Authority);
-            serverUrl = plugin.Config.ServerUrl;
-            plugin.Save();
             log.Write("client.configured device_found=" + (device is not null));
         }
         catch (Exception ex)
         {
             log.Write("client.configuration_failed", ex);
-            status = "Check the HTTPS hostname. If a device credential cannot be opened, use account recovery.";
+            connectionStatus = "The game service is not configured. Please install the latest plugin update.";
             screen = "welcome";
         }
     }
@@ -96,6 +100,7 @@ public sealed partial class MainWindow : Window, IDisposable
             {
                 case "profile":
                     profile = message.Profile;
+                    if (profile is not null) { sessionReady = serviceAvailable = true; connectionRetry.Connected(); }
                     if (savingProfile)
                     { savingProfile = false; screen = room is null ? "menu" : "game"; status = "Profile saved."; }
                     if (profile is not null && screen != "profile") displayName = profile.DisplayName;
@@ -130,17 +135,25 @@ public sealed partial class MainWindow : Window, IDisposable
                     break;
                 case "disconnected":
                     savingProfile = false;
-                    status = message.Error ?? "Disconnected. Trying to reconnect.";
-                    if (reconnect) reconnectAt = Environment.TickCount64 + 3000;
+                    sessionReady = serviceAvailable = false;
+                    connectionStatus = "Connection interrupted. Rejoining your drawing room automatically...";
+                    if (connectionRetry.Due(Environment.TickCount64)) connectionRetry.Failed(Environment.TickCount64);
                     break;
             }
         }
         long now = Environment.TickCount64;
         if (client?.Connected == true)
         {
+            if (!sessionReady && !busy && now >= sessionDeadline)
+            {
+                connectionStatus = "The server took too long to load your profile. Trying again...";
+                Work(async () => await client.DisconnectAsync(), "Reconnecting");
+            }
             if (now - heartbeatAt > 15000) { Send(new("ping")); heartbeatAt = now; }
         }
-        else if (reconnect && !busy && device is not null && now >= reconnectAt && retry < 8) Connect();
+        else if (client is not null && !busy && connectionRetry.Due(now) && (!serviceAvailable || device is not null)) Connect();
+        else if (device is null && serviceAvailable && !busy && now >= heartbeatAt)
+        { Connect(); }
         if (now - statsAt > 10000)
         {
             log.Write($"client.stats connected={client?.Connected == true} events={received} drawings_sent={draws} room_phase={room?.Phase ?? "none"}");
@@ -168,7 +181,9 @@ public sealed partial class MainWindow : Window, IDisposable
         {
             device = saved; profile = result.Profile; displayName = result.Profile.DisplayName;
             newRecovery = result.RecoveryCode; recoveryInput = ""; savedRecovery = false; revealRecovery = false;
-            retry = 0; reconnect = true;
+            sessionReady = false;
+            sessionDeadline = Environment.TickCount64 + 15000;
+            connectionRetry.Connected();
         });
         await client!.ConnectAsync(result.AccessToken);
         actions.Enqueue(() => status = "Account ready. Save the recovery code below.");
@@ -176,28 +191,47 @@ public sealed partial class MainWindow : Window, IDisposable
 
     private void Connect()
     {
-        if (client is null || device is null || busy) return;
-        reconnect = true;
+        if (client is null || busy) return;
+        // A fresh authenticated snapshot replaces potentially expired room state.
+        // Room membership is restored by the server when its reconnect grace applies.
+        if (device is not null) { room = null; chat.Clear(); if (screen == "game") screen = "menu"; }
+        sessionReady = false;
+        connectionStatus = device is null ? "Checking the game service..." : "Signing in to your Kupopop profile...";
         var activeClient = client;
-        string token = device.AccessToken;
+        string? token = device?.AccessToken;
         Work(async () =>
         {
-            await activeClient.ConnectAsync(token);
-            actions.Enqueue(() => { retry = 0; status = "Connected."; });
+            await activeClient.CheckHealthAsync();
+            if (token is not null) await activeClient.ConnectAsync(token);
+            actions.Enqueue(() =>
+            {
+                serviceAvailable = true;
+                sessionDeadline = Environment.TickCount64 + 15000;
+                heartbeatAt = Environment.TickCount64 + (token is null ? 30000 : 0);
+                if (token is null) connectionRetry.Connected();
+                connectionStatus = token is null ? "Connected." : "Loading your profile...";
+            });
         }, "Connecting");
     }
+
+    private bool ConnectionReady => serviceAvailable && (device is null || (client?.Connected == true && sessionReady));
 
     private bool Send(ClientCommand command)
     {
         bool sent = client?.Send(command) == true;
-        if (!sent) status = "Not connected. Open Connection and reconnect.";
+        if (!sent)
+        {
+            sessionReady = serviceAvailable = false;
+            connectionStatus = "Connection interrupted. Reconnecting automatically...";
+        }
         return sent;
     }
 
     private void Work(Func<Task> operation, string label)
     {
         if (busy) return;
-        busy = true; status = label + "...";
+        busy = true;
+        if (label != "Connecting") status = label + "...";
         _ = Task.Run(async () =>
         {
             try { await operation().ConfigureAwait(false); }
@@ -206,8 +240,21 @@ public sealed partial class MainWindow : Window, IDisposable
                 log.Write("client.operation_failed category=" + label, ex);
                 actions.Enqueue(() =>
                 {
-                    status = $"{label} failed ({ex.GetType().Name}). Check the server, certificate, and diagnostic log.";
-                    retry++; reconnectAt = Environment.TickCount64 + Math.Min(30000, 2000 * (1 << Math.Min(retry, 4)));
+                    if (label != "Connecting") status = $"{label} failed. Please try again. Details were saved to the diagnostic log.";
+                    if (label == "Connecting" || ex is HttpRequestException { StatusCode: null } or OperationCanceledException)
+                    {
+                        sessionReady = serviceAvailable = false;
+                        connectionStatus = ex is InvalidDataException ? "The server requires a different plugin version. Please check for an update." :
+                            "The game service is unavailable. We will keep trying automatically.";
+                        connectionRetry.Failed(Environment.TickCount64);
+                        if (label == "Connecting" && ex is HttpRequestException { StatusCode: System.Net.HttpStatusCode.Unauthorized })
+                        {
+                            // Keep the encrypted file for recovery; never silently reuse another server's credentials.
+                            device = null; profile = null; room = null; chat.Clear(); screen = "welcome";
+                            returningArtist = true;
+                            status = "Your saved sign-in is no longer valid. Recover your profile using your private code.";
+                        }
+                    }
                 });
             }
             finally { actions.Enqueue(() => busy = false); }
@@ -216,7 +263,7 @@ public sealed partial class MainWindow : Window, IDisposable
 
     public void Dispose()
     {
-        disposed = true; reconnect = false;
+        disposed = true;
         client?.Dispose();
         painting.Dispose(); avatarEditor.Dispose(); avatars.Dispose(); art.Dispose();
         newRecovery = ""; recoveryInput = "";

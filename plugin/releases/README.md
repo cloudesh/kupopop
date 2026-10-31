@@ -1,7 +1,9 @@
 # Plugin release output
 
-Reserved for generated plugin packages and custom repository release metadata.
-There are no binaries or working repository manifests yet.
+`testing.zip` is the local Kupo Skribbl plugin package. `repo.json` is the live
+custom installer feed. Internal package/configuration names remain `Kupopop`
+so updates preserve installation and device data.
 
-Choose artifact retention and GitHub Releases automation during implementation;
-the presence of this folder does not imply generated binaries must be committed.
+Build-Release.ps1 creates a candidate feed under its output folder. GitHub Actions
+uploads and verifies the release ZIP before promoting the live feed. Never
+advertise an asset that has not yet been uploaded.

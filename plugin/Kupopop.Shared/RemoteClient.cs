@@ -34,6 +34,17 @@ public sealed class RemoteClient : IDisposable
     public Task<AccountCredentials> CreateAsync(string name) => PostAsync("api/accounts", new AccountRequest(name));
     public Task<AccountCredentials> RecoverAsync(string code) => PostAsync("api/recover", new RecoveryRequest(code));
 
+    public async Task CheckHealthAsync()
+    {
+        using var response = await http.GetAsync("health").ConfigureAwait(false);
+        response.EnsureSuccessStatusCode();
+        var health = await response.Content.ReadFromJsonAsync<ServiceHealth>(Protocol.Json).ConfigureAwait(false);
+        if (health?.Protocol != Protocol.Version)
+            throw new InvalidDataException("The server protocol is incompatible. Update the plugin.");
+    }
+
+    private sealed record ServiceHealth(int Protocol);
+
     public async Task<AccountCredentials> RotateRecoveryAsync(string token)
     {
         using var request = new HttpRequestMessage(HttpMethod.Post, "api/recovery-code");
@@ -69,6 +80,8 @@ public sealed class RemoteClient : IDisposable
         catch (Exception ex)
         {
             diagnostic?.Invoke("websocket.connect_failed http_status=" + (int)socket.HttpStatusCode, ex);
+            if (socket.HttpStatusCode is System.Net.HttpStatusCode.Unauthorized or System.Net.HttpStatusCode.UpgradeRequired)
+                throw new HttpRequestException("Sign-in rejected.", ex, socket.HttpStatusCode);
             throw;
         }
         outgoing = Channel.CreateBounded<byte[]>(128);

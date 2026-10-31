@@ -53,7 +53,7 @@ if (proxy) app.UseForwardedHeaders(new ForwardedHeadersOptions
 { ForwardedHeaders = ForwardedHeaders.XForwardedFor | ForwardedHeaders.XForwardedProto });
 app.UseRateLimiter();
 app.UseWebSockets(new WebSocketOptions { KeepAliveInterval = TimeSpan.FromSeconds(20) });
-app.MapGet("/health", () => Results.Json(new { service = "Kupopop Draw", version = typeof(GameEngine).Assembly.GetName().Version?.ToString(), protocol = Protocol.Version }));
+app.MapGet("/health", () => Results.Json(new { service = "Kupo Skribbl", version = typeof(GameEngine).Assembly.GetName().Version?.ToString(), protocol = Protocol.Version }));
 
 app.MapPost("/api/accounts", (AccountRequest request, AccountStore accounts) =>
 {
@@ -132,7 +132,7 @@ var ticking = Task.Run(async () =>
     catch (Exception ex) { app.Logger.LogCritical(ex, "Game clock failed; server stopping."); app.Lifetime.StopApplication(); }
 });
 app.Lifetime.ApplicationStopping.Register(() => tickStop.Cancel());
-app.Logger.LogInformation("Kupopop Draw {Version} starting. Protocol={Protocol} Mode={Mode}", typeof(GameEngine).Assembly.GetName().Version, Protocol.Version,
+app.Logger.LogInformation("Kupo Skribbl {Version} starting. Protocol={Protocol} Mode={Mode}", typeof(GameEngine).Assembly.GetName().Version, Protocol.Version,
     testing ? "isolated integration test" : proxy ? "TLS reverse proxy (loopback backend)" : "localhost development TLS");
 await app.RunAsync();
 tickStop.Cancel();

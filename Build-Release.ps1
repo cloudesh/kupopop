@@ -41,6 +41,11 @@ if (-not $SkipServers) {
             Copy-Item -Path 'server/hosting/*.cmd','server/hosting/*.ps1' -Destination $taskFolder -Force
         } else { Copy-Item -Path 'server/hosting/*.sh' -Destination $taskFolder -Force }
         Copy-Item -LiteralPath 'server/HOSTING.md' -Destination (Join-Path $taskFolder 'README.md') -Force
+        $taskDeployment = Join-Path $taskFolder 'deploy'
+        New-Item -ItemType Directory -Path $taskDeployment -Force | Out-Null
+        foreach ($taskTemplate in @('Dockerfile','compose.yaml','.dockerignore','Caddyfile.example','README.md')) {
+            Copy-Item -LiteralPath (Join-Path 'server/deploy' $taskTemplate) -Destination $taskDeployment -Force
+        }
         Copy-Item -LiteralPath 'LICENSE','THIRD_PARTY_NOTICES.md' -Destination $taskFolder -Force
         Zip-Directory -Source $taskFolder -Destination (Join-Path $taskOutput "Kupopop.Server-$taskRuntime.zip") -Linux:($taskRuntime -eq 'linux-x64')
     }

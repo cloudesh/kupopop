@@ -1,30 +1,36 @@
-# Kupopop Draw
+# Kupo Skribbl
 
 A native Dalamud drawing-and-guessing game for Final Fantasy XIV. Draw with
 friends, race to solve the word, and make a little avatar of your own.
 
-**Experimental 0.3.2 — compiled and automatically tested; in-game testing required.**
+**Experimental 0.3.3 — compiled and automatically tested; in-game testing required.**
 
 ## Try it
 
-On this PC, double-click **[Start-My-Server.cmd](Start-My-Server.cmd)** in this
-project folder. It builds the current server source and starts local HTTPS.
-Use this same launcher after updates. Accounts, certificates, and logs live in
-`server/local/`, separate from replaceable build output. Keep its console open.
+The plugin automatically connects to **https://play.kupopop.com**. Players do not
+need to run a server or enter an address. An unavailable service shows a short
+connection page; it retries automatically and opens the game when ready.
 
 Custom plugin repository URL:
 
 `https://raw.githubusercontent.com/cloudesh/kupopop/main/plugin/releases/repo.json`
 
 Add it under Dalamud Settings -> Experimental -> Custom Plugin Repositories,
-install **Kupopop Draw**, and open **`/kupopop`**. This custom release is not an
+install **Kupo Skribbl**, and open **`/kuposkribbl`** (`/kupopop` remains an alias).
+The installation ID stays `Kupopop` so existing installations update normally.
+This custom release is not an
 official Dalamud repository submission.
 
-Download the [Windows/Linux server packages](https://github.com/cloudesh/kupopop/releases/tag/v0.3.2).
-Windows local testing: extract the Windows server ZIP and double-click
-**Start-Local.cmd**, complete its explicit first-run certificate trust step, then
-use **`https://localhost:7443`** in the plugin. For multiple computers, host the
-server behind its public DNS/TLS endpoint. There is no pre-operated public server.
+Self-hosting/development: [Windows/Linux server packages](https://github.com/cloudesh/kupopop/releases/tag/v0.3.3)
+and [unattended Linux deployment](server/deploy/README.md) remain available. The
+stable PC launcher is **[Start-My-Server.cmd](Start-My-Server.cmd)**; its data stays
+in `server/local/`. A development plugin can target localhost by changing
+`OfficialService.Origin` before building. The distributed plugin uses the single
+maintained service and has no connection settings.
+
+Profiles belong to the backend that created them. A local development profile
+does not automatically migrate to the maintained server; its encrypted local
+credential and server data remain intact.
 
 [Testing and logs](TESTING.md) · [Hosting instructions](server/HOSTING.md)
 

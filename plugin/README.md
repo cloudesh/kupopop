@@ -2,8 +2,12 @@
 
 Native Dalamud plugin source and release packaging.
 
-First product: an in-game drawing-and-guessing game with a persistent Kupopop
+First product: Kupo Skribbl, an in-game drawing-and-guessing game with a persistent Kupopop
 profile. Future games will arrive through plugin updates.
+
+Clients connect automatically to `https://play.kupopop.com`. The service indicator
+is read-only and navigation is gated during connection/reconnection. There is no
+server selector. `/kuposkribbl` opens the game; `/kupopop` remains an alias.
 
 Native C# rendering is implemented and compiled against API 15. In-game testing
 is required; see the root TESTING.md.

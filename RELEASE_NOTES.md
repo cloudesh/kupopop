@@ -1,13 +1,11 @@
-Kupopop Draw 0.3.2 cleans up the canvas and sticky-note controls.
+Kupo Skribbl 0.3.3 introduces the game's new name and automatic connection.
 
-- The central drawing area is one canvas sheet, without an outer panel, extra padding, or Drawing board heading. Drawing proportions and server coordinates remain unchanged.
-- Wider artists panel, larger 40-unit portraits, and no Room host text row.
-- Front-page notes have no scrollbars. Button anchors use the actual content region, eliminating the tiny overflow at their lower edge.
-- Sticky notes use matching-color edges and soft shadows instead of cream backing sheets. Their actions use paper-tinted strips and ink rules, including the profile actions.
-- Empty space near the top of the page now drags the book. Header controls retain click priority, and pinned books stay still.
-- Native menu previews at 980/820 pixels wide reported zero horizontal/vertical overflow. Native input checks cover empty-top dragging and header-button clicks.
+- Plugin installer name, book heading, window title, server labels and documentation now use Kupo Skribbl. Open with /kuposkribbl; /kupopop remains an alias.
+- Automatically connects to https://play.kupopop.com using trusted HTTPS/WSS. Connection controls and server address settings have been removed.
+- A short "Trying to connect" page gates play during outages and sign-in. Retries continue automatically with a delay capped at 30 seconds. The header shows Connected when the service/profile is ready.
+- Default moogle avatars blend into surrounding paper; white facial features, custom artwork, existing avatar seeds and local account files are preserved.
+- Appearance preferences and file diagnostics remain available through the plugin installer settings action or /kuposkribbl debug, once connected.
+- Adds an unattended Linux Docker Compose deployment with persistent account/TLS storage. Windows/Linux packages and the permanent local launcher remain available.
 
-Requires Dalamud API 15 and a running Kupopop server. Protocol 1 remains compatible with the previous server; account data and custom avatars are preserved.
-Compiled and automatically tested; in-game rendering and input still require testing.
+Profiles are specific to their backend. Previously created local-development profiles do not automatically migrate to the new maintained service.
 
-See TESTING.md, UI_DESIGN.md, and server/HOSTING.md for usage, appearance, logs, and hosting.

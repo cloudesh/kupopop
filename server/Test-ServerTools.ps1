@@ -39,6 +39,20 @@ try {
     Assert-ServerTools (($taskNames -join ',') -eq 'Kupopop.Server.exe,README.md,Start-Local.cmd') 'release ZIP includes only application files and excludes runtime state, keys, logs, and proxy caches'
 } finally { $taskZip.Dispose() }
 
+# Source paths are often relative when the helper is invoked by hand. Runtime
+# exclusions must apply to the same archive-relative names in every path form.
+Push-Location -LiteralPath $taskTestRoot
+try {
+    foreach ($taskSource in @('payload', ('.' + [IO.Path]::DirectorySeparatorChar + 'payload'), ($taskPayload + [IO.Path]::DirectorySeparatorChar))) {
+        Zip-Directory -Source $taskSource -Destination $taskZipPath
+        $taskZip = [IO.Compression.ZipFile]::OpenRead($taskZipPath)
+        try {
+            $taskNames = @($taskZip.Entries.FullName | Sort-Object)
+            Assert-ServerTools (($taskNames -join ',') -eq 'Kupopop.Server.exe,README.md,Start-Local.cmd') 'relative and trailing-separator source paths preserve ZIP names and privacy exclusions'
+        } finally { $taskZip.Dispose() }
+    }
+} finally { Pop-Location }
+
 foreach ($taskScript in @((Join-Path $PSScriptRoot 'Start-Local.ps1'),(Join-Path $PSScriptRoot 'Server-Tools.ps1'),(Join-Path (Split-Path -Parent $PSScriptRoot) 'Build-Release.ps1'))) {
     $taskErrors = $null
     [Management.Automation.Language.Parser]::ParseFile($taskScript, [ref]$null, [ref]$taskErrors) | Out-Null
