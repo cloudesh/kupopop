@@ -4,7 +4,7 @@ using Kupopop.Shared;
 
 namespace Kupopop.Server;
 
-public sealed class GameEngine(AccountStore accounts, ILogger<GameEngine> log, TimeProvider clock)
+public sealed class GameEngine(AccountStore accounts, ILogger<GameEngine> log, TimeProvider clock, WordBank? wordBank = null)
 {
     private sealed class Member(Guid id)
     {
@@ -22,6 +22,9 @@ public sealed class GameEngine(AccountStore accounts, ILogger<GameEngine> log, T
         public RoomOptions Options = options;
         public Dictionary<Guid, Member> Members = [];
         public PixelCanvas Canvas = new();
+        public CanvasHistory History = new();
+        public KickBallot? Vote;
+        public bool VoteUsed;
         public string Phase = "waiting";
         public List<Guid> Deck = [];
         public int Position = -1;
@@ -38,7 +41,15 @@ public sealed class GameEngine(AccountStore accounts, ILogger<GameEngine> log, T
     private readonly object gate = new();
     private readonly Dictionary<Guid, IGamePeer> peers = [];
     private readonly Dictionary<string, Room> rooms = new(StringComparer.OrdinalIgnoreCase);
-    private static readonly string[] Words = ["Chocobo", "Moogle", "Cactuar"];
+    private readonly WordBank words = wordBank ?? WordBank.Starter();
+    private sealed class KickBallot(Guid target, Guid[] eligible, int required, DateTimeOffset expires)
+    {
+        public Guid Target = target;
+        public HashSet<Guid> Eligible = eligible.ToHashSet();
+        public HashSet<Guid> Votes = [];
+        public int Required = required;
+        public DateTimeOffset Expires = expires;
+    }
     private DateTimeOffset Now => clock.GetUtcNow();
 
     public void Attach(IGamePeer peer)
@@ -48,6 +59,7 @@ public sealed class GameEngine(AccountStore accounts, ILogger<GameEngine> log, T
             if (peers.Remove(peer.Id, out var old)) old.Close();
             peers[peer.Id] = peer;
             peer.Send(new("profile", Profile: accounts.Get(peer.Id)));
+            peer.Send(new("wordlists", WordLists: words.Catalog));
             var room = rooms.Values.FirstOrDefault(r => r.Members.ContainsKey(peer.Id));
             if (room is not null)
             {
@@ -145,14 +157,25 @@ public sealed class GameEngine(AccountStore accounts, ILogger<GameEngine> log, T
                         if (room?.Phase != "drawing" || room.Drawer != peer.Id || command.TurnId != room.TurnId)
                             throw new ArgumentException("Drawing is only available during your current turn.");
                         if (Now >= room.Deadline) { EndTurn(room); break; }
-                        if (command.Draw is null || !room.Canvas.Apply(command.Draw)) throw new ArgumentException("Drawing operation rejected.");
+                        if (command.Draw is null || !room.Canvas.Valid(command.Draw)) throw new ArgumentException("Drawing operation rejected.");
+                        room.History.Capture(room.Canvas, command.Draw.StrokeId);
+                        room.Canvas.Apply(command.Draw);
                         Broadcast(room, new("draw", Draw: command.Draw, ActorId: peer.Id, TurnId: room.TurnId));
+                        break;
+                    case "undo":
+                        if (room?.Phase != "drawing" || room.Drawer != peer.Id || command.TurnId != room.TurnId || Now >= room.Deadline)
+                            throw new ArgumentException("Undo is only available during your current turn.");
+                        if (!room.History.Undo(room.Canvas)) throw new ArgumentException("Nothing to undo.");
+                        Broadcast(room, new("canvas", Canvas: (byte[])room.Canvas.Pixels.Clone(), TurnId: room.TurnId, CanUndo: room.History.CanUndo));
+                        break;
+                    case "vote-kick":
+                        VoteKick(peer, room, command.TurnId);
                         break;
                     case "chat":
                         Chat(peer, room, command.Text ?? "");
                         break;
                     case "profile":
-                        var profile = accounts.Update(peer.Id, command.Text, command.Avatar, command.ResetAvatar);
+                        var profile = accounts.Update(peer.Id, command.Text, command.Avatar, command.ResetAvatar, command.AvatarPreset);
                         peer.Send(new("profile", Profile: profile));
                         if (room is not null) BroadcastState(room);
                         break;
@@ -160,6 +183,8 @@ public sealed class GameEngine(AccountStore accounts, ILogger<GameEngine> log, T
                         RequireHost(peer, room);
                         if (!Guid.TryParse(command.Text, out var target) || target == peer.Id || !room!.Members.ContainsKey(target))
                             throw new ArgumentException("Select another player to remove.");
+                        if (room.Phase == "drawing" && target == room.Drawer)
+                            throw new ArgumentException("Use the vote to remove the current drawer.");
                         Remove(room, target);
                         if (peers.TryGetValue(target, out var kicked))
                         { kicked.RoomCode = null; kicked.Send(new("left", Error: "The host removed you from the room.")); }
@@ -191,6 +216,7 @@ public sealed class GameEngine(AccountStore accounts, ILogger<GameEngine> log, T
                     continue;
                 }
                 room.EmptySince = default;
+                if (room.Vote is { } ballot && Now >= ballot.Expires) { room.Vote = null; BroadcastState(room); }
                 if (room.Phase == "drawing")
                 {
                     if (Now >= room.Deadline || room.Drawer is null ||
@@ -239,6 +265,7 @@ public sealed class GameEngine(AccountStore accounts, ILogger<GameEngine> log, T
 
     private void NextTurn(Room room)
     {
+        room.Vote = null; room.VoteUsed = false; room.History.Clear();
         do room.Position++; while (room.Position < room.Deck.Count &&
             (!room.Members.TryGetValue(room.Deck[room.Position], out var member) || !member.Connected));
         if (room.Position >= room.Deck.Count || room.Members.Values.Count(m => m.Connected) < 2)
@@ -256,8 +283,7 @@ public sealed class GameEngine(AccountStore accounts, ILogger<GameEngine> log, T
         room.TurnId = Guid.NewGuid();
         room.Deadline = Now.AddSeconds(room.Options.TurnSeconds);
         room.Revealed = 0;
-        string[] candidates = Words.Where(w => w != room.LastWord).ToArray();
-        room.Word = candidates[RandomNumberGenerator.GetInt32(candidates.Length)];
+        room.Word = words.Choose(room.Options.WordLists, room.LastWord);
         room.LastWord = room.Word;
         room.Canvas.Clear();
         foreach (var member in room.Members.Values) member.Solved = false;
@@ -269,6 +295,7 @@ public sealed class GameEngine(AccountStore accounts, ILogger<GameEngine> log, T
     private void EndTurn(Room room)
     {
         if (room.Phase != "drawing") return;
+        room.Vote = null; room.History.Clear();
         room.Phase = "intermission";
         room.Deadline = Now.AddSeconds(4);
         SystemMessage(room, "Turn finished. The answer is shown above the canvas.");
@@ -310,7 +337,9 @@ public sealed class GameEngine(AccountStore accounts, ILogger<GameEngine> log, T
             room.Deadline, hint, showWord ? room.Word : null, done,
             room.Members.Values.Select(m => new PlayerView(accounts.Get(m.Id)!, m.Score, m.Connected,
                 m.Solved, m.Id == room.Host, m.Id == room.Drawer)).ToArray(), Now,
-            snapshot ? (byte[])room.Canvas.Pixels.Clone() : null, reset)));
+            snapshot ? (byte[])room.Canvas.Pixels.Clone() : null, reset,
+            room.Phase == "drawing" && room.Drawer == peer.Id && room.History.CanUndo,
+            room.Vote is { } vote ? new(vote.Target, vote.Votes.Count, vote.Required, vote.Votes.Contains(peer.Id), vote.Expires) : null)));
     }
 
     private void BroadcastState(Room room, bool reset = false, Guid? except = null)
@@ -327,14 +356,41 @@ public sealed class GameEngine(AccountStore accounts, ILogger<GameEngine> log, T
 
     private void SystemMessage(Room room, string text) => Broadcast(room, new("chat", Chat: new(null, "Kupopop", text, System: true)));
 
-    private static RoomOptions Validate(RoomOptions options)
+    private RoomOptions Validate(RoomOptions options)
     {
         string title = options.Title?.Trim() ?? "";
         if (!Protocol.ValidName(title)) throw new ArgumentException("Room title must be 2–40 characters.");
         if (options.TurnSeconds is < 15 or > 300 || options.Rounds is < 1 or > 5 ||
             options.MaxPlayers is < 2 or > 16 || options.HintSeconds is < 0 or > 300)
             throw new ArgumentException("Room settings are outside supported limits.");
-        return options with { Title = title };
+        return options with { Title = title, WordLists = words.Selection(options.WordLists) };
+    }
+
+    private void VoteKick(IGamePeer peer, Room? room, Guid turn)
+    {
+        if (room?.Phase != "drawing" || turn != room.TurnId || Now >= room.Deadline ||
+            room.Drawer is not { } target || target == peer.Id || !room.Members[peer.Id].Connected)
+            throw new ArgumentException("You may only vote on the current drawer.");
+        if (room.Vote is null)
+        {
+            if (room.VoteUsed) throw new ArgumentException("A vote has already ended this turn.");
+            var online = room.Members.Values.Where(m => m.Connected).ToArray();
+            Guid[] eligible = online.Where(m => m.Id != target).Select(m => m.Id).ToArray();
+            int required = online.Length < 5 ? eligible.Length : (int)Math.Ceiling(eligible.Length * 0.7);
+            room.Vote = new(target, eligible, required, Now.AddSeconds(30)); room.VoteUsed = true;
+        }
+        var ballot = room.Vote;
+        if (Now >= ballot.Expires || !ballot.Eligible.Contains(peer.Id) || !ballot.Votes.Add(peer.Id))
+            throw new ArgumentException("This vote has ended or your vote was already counted.");
+        if (ballot.Votes.Count >= ballot.Required)
+        {
+            room.Vote = null;
+            Remove(room, target);
+            if (peers.TryGetValue(target, out var removed)) removed.Send(new("left", Error: "The room voted to remove you."));
+            SystemMessage(room, "The drawer was removed by vote.");
+            log.LogInformation("Drawer removed by room vote. Votes={Votes} Required={Required}", ballot.Votes.Count, ballot.Required);
+        }
+        else BroadcastState(room);
     }
 
     private static string Normalize(string value)

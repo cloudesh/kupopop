@@ -41,6 +41,7 @@ if (-not $SkipServers) {
             Copy-Item -Path 'server/hosting/*.cmd','server/hosting/*.ps1' -Destination $taskFolder -Force
         } else { Copy-Item -Path 'server/hosting/*.sh' -Destination $taskFolder -Force }
         Copy-Item -LiteralPath 'server/HOSTING.md' -Destination (Join-Path $taskFolder 'README.md') -Force
+        Copy-Item -LiteralPath 'server/WORD_LISTS.md' -Destination $taskFolder -Force
         $taskDeployment = Join-Path $taskFolder 'deploy'
         New-Item -ItemType Directory -Path $taskDeployment -Force | Out-Null
         foreach ($taskTemplate in @('Dockerfile','compose.yaml','.dockerignore','Caddyfile.example','README.md')) {

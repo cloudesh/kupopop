@@ -5,7 +5,7 @@ namespace Kupopop.Shared;
 
 public static class Protocol
 {
-    public const int Version = 1;
+    public const int Version = 2;
     public const int CanvasWidth = 384;
     public const int CanvasHeight = 288;
     public const int AvatarSize = 64;
@@ -43,10 +43,13 @@ public static class Protocol
 public sealed record AccountRequest(string DisplayName);
 public sealed record RecoveryRequest(string RecoveryCode);
 public sealed record AccountCredentials(Guid AccountId, string AccessToken, string RecoveryCode, PlayerProfile Profile);
-public sealed record PlayerProfile(Guid Id, string DisplayName, int AvatarSeed, byte[]? AvatarPixels = null);
+public sealed record PlayerProfile(Guid Id, string DisplayName, int AvatarSeed, byte[]? AvatarPixels = null, string? AvatarPreset = null);
 
 public sealed record RoomOptions(string Title, bool IsPublic = false, int TurnSeconds = 90,
-    int Rounds = 2, int HintSeconds = 30, int MaxPlayers = 16);
+    int Rounds = 2, int HintSeconds = 30, int MaxPlayers = 16, string[]? WordLists = null);
+
+public sealed record WordListInfo(string Id, string Name, int Count, bool DefaultEnabled, bool Complex);
+public sealed record KickVoteView(Guid Target, int Votes, int Required, bool YouVoted, DateTimeOffset ExpiresAt);
 
 public sealed record RoomSummary(string Code, string Title, int Players, int MaxPlayers, string Phase);
 public sealed record PlayerView(PlayerProfile Profile, int Score, bool Connected, bool Solved, bool IsHost, bool IsDrawer);
@@ -54,11 +57,13 @@ public sealed record ChatLine(Guid? Sender, string Name, string Text, bool Done 
 
 public sealed record RoomView(string Code, RoomOptions Options, string Phase, Guid HostId, Guid? DrawerId,
     Guid TurnId, int Round, DateTimeOffset Deadline, string Hint, string? Word, bool YouAreDone,
-    PlayerView[] Players, DateTimeOffset ServerTime, byte[]? Canvas = null, bool ResetCanvas = false);
+    PlayerView[] Players, DateTimeOffset ServerTime, byte[]? Canvas = null, bool ResetCanvas = false,
+    bool CanUndo = false, KickVoteView? KickVote = null);
 
-public sealed record DrawOperation(string Tool, int X1, int Y1, int X2, int Y2, byte Color = 1, int Size = 3);
+public sealed record DrawOperation(string Tool, int X1, int Y1, int X2, int Y2, byte Color = 1, int Size = 3, Guid StrokeId = default);
 public sealed record ClientCommand(string Type, string? Text = null, RoomOptions? Options = null,
-    DrawOperation? Draw = null, Guid TurnId = default, byte[]? Avatar = null, bool ResetAvatar = false);
+    DrawOperation? Draw = null, Guid TurnId = default, byte[]? Avatar = null, bool ResetAvatar = false, string? AvatarPreset = null);
 public sealed record ServerEvent(string Type, RoomView? Room = null, RoomSummary[]? Rooms = null,
     ChatLine? Chat = null, DrawOperation? Draw = null, Guid? ActorId = null,
-    string? Error = null, PlayerProfile? Profile = null, Guid TurnId = default, string? RejectedCommand = null);
+    string? Error = null, PlayerProfile? Profile = null, Guid TurnId = default, string? RejectedCommand = null,
+    WordListInfo[]? WordLists = null, byte[]? Canvas = null, bool CanUndo = false);

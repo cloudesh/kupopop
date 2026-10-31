@@ -16,11 +16,15 @@ public sealed partial class MainWindow : Window, IDisposable
     private readonly CanvasWidget painting = new();
     private readonly CanvasWidget avatarEditor = new();
     private readonly PixelCanvas canvas = new();
-    private readonly PixelCanvas avatar = new(64, 64);
-    private readonly AvatarTextures avatars = new();
+    private readonly PixelCanvas avatar = new(64, 64, transparency: true);
+    private readonly CanvasHistory avatarHistory = new();
+    private string? avatarPreset;
+    private WordListInfo[] wordLists = [];
+    private readonly HashSet<string> selectedWordLists = [];
+    private bool wordListsChosen, undoPending, canUndoDrawing;
+    private readonly AvatarTextures avatars;
     private readonly UiAssets art;
     private readonly List<ChatLine> chat = [];
-    private readonly HashSet<Guid> muted = [];
     private RemoteClient? client;
     private DeviceAccount? device;
     private PlayerProfile? profile;
@@ -51,6 +55,7 @@ public sealed partial class MainWindow : Window, IDisposable
     {
         this.plugin = plugin;
         this.log = log;
+        avatars = new(log);
         art = new(log);
         vault = new(directory);
         Size = new(980, 650);
@@ -112,6 +117,7 @@ public sealed partial class MainWindow : Window, IDisposable
                     if (differentRoom) chat.Clear();
                     if (state.ResetCanvas || newTurn) canvas.Clear();
                     if (state.Canvas is { } pixels) canvas.Load(pixels);
+                    if (newTurn || state.Canvas is not null) { undoPending = false; canUndoDrawing = state.CanUndo; }
                     room = state;
                     serverOffset = state.ServerTime - DateTimeOffset.UtcNow;
                     if (screen != "profile") screen = "game";
@@ -120,21 +126,33 @@ public sealed partial class MainWindow : Window, IDisposable
                 case "draw" when message.Draw is { } op:
                     if (room?.TurnId == message.TurnId && message.ActorId != device?.AccountId) canvas.Apply(op);
                     break;
+                case "canvas" when message.Canvas is { } restored && room?.TurnId == message.TurnId:
+                    canvas.Load(restored); undoPending = false; canUndoDrawing = message.CanUndo;
+                    break;
+                case "wordlists":
+                    wordLists = message.WordLists ?? [];
+                    if (!wordListsChosen)
+                    {
+                        selectedWordLists.Clear();
+                        foreach (var list in wordLists.Where(l => l.DefaultEnabled)) selectedWordLists.Add(list.Id);
+                    }
+                    break;
                 case "rooms": publicRooms = message.Rooms ?? []; status = $"{publicRooms.Length} public room(s)."; break;
                 case "chat" when message.Chat is { } line:
-                    if (line.Sender is null || !muted.Contains(line.Sender.Value))
-                    { chat.Add(line); if (chat.Count > 200) chat.RemoveAt(0); scrollChat = true; }
+                    chat.Add(line); if (chat.Count > 200) chat.RemoveAt(0); scrollChat = true;
                     break;
                 case "left": room = null; chat.Clear(); screen = "menu"; status = message.Error ?? "You left the room."; break;
                 case "error":
                     status = message.Error ?? "Server rejected the action.";
                     if (message.RejectedCommand == "profile") savingProfile = false;
+                    if (message.RejectedCommand == "undo") { undoPending = false; canUndoDrawing = false; Send(new("sync")); }
                     log.Write("server.action_rejected action=" + SafeCommand(message.RejectedCommand) + " reason=" + SafeReason(message.Error));
                     if (room is not null && message.RejectedCommand == "draw" && Environment.TickCount64 - lastSync > 1000)
                     { lastSync = Environment.TickCount64; Send(new("sync")); }
                     break;
                 case "disconnected":
                     savingProfile = false;
+                    undoPending = false;
                     sessionReady = serviceAvailable = false;
                     connectionStatus = "Connection interrupted. Rejoining your drawing room automatically...";
                     if (connectionRetry.Due(Environment.TickCount64)) connectionRetry.Failed(Environment.TickCount64);

@@ -16,18 +16,19 @@ public sealed class CanvasWidget : IDisposable
     private bool dragging;
     private int x, y;
     private long sentAt;
+    private Guid stroke;
     public string Tool = "pencil";
     public byte Color = 1;
     public int Size = 3;
     public Vector2 RenderSize { get; private set; }
 
-    public void Toolbar(string id)
+    public void Toolbar(string id, bool transparency = false, Action? undo = null, bool canUndo = false)
     {
         ImGui.PushID(id);
         try
         {
             float available = ImGui.GetContentRegionAvail().X;
-            float brushWidth = Math.Min(UiTheme.S(110), Math.Max(UiTheme.S(70), available - UiTheme.S(122)));
+            float brushWidth = Math.Min(UiTheme.S(110), Math.Max(UiTheme.S(60), available - UiTheme.S(164)));
             foreach (string tool in new[] { "pencil", "fill", "eraser" })
             {
                 if (tool != "pencil") ImGui.SameLine();
@@ -37,13 +38,19 @@ public sealed class CanvasWidget : IDisposable
                 using (Plugin.PluginInterface.UiBuilder.IconFontFixedWidthHandle.Push())
                     if (ImGui.Button(icon.ToIconString() + "##" + tool, UiTheme.V(28, 28))) Tool = tool;
                 if (ImGui.IsItemHovered() || ImGui.IsItemFocused())
-                    ImGui.SetTooltip(tool == "pencil" ? "Pencil" : tool == "fill" ? "Fill bucket" : "Eraser");
+                    ImGui.SetTooltip(tool == "pencil" ? "Pencil" : tool == "fill" ? "Fill bucket" : transparency ? "Erase to transparent" : "Eraser");
             }
             ImGui.SameLine(); ImGui.SetNextItemWidth(brushWidth);
             ImGui.SliderInt("##brush-size", ref Size, 1, 20, "%d px");
             if (ImGui.IsItemHovered() || ImGui.IsItemFocused()) ImGui.SetTooltip("Brush size");
-            float swatch = Math.Min(UiTheme.S(20), (available - UiTheme.S(2) * 15) / 16);
-            for (byte i = 0; i < Palette.Colors.Length; i++)
+            ImGui.SameLine();
+            using (ImRaii.Disabled(!canUndo || undo is null))
+            using (Plugin.PluginInterface.UiBuilder.IconFontFixedWidthHandle.Push())
+                if (ImGui.Button(FontAwesomeIcon.Undo.ToIconString() + "##undo", UiTheme.V(28, 28))) { dragging = false; undo?.Invoke(); }
+            if (ImGui.IsItemHovered() || ImGui.IsItemFocused()) ImGui.SetTooltip("Undo last stroke");
+            int colours = transparency ? Palette.Colors.Length : Palette.Transparent;
+            float swatch = Math.Min(UiTheme.S(20), (available - UiTheme.S(2) * (colours - 1)) / colours);
+            for (byte i = 0; i < colours; i++)
             {
                 if (i != 0) ImGui.SameLine(0, UiTheme.S(2));
                 ImGui.PushID(i);
@@ -51,8 +58,11 @@ public sealed class CanvasWidget : IDisposable
                 var centre = (ImGui.GetItemRectMin() + ImGui.GetItemRectMax()) / 2;
                 uint c = Palette.Colors[i];
                 var colour = new Vector4((c & 255) / 255f, ((c >> 8) & 255) / 255f, ((c >> 16) & 255) / 255f, 1);
+                if (i == Palette.Transparent) colour = UiTheme.Paper;
                 var draw = ImGui.GetWindowDrawList();
                 draw.AddCircleFilled(centre, swatch * 0.32f, UiTheme.C(colour));
+                if (i == Palette.Transparent)
+                    draw.AddLine(centre - new Vector2(swatch * 0.23f), centre + new Vector2(swatch * 0.23f), UiTheme.C(UiTheme.Rose), UiTheme.S(1.5f));
                 draw.AddCircle(centre, swatch * 0.32f, UiTheme.C(UiTheme.Line));
                 if (Color == i) draw.AddCircle(centre, swatch * 0.46f, UiTheme.C(UiTheme.Ink), 0, UiTheme.S(1.5f));
                 if (ImGui.IsItemClicked()) Color = i;
@@ -63,7 +73,7 @@ public sealed class CanvasWidget : IDisposable
         finally { ImGui.PopID(); }
     }
 
-    private static readonly string[] ColourNames = ["Paper", "Ink", "Graphite", "Silver", "Rose", "Scarlet", "Amber", "Sunshine", "Moss", "Forest", "Aqua", "Sky", "Violet", "Plum", "Clay", "Peach"];
+    private static readonly string[] ColourNames = ["White", "Ink", "Graphite", "Silver", "Rose", "Scarlet", "Amber", "Sunshine", "Moss", "Forest", "Aqua", "Sky", "Violet", "Plum", "Clay", "Peach", "Transparent"];
 
     public void Draw(string id, PixelCanvas canvas, Vector2 available, bool writable, Action<DrawOperation> submit)
     {
@@ -85,6 +95,16 @@ public sealed class CanvasWidget : IDisposable
         Vector2 top = ImGui.GetCursorScreenPos();
         ImGui.InvisibleButton(id, size);
         UiTheme.SheetEdges(top, top + size);
+        if (canvas.Transparency)
+        {
+            var draw = ImGui.GetWindowDrawList();
+            float cell = UiTheme.S(12);
+            for (int row = 0; row * cell < size.Y; row++)
+                for (int col = 0; col * cell < size.X; col++)
+                    draw.AddRectFilled(top + new Vector2(col * cell, row * cell),
+                        top + Vector2.Min(size, new Vector2((col + 1) * cell, (row + 1) * cell)),
+                        UiTheme.C((row + col) % 2 == 0 ? UiTheme.Paper : UiTheme.Inset));
+        }
         ImGui.GetWindowDrawList().AddImage(texture.Handle, top, top + size);
         ImGui.GetWindowDrawList().AddRect(top - UiTheme.V(1, 1), top + size + UiTheme.V(1, 1), UiTheme.C(UiTheme.Line));
         bool down = writable && ImGui.IsItemActive() && ImGui.IsMouseDown(ImGuiMouseButton.Left);
@@ -95,7 +115,8 @@ public sealed class CanvasWidget : IDisposable
             int ny = Math.Clamp((int)(mouse.Y / size.Y * canvas.Height), 0, canvas.Height - 1);
             if (!dragging || (Tool != "fill" && now - sentAt >= 33 && (nx != x || ny != y)))
             {
-                submit(new(Tool, dragging ? x : nx, dragging ? y : ny, nx, ny, Color, Size));
+                if (!dragging) stroke = Guid.NewGuid();
+                submit(new(Tool, dragging ? x : nx, dragging ? y : ny, nx, ny, Color, Size, stroke));
                 x = nx; y = ny; sentAt = now;
             }
         }

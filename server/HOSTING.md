@@ -1,12 +1,18 @@
 # Kupo Skribbl server: first run
 
 Download and fully extract the Windows x64 or Linux x64 server ZIP from
-https://github.com/cloudesh/kupopop/releases/tag/v0.3.3. The packages include .NET;
+https://github.com/cloudesh/kupopop/releases/tag/v0.4.0. The packages include .NET;
 players and hosts do not need to install an SDK or runtime.
 
 The maintained service is **https://play.kupopop.com**. Regular players connect
 automatically; they do not need these self-hosting tools. For unattended Linux
 hosting, see [the Docker Compose deployment](deploy/README.md).
+
+Version 0.4.0 uses protocol 2: update both plugin and server. Existing accounts
+and certificates are preserved, but a restart ends active rooms. Private word
+banks live in `data/word-lists.json`; see [WORD_LISTS.md](WORD_LISTS.md). The
+maintained service's full bank is not bundled; fresh hosts generate a starter
+file and may replace it with their own lists.
 
 ## Windows: local in-game testing
 

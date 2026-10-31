@@ -29,7 +29,7 @@ function Zip-Directory {
             $taskName = $taskFile.FullName.Substring($taskSourceRoot.Length).TrimStart([IO.Path]::DirectorySeparatorChar, [IO.Path]::AltDirectorySeparatorChar).Replace('\','/')
             # Never ship a running host's state, credentials, TLS keys, logs, or proxy cache.
             if ($taskName -match '^(data|logs|local|caddy-download)(/|$)' -or
-                $taskName -match '(^|/)(accounts\.json(?:\.tmp)?|hostname\.txt|Caddyfile)$' -or
+                $taskName -match '(^|/)(accounts\.json(?:\.tmp)?|word-lists\.json(?:\.tmp)?|hostname\.txt|Caddyfile)$' -or
                 $taskName -match '(^|/)caddy([_.-]|$)' -or
                 $taskName -match '\.(pfx|cer|pem|key|dpapi|log)(\..*)?$') { continue }
             $taskEntry = $taskZip.CreateEntry($taskName, [IO.Compression.CompressionLevel]::Optimal)

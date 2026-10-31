@@ -1,11 +1,10 @@
-Kupo Skribbl 0.3.3 introduces the game's new name and automatic connection.
+Kupo Skribbl 0.4.0 adds transparent portraits, drawing undo, word-list choices and drawer voting.
 
-- Plugin installer name, book heading, window title, server labels and documentation now use Kupo Skribbl. Open with /kuposkribbl; /kupopop remains an alias.
-- Automatically connects to https://play.kupopop.com using trusted HTTPS/WSS. Connection controls and server address settings have been removed.
-- A short "Trying to connect" page gates play during outages and sign-in. Retries continue automatically with a delay capped at 30 seconds. The header shows Connected when the service/profile is ready.
-- Default moogle avatars blend into surrounding paper; white facial features, custom artwork, existing avatar seeds and local account files are preserved.
-- Appearance preferences and file diagnostics remain available through the plugin installer settings action or /kuposkribbl debug, once connected.
-- Adds an unattended Linux Docker Compose deployment with persistent account/TLS storage. Windows/Linux packages and the permanent local launcher remain available.
-
-Profiles are specific to their backend. Previously created local-development profiles do not automatically migrate to the new maintained service.
+- Profile editor supports transparent pixels, transparent fill and erasing, with a checkerboard preview. Default reset now loads a truly transparent background; existing custom white pixels remain unchanged.
+- Choose seven editable moogle presets or 22 job emblems from the portrait drop-down. Emblems load from the installed game; only a preset ID is shared.
+- Undo removes the last complete stroke/fill on both canvases. Gameplay undo is validated on the server and synchronized to everyone; history is bounded to 24 actions and resets each turn.
+- Room creation offers a multi-select Word Lists drop-down showing List name - amount. The maintained service has 19 private lists with 511 entries, with 15 normal lists enabled and four advanced lists disabled by default.
+- Full word banks stay in private server data and are not shipped in plugin/server release binaries or GitHub source. Clients receive only metadata and answers permitted by game state. Players can still learn words by playing; this is not a guarantee against collecting previously seen answers.
+- Removes Mute. Vote to kick appears on the current drawer. Fewer than five connected players require all other players; five or more require 70% of the other players rounded up. Ballots last 30 seconds, fix eligibility/threshold at creation, allow one vote per person, and expire/reset with the turn.
+- Protocol 2 requires plugin and server 0.4.0. Profiles, credentials and certificates are preserved; deploying the server ends active rooms. Self-hosted fresh installs receive a small starter bank and can import private lists.
 

@@ -3,7 +3,7 @@
 A native Dalamud drawing-and-guessing game for Final Fantasy XIV. Draw with
 friends, race to solve the word, and make a little avatar of your own.
 
-**Experimental 0.3.3 — compiled and automatically tested; in-game testing required.**
+**Experimental 0.4.0 — compiled and automatically tested; in-game testing required.**
 
 ## Try it
 
@@ -21,7 +21,7 @@ The installation ID stays `Kupopop` so existing installations update normally.
 This custom release is not an
 official Dalamud repository submission.
 
-Self-hosting/development: [Windows/Linux server packages](https://github.com/cloudesh/kupopop/releases/tag/v0.3.3)
+Self-hosting/development: [Windows/Linux server packages](https://github.com/cloudesh/kupopop/releases/tag/v0.4.0)
 and [unattended Linux deployment](server/deploy/README.md) remain available. The
 stable PC launcher is **[Start-My-Server.cmd](Start-My-Server.cmd)**; its data stays
 in `server/local/`. A development plugin can target localhost by changing
@@ -46,7 +46,18 @@ credential and server data remain intact.
   current drawer and correct guessers.
 - Self-contained Windows x64/Linux x64 server packages and file diagnostics.
 
-Only three prototype FFXIV words are currently included. No Kupo-Points, shop,
+The maintained service has 19 private word lists with 511 entries. Standard
+categories default on; advanced mechanics/terminology/ultimate/actions lists
+default off. Room hosts multi-select lists by name/count; full word banks never
+travel in the catalog. Private word data is configured separately from open
+server source; see [word-list hosting](server/WORD_LISTS.md).
+
+Both canvases have stroke undo. Portraits support transparency, seven moogle
+presets and 22 game-provided job emblems. Mute is removed; a server-authoritative
+drawer vote requires unanimity below five players or 70% of others for five or
+more, with a thirty-second ballot. Protocol 2 requires matching updated clients.
+
+No Kupo-Points, shop,
 Lodestone verification, or Homeworld Rooms yet. The shared Kupopop profile is
 designed for future games; the initial product focuses on drawing.
 

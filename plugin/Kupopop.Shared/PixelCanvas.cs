@@ -2,6 +2,7 @@ namespace Kupopop.Shared;
 
 public static class Palette
 {
+    public const byte Transparent = 16;
     // RGBA, little-endian compatible with ImGui packed colors. Index zero is canvas white.
     public static readonly uint[] Colors =
     [
@@ -9,6 +10,7 @@ public static class Palette
         0xFF4946E8, 0xFF3766F2, 0xFF3AA3FF, 0xFF56DDF9,
         0xFF60BE5B, 0xFF5A7C2A, 0xFFD8BD43, 0xFFE58B41,
         0xFFD8578A, 0xFFAC54D6, 0xFF95625B, 0xFF82B3E8,
+        0x00000000,
     ];
 }
 
@@ -18,32 +20,35 @@ public sealed class PixelCanvas
     public int Height { get; }
     public byte[] Pixels { get; private set; }
     public int Revision { get; private set; }
+    public bool Transparency { get; }
 
-    public PixelCanvas(int width = Protocol.CanvasWidth, int height = Protocol.CanvasHeight)
+    public PixelCanvas(int width = Protocol.CanvasWidth, int height = Protocol.CanvasHeight, bool transparency = false)
     {
         Width = width;
         Height = height;
         Pixels = new byte[width * height];
+        Transparency = transparency;
+        if (transparency) Array.Fill(Pixels, Palette.Transparent);
     }
 
     public void Load(byte[] pixels)
     {
-        if (pixels.Length != Pixels.Length || pixels.Any(p => p >= Palette.Colors.Length))
+        if (pixels.Length != Pixels.Length || pixels.Any(p => p >= (Transparency ? Palette.Colors.Length : Palette.Transparent)))
             throw new InvalidDataException("Invalid canvas.");
         Pixels = (byte[])pixels.Clone();
         Revision++;
     }
 
-    public void Clear() { Array.Clear(Pixels); Revision++; }
+    public void Clear() { Array.Fill(Pixels, Transparency ? Palette.Transparent : (byte)0); Revision++; }
 
     public bool Valid(DrawOperation op) => op.Tool is "pencil" or "eraser" or "fill"
-        && op.Color < Palette.Colors.Length && op.Size is >= 1 and <= 20
+        && op.Color < (Transparency ? Palette.Colors.Length : Palette.Transparent) && op.Size is >= 1 and <= 20
         && Inside(op.X1, op.Y1) && Inside(op.X2, op.Y2);
 
     public bool Apply(DrawOperation op)
     {
         if (!Valid(op)) return false;
-        byte color = op.Tool == "eraser" ? (byte)0 : op.Color;
+        byte color = op.Tool == "eraser" ? (Transparency ? Palette.Transparent : (byte)0) : op.Color;
         if (op.Tool == "fill") Fill(op.X2, op.Y2, color);
         else
         {
@@ -71,7 +76,7 @@ public sealed class PixelCanvas
             result[i * 4] = (byte)c;
             result[i * 4 + 1] = (byte)(c >> 8);
             result[i * 4 + 2] = (byte)(c >> 16);
-            result[i * 4 + 3] = 255;
+            result[i * 4 + 3] = (byte)(c >> 24);
         }
         return result;
     }
@@ -119,7 +124,7 @@ public static class AvatarGenerator
     public static byte[] Rgba(int seed)
     {
         int size = Protocol.AvatarSize;
-        var canvas = new PixelCanvas(size, size);
+        var canvas = new PixelCanvas(size, size, transparency: true);
         canvas.Load(Generate(seed, out var silhouette));
         byte[] rgba = canvas.Rgba();
         for (int p = 0; p < silhouette.Length; p++)
@@ -163,6 +168,8 @@ public static class AvatarGenerator
         Line(32, 47, 28, 50, 2); Line(32, 47, 36, 50, 2);
         Line(9, 42, 16, 44, 3); Line(48, 44, 55, 42, 3);
         if (random.Next(2) == 0) { Ellipse(17, 46, 3, 1, 15); Ellipse(47, 46, 3, 1, 15); }
+        for (int i = 0; i < canvas.Pixels.Length; i++)
+            if (mask.Pixels[i] == 0) canvas.Pixels[i] = Palette.Transparent;
         silhouette = mask.Pixels;
         return canvas.Pixels;
 

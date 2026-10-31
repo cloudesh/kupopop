@@ -85,7 +85,7 @@ public sealed class RemoteClient : IDisposable
             throw;
         }
         outgoing = Channel.CreateBounded<byte[]>(128);
-        diagnostic?.Invoke("websocket.connected protocol=1", null);
+        diagnostic?.Invoke("websocket.connected protocol=" + Protocol.Version, null);
         connection = RunAsync(socket, outgoing, stop.Token);
     }
 

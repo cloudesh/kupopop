@@ -41,7 +41,7 @@ var portraits = Enumerable.Range(0, 128).Select(AvatarGenerator.Rgba).ToArray();
 Check(portraits.All(p => p[3] == 0 && p[(63 * 64 + 63) * 4 + 3] == 0 &&
     p[(34 * 64 + 32) * 4 + 3] == 255 && p[(34 * 64 + 32) * 4] == 255),
     "default portrait exterior blends into paper while the white moogle face stays opaque across seeds");
-canvas.Load(AvatarGenerator.Generate(123));
+canvas.Load(new byte[64 * 64]);
 byte[] customPortrait = canvas.Rgba();
 Check(Enumerable.Range(0, 64 * 64).All(i => customPortrait[i * 4 + 3] == 255),
     "editable/custom portrait conversion retains every background pixel and its opacity");
@@ -98,6 +98,7 @@ Check(await RejectHealthResponse("{\"protocol\":999}"), "connection gate rejects
 Check(await RejectHealthResponse("{\"service\":\"not the game\"}"), "connection gate rejects a response without the game protocol");
 
 var accounts = new AccountStore(Path.Combine(working, "accounts"));
+FeatureChecks.Run(working, Check);
 var credentials = Enumerable.Range(0, 18).Select(i => accounts.Create("Artist " + i)).ToArray();
 string accountFile = File.ReadAllText(Path.Combine(working, "accounts", "accounts.json"));
 Check(!accountFile.Contains(credentials[0].AccessToken) && !accountFile.Contains(credentials[0].RecoveryCode), "account persistence contains credential verifiers, not bearer secrets");
@@ -233,6 +234,9 @@ try
     first.Send(new("draw", Draw: new("pencil", 5, 5, 30, 30, 4), TurnId: drawing.Room!.TurnId));
     var drawReceived = await WaitEvent(second, e => e.Type == "draw");
     Check(drawReceived.Draw?.Color == 4, "real WebSocket clients receive synchronized drawing");
+    first.Send(new("undo", TurnId: drawing.Room.TurnId));
+    Check((await WaitEvent(second, e => e.Type == "canvas")).Canvas!.All(c => c == 0) &&
+        (await WaitEvent(first, e => e.Type == "canvas")).Canvas!.All(c => c == 0), "real WebSocket undo synchronizes drawer and spectator snapshots");
     second.Send(new("chat", Text: drawing.Room.Word));
     await WaitEvent(second, e => e.Room?.YouAreDone == true);
     second.Send(new("chat", Text: "integration-private-message"));
@@ -243,6 +247,12 @@ try
     while (third.TryRead(out var evt)) if (evt is not null) thirdEvents.Add(evt);
     Check(thirdEvents.All(e => e.Chat?.Text != "integration-private-message" && e.Room?.Word is null),
         "real network unsolved client receives neither done-mode content nor answer");
+    third.Send(new("vote-kick", TurnId: drawing.Room.TurnId));
+    Check((await WaitEvent(third, e => e.Room?.KickVote?.Votes == 1)).Room!.KickVote!.Required == 2,
+        "real network ballot sends only tally, threshold and per-client voting status");
+    second.Send(new("vote-kick", TurnId: drawing.Room.TurnId));
+    Check((await WaitEvent(first, e => e.Type == "left")).Error == "The room voted to remove you.",
+        "real network unanimous vote removes the drawer and notifies their client");
     using var wrongVersion = new ClientWebSocket();
     wrongVersion.Options.SetRequestHeader("Authorization", "Bearer " + one.AccessToken);
     wrongVersion.Options.SetRequestHeader("X-Kupopop-Protocol", "999");

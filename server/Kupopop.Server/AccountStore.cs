@@ -68,17 +68,20 @@ public sealed class AccountStore
         }
     }
 
-    public PlayerProfile Update(Guid id, string? name, byte[]? avatar, bool reset)
+    public PlayerProfile Update(Guid id, string? name, byte[]? avatar, bool reset, string? preset = null)
     {
         lock (gate)
         {
             var current = accounts[id];
             if (name is not null && !Protocol.ValidName(name)) throw new ArgumentException("Use a display name of 2–40 characters.");
             if (!Protocol.ValidAvatar(avatar)) throw new ArgumentException("Avatar format rejected.");
+            if (preset is not null && AvatarPresets.Find(preset) is null) throw new ArgumentException("Avatar preset rejected.");
+            if (avatar is not null && preset is not null) throw new ArgumentException("Choose a drawn avatar or a preset.");
             var profile = current.Profile with
             {
                 DisplayName = name?.Trim() ?? current.Profile.DisplayName,
-                AvatarPixels = reset ? null : avatar ?? current.Profile.AvatarPixels,
+                AvatarPixels = reset || preset is not null ? null : avatar ?? current.Profile.AvatarPixels,
+                AvatarPreset = reset || avatar is not null ? null : preset ?? current.Profile.AvatarPreset,
             };
             accounts[id] = current with { Profile = profile };
             PersistOrRollback(id, current);

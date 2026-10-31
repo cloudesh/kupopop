@@ -319,15 +319,16 @@ public sealed partial class MainWindow
                     UiTheme.Field("Name your drawing room", "##room-name", ref roomTitle, 40, "A name for your little gathering");
                     UiTheme.Gap(5);
                     UiRoomSettings.Draw(ref seconds, ref rounds, ref hints, ref capacity);
+                    WordListSelector();
                     UiTheme.Gap(5); UiTheme.Rule();
                     ImGui.Checkbox("List this room in Public Rooms", ref publicRoom);
                     UiTheme.Wrapped(publicRoom
                         ? "Anyone on this server sees the room name and artist count. Your profile is visible after they join."
                         : "By invitation. Share the code with your friends.", UiTheme.Muted);
                     UiTheme.Gap(6);
-                    using (ImRaii.Disabled(client?.Connected != true || !Protocol.ValidName(roomTitle)))
+                    using (ImRaii.Disabled(client?.Connected != true || !Protocol.ValidName(roomTitle) || selectedWordLists.Count == 0))
                         if (UiTheme.Button("Open the room", UiTheme.S(170), primary: true))
-                            Send(new("create", Options: new(roomTitle, publicRoom, Math.Clamp(seconds, 15, 300), Math.Clamp(rounds, 1, 5), Math.Clamp(hints, 0, 300), Math.Clamp(capacity, 2, 16))));
+                            Send(new("create", Options: new(roomTitle, publicRoom, Math.Clamp(seconds, 15, 300), Math.Clamp(rounds, 1, 5), Math.Clamp(hints, 0, 300), Math.Clamp(capacity, 2, 16), selectedWordLists.ToArray())));
                     ImGui.SameLine(); if (UiTheme.Button("Back", 0, quiet: true)) screen = "menu";
                 }
             }
@@ -349,6 +350,30 @@ public sealed partial class MainWindow
     {
         float bottom = ImGui.GetCursorPosY() + ImGui.GetContentRegionAvail().Y - UiTheme.S(30);
         if (ImGui.GetCursorPosY() < bottom) ImGui.SetCursorPosY(bottom);
+    }
+
+    private void WordListSelector()
+    {
+        UiTheme.Caption("Word Lists");
+        ImGui.SetNextItemWidth(-1);
+        if (!ImGui.BeginCombo("##word-lists", $"{selectedWordLists.Count} lists selected")) return;
+        try
+        {
+            if (ImGui.Selectable("Use normal lists"))
+            {
+                selectedWordLists.Clear();
+                foreach (var list in wordLists.Where(l => l.DefaultEnabled)) selectedWordLists.Add(list.Id);
+                wordListsChosen = true;
+            }
+            foreach (var list in wordLists)
+            {
+                bool enabled = selectedWordLists.Contains(list.Id);
+                if (ImGui.Checkbox($"{list.Name} - {list.Count}##{list.Id}", ref enabled))
+                { if (enabled) selectedWordLists.Add(list.Id); else selectedWordLists.Remove(list.Id); wordListsChosen = true; }
+                if (ImGui.IsItemHovered()) ImGui.SetTooltip(list.Complex ? "Advanced: disabled by default." : "Standard word list.");
+            }
+        }
+        finally { ImGui.EndCombo(); }
     }
 
     private void PublicRooms()
@@ -471,11 +496,18 @@ public sealed partial class MainWindow
             if (role.Length > 0) UiTheme.Wrapped(role, UiTheme.Muted);
             if (player.Profile.Id != device?.AccountId)
             {
-                if (ToolAction(muted.Contains(player.Profile.Id) ? FontAwesomeIcon.VolumeMute : FontAwesomeIcon.VolumeUp, muted.Contains(player.Profile.Id) ? "Unmute" : "Mute"))
-                { if (!muted.Add(player.Profile.Id)) muted.Remove(player.Profile.Id); }
-                if (state.HostId == device?.AccountId)
-                { ImGui.SameLine(); if (ToolAction(FontAwesomeIcon.UserMinus, "Remove from room")) Send(new("kick", Text: player.Profile.Id.ToString())); }
+                if (player.IsDrawer && state.Phase == "drawing")
+                {
+                    using (ImRaii.Disabled(state.KickVote?.YouVoted == true))
+                        if (UiTheme.Button(state.KickVote?.YouVoted == true ? "Vote counted" : "Vote to kick", 0, quiet: true))
+                            Send(new("vote-kick", TurnId: state.TurnId));
+                    if (ImGui.IsItemHovered()) ImGui.SetTooltip("Fewer than 5 artists: unanimous. Otherwise 70% of other connected artists, rounded up. Voting lasts 30 seconds.");
+                }
+                else if (state.HostId == device?.AccountId)
+                { if (ToolAction(FontAwesomeIcon.UserMinus, "Remove from room")) Send(new("kick", Text: player.Profile.Id.ToString())); }
             }
+            if (player.IsDrawer && state.KickVote is { } vote)
+                UiTheme.Wrapped($"Votes {vote.Votes}/{vote.Required} / {Math.Max(0, (int)(vote.ExpiresAt - (DateTimeOffset.UtcNow + serverOffset)).TotalSeconds)}s", UiTheme.Rose);
             UiTheme.Rule();
         }
     }
@@ -484,11 +516,11 @@ public sealed partial class MainWindow
     {
         bool canDraw = client?.Connected == true && state.Phase == "drawing" && state.DrawerId == device?.AccountId;
         float top = ImGui.GetCursorScreenPos().Y;
-        if (canDraw) painting.Toolbar("game-tools");
+        if (canDraw) painting.Toolbar("game-tools", undo: () => { if (Send(new("undo", TurnId: state.TurnId))) undoPending = true; }, canUndo: canUndoDrawing && !undoPending);
         float toolsHeight = ImGui.GetCursorScreenPos().Y - top;
-        painting.Draw("game-canvas", canvas, new Vector2(ImGui.GetContentRegionAvail().X, Math.Max(UiTheme.S(8), height - toolsHeight)), canDraw, operation =>
+        painting.Draw("game-canvas", canvas, new Vector2(ImGui.GetContentRegionAvail().X, Math.Max(UiTheme.S(8), height - toolsHeight)), canDraw && !undoPending, operation =>
         {
-            if (Send(new("draw", Draw: operation, TurnId: state.TurnId))) { canvas.Apply(operation); draws++; }
+            if (Send(new("draw", Draw: operation, TurnId: state.TurnId))) { canvas.Apply(operation); draws++; canUndoDrawing = true; }
         });
         var size = new Vector2(MathF.Round(painting.RenderSize.X), MathF.Round(painting.RenderSize.Y));
         if (size != lastCanvasSize && Environment.TickCount64 >= nextLayoutLog)
@@ -546,8 +578,10 @@ public sealed partial class MainWindow
     {
         if (profile is null) { status = "Connect to load your profile first."; return; }
         displayName = profile.DisplayName;
-        avatar.Load(profile.AvatarPixels ?? AvatarGenerator.Generate(profile.AvatarSeed));
-        avatarReset = profile.AvatarPixels is null;
+        avatar.Load(AvatarPresets.Pixels(profile));
+        avatarPreset = profile.AvatarPreset;
+        avatarReset = profile.AvatarPixels is null && avatarPreset is null;
+        avatarHistory.Clear();
         screen = "profile";
     }
 
@@ -567,13 +601,23 @@ public sealed partial class MainWindow
                 if (editor.Success)
                 {
                     UiTheme.Caption("YOUR CANVAS");
-                    avatarEditor.Toolbar("avatar-tools");
+                    AvatarChoices();
+                    bool emblem = AvatarPresets.Find(avatarPreset)?.Icon is > 0;
+                    if (emblem && profile is not null)
+                    {
+                        ImGui.Image(avatars.Get(profile with { AvatarPixels = null, AvatarPreset = avatarPreset }).Handle, UiTheme.V(128, 128));
+                        UiTheme.Wrapped("Job emblem from your game client. Choose a moogle or custom drawing to paint.", UiTheme.Muted);
+                    }
+                    else
+                    {
+                    avatarEditor.Toolbar("avatar-tools", transparency: true, undo: () => { avatarHistory.Undo(avatar); avatarReset = false; avatarPreset = null; }, canUndo: avatarHistory.CanUndo);
                     avatarEditor.Draw("avatar-canvas", avatar, new Vector2(ImGui.GetContentRegionAvail().X,
                         Math.Max(UiTheme.S(100), ImGui.GetContentRegionAvail().Y - UiTheme.S(38))), true,
-                        operation => { avatar.Apply(operation); avatarReset = false; });
+                        operation => { avatarHistory.Capture(avatar, operation.StrokeId); avatar.Apply(operation); avatarReset = false; avatarPreset = null; });
+                    }
                     UiTheme.Gap(5);
                     if (UiTheme.Button("Use my default avatar", 0, quiet: true) && profile is not null)
-                    { avatar.Load(AvatarGenerator.Generate(profile.AvatarSeed)); avatarReset = true; }
+                    { avatar.Load(AvatarGenerator.Generate(profile.AvatarSeed)); avatarReset = true; avatarPreset = null; avatarHistory.Clear(); }
                 }
             }
             ImGui.TableNextColumn();
@@ -586,7 +630,7 @@ public sealed partial class MainWindow
             using (ImRaii.Disabled(savingProfile || client?.Connected != true || !Protocol.ValidName(displayName)))
                 if (UiTheme.NoteButton(savingProfile ? "Saving..." : "Save my profile", ImGui.GetContentRegionAvail().X, UiTheme.StickyRose, primary: true))
                 {
-                    savingProfile = Send(new("profile", Text: displayName, Avatar: avatarReset ? null : (byte[])avatar.Pixels.Clone(), ResetAvatar: avatarReset));
+                    savingProfile = Send(new("profile", Text: displayName, Avatar: avatarReset || avatarPreset is not null ? null : (byte[])avatar.Pixels.Clone(), ResetAvatar: avatarReset, AvatarPreset: avatarPreset));
                     if (savingProfile) status = "Saving profile...";
                 }
             UiTheme.Rule(); UiTheme.Caption("ACCOUNT RECOVERY");
@@ -626,7 +670,24 @@ public sealed partial class MainWindow
         if (UiTheme.Button(newRecovery.Length > 0 ? "Back" : screen == "welcome" ? "Back to welcome" : "Back to play", 0, quiet: true)) ShowDebug = false;
     }
 
-    private static string SafeCommand(string? command) => command is "start" or "join" or "create" or "draw" or "profile" or "chat" or "sync" or "kick" or "leave" or "list" ? command : "unknown";
+    private void AvatarChoices()
+    {
+        ImGui.SetNextItemWidth(-1);
+        if (!ImGui.BeginCombo("##avatar-presets", avatarPreset is { } id ? AvatarPresets.Find(id)?.Name ?? "Custom drawing" : avatarReset ? "Your default moogle" : "Custom drawing")) return;
+        try
+        {
+            if (ImGui.Selectable("Your default moogle") && profile is not null)
+            { avatar.Load(AvatarGenerator.Generate(profile.AvatarSeed)); avatarReset = true; avatarPreset = null; avatarHistory.Clear(); }
+            if (ImGui.Selectable("New transparent drawing"))
+            { avatar.Clear(); avatarReset = false; avatarPreset = null; avatarHistory.Clear(); }
+            foreach (var preset in AvatarPresets.Items)
+                if (ImGui.Selectable(preset.Name, avatarPreset == preset.Id))
+                { avatar.Load(AvatarGenerator.Generate(preset.Seed)); avatarPreset = preset.Id; avatarReset = false; avatarHistory.Clear(); }
+        }
+        finally { ImGui.EndCombo(); }
+    }
+
+    private static string SafeCommand(string? command) => command is "start" or "join" or "create" or "draw" or "undo" or "vote-kick" or "profile" or "chat" or "sync" or "kick" or "leave" or "list" ? command : "unknown";
     private static string SafeReason(string? error) => error switch
     {
         "At least two connected players are needed." => "players_required",

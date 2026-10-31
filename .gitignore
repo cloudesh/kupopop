@@ -12,6 +12,7 @@ server/hosting/caddy*
 server/deploy/Caddyfile
 server/deploy/Kupopop.Server
 server/deploy/backups/
+**/word-lists.json
 *.user
 *.pfx
 *.cer

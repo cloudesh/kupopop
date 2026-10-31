@@ -31,6 +31,7 @@ builder.WebHost.ConfigureKestrel(options =>
     });
 });
 builder.Services.AddSingleton(new AccountStore(data));
+builder.Services.AddSingleton(WordBank.Open(data));
 builder.Services.AddSingleton(TimeProvider.System);
 builder.Services.AddSingleton<GameEngine>();
 builder.Services.AddRateLimiter(options =>
