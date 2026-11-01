@@ -290,12 +290,12 @@ public static class UiTheme
     {
         private ImRaii.ChildDisposable child;
         public bool Success { get; }
-        public PaperPanel(string id, Vector2 size, bool inset = false, bool compact = false, bool taped = false, Vector4? note = null, bool scrollable = true, bool plainTop = false, bool flush = false, bool attachedTabs = false)
+        public PaperPanel(string id, Vector2 size, bool inset = false, bool compact = false, bool taped = false, Vector4? note = null, bool scrollable = true, bool plainTop = false, bool flush = false, bool attachedTabs = false, float noteAngle = 0)
         {
             using var color = ImRaii.PushColor(ImGuiCol.ChildBg, Vector4.Zero);
             using var border = ImRaii.PushColor(ImGuiCol.Border, Vector4.Zero);
             using var padding = ImRaii.PushStyle(ImGuiStyleVar.WindowPadding, compact ? V(10, note.HasValue && !plainTop ? 22 : 10) : V(14, taped || note.HasValue ? 24 : 14));
-            var flags = scrollable ? ImGuiWindowFlags.None : ImGuiWindowFlags.NoScrollbar;
+            var flags = scrollable ? ImGuiWindowFlags.None : ImGuiWindowFlags.NoScrollbar | ImGuiWindowFlags.NoScrollWithMouse;
             var scope = ImRaii.Child(id, size, true, flags);
             child = scope;
             Success = scope.Success;
@@ -304,6 +304,7 @@ public static class UiTheme
                 var min = ImGui.GetWindowPos() + (flush ? Vector2.Zero : V(6, 6));
                 var max = ImGui.GetWindowPos() + ImGui.GetWindowSize() - (flush ? Vector2.Zero : V(6, 6));
                 var draw = ImGui.GetWindowDrawList();
+                int decorationStart = draw.VtxBuffer.Size;
                 draw.PushClipRect(ImGui.GetWindowPos() + V(1, 1), ImGui.GetWindowPos() + ImGui.GetWindowSize() - V(1, 1), false);
                 var surface = note ?? (inset ? Inset : Panel);
                 if (note.HasValue)
@@ -338,6 +339,7 @@ public static class UiTheme
                     draw.AddTriangleFilled(max - V(12, 0), max - V(0, 12), max, C(curl));
                     draw.AddLine(max - V(12, 0), max - V(0, 12), C(Line));
                 }
+                if (note.HasValue && noteAngle != 0) UiStationery.TiltDecoration(draw, decorationStart, (min + max) / 2, noteAngle);
                 draw.PopClipRect();
             }
         }

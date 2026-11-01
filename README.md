@@ -2,7 +2,7 @@
   <img src="plugin/images/banner.png" alt="Kupo Skribbl — a moogle's drawing book" width="100%" />
 </p>
 
-<h1 align="center">Kupo Skribbl · FFXIV Drawing &amp; Guessing Game</h1>
+<h1 align="center">Kupo Skribbl · FFXIV Drawing Game for Dalamud</h1>
 
 <p align="center">Turn your next get-together into a drawing party.<br />Pick a word, draw something questionable, and let your friends guess — a party for 2–16 players, right inside Final Fantasy XIV.</p>
 
@@ -15,7 +15,7 @@
 
 <p align="center">
   <a href="https://github.com/cloudesh/kupopop/releases"><img src="https://img.shields.io/github/downloads/cloudesh/kupopop/total?style=flat-square&amp;color=9a506b&amp;label=downloads" alt="GitHub release downloads" /></a>
-  <a href="https://github.com/cloudesh/kupopop/releases"><img src="https://img.shields.io/github/v/release/cloudesh/kupopop?include_prereleases&amp;style=flat-square&amp;color=42766b&amp;label=latest" alt="Latest experimental release" /></a>
+  <a href="https://github.com/cloudesh/kupopop/releases/latest"><img src="https://img.shields.io/github/v/release/cloudesh/kupopop?style=flat-square&amp;color=42766b&amp;label=latest" alt="Latest Kupo Skribbl release" /></a>
   <a href="LICENSE"><img src="https://img.shields.io/github/license/cloudesh/kupopop?style=flat-square&amp;color=9c7844" alt="MIT license" /></a>
 </p>
 
@@ -24,6 +24,8 @@
 **Your own little art book.** Draw your portrait, pick light or dark paper, rescue a masterpiece with undo, and give a good drawing a thumbs-up. Tap the home-page moogle for a little surprise.
 
 **Something for every group.** Choose FFXIV, everyday things, internet memes or video games. Hosts can set the timer, rounds and word choices, or bring their own custom words for an unranked game.
+
+**Version 1.0 is here.** A Pictionary-style multiplayer game for FFXIV, with drawn portraits, friends and shared profiles. Profile opens with your portrait and game record; choose **Change profile picture** when you want to draw a new one.
 
 ## Install in Dalamud
 
@@ -39,7 +41,7 @@
 
 Create your profile, save its private recovery code, and invite a friend. Everyone connects automatically to the same service. Keep the recovery code somewhere safe and never share it.
 
-**Experimental release:** Kupo Skribbl is available through the custom repository above; it is not currently listed in the official Dalamud repository. All players need Dalamud/XIVLauncher and their own copy of the plugin.
+**Custom repository:** Version 1.0 is available through the link above, added under Dalamud's **Experimental** settings. It is not currently listed in the official Dalamud repository. All players need Dalamud/XIVLauncher and their own copy of the plugin.
 
 ## How to play
 

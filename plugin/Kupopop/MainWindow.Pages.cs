@@ -203,7 +203,7 @@ public sealed partial class MainWindow
         {
             if (UiTheme.Button("Use this avatar & continue", 0, primary: true)) { newRecovery = ""; screen = room is null ? "menu" : "game"; }
             ImGui.SameLine();
-            if (UiTheme.Button("Draw my own")) { newRecovery = ""; OpenProfile(); }
+            if (UiTheme.Button("Draw my own")) { newRecovery = ""; OpenProfile(editPicture: true); }
         }
     }
 
@@ -220,7 +220,7 @@ public sealed partial class MainWindow
         try
         {
             ImGui.TableNextColumn();
-            using (var card = new UiTheme.PaperPanel("join-card", new Vector2(0, UiTheme.S(250)), note: ActiveInvitations().Length > 0 ? UiTheme.InvitationPaper : UiTheme.StickyYellow, scrollable: false))
+            using (var card = new UiTheme.PaperPanel("join-card", new Vector2(0, UiTheme.S(250)), note: ActiveInvitations().Length > 0 ? UiTheme.InvitationPaper : UiTheme.StickyYellow, scrollable: false, noteAngle: -0.65f))
             {
                 if (card.Success)
                 {
@@ -238,7 +238,7 @@ public sealed partial class MainWindow
                 }
             }
             ImGui.TableNextColumn();
-            using (var card = new UiTheme.PaperPanel("make-card", new Vector2(0, UiTheme.S(250)), note: UiTheme.StickyRose, scrollable: false))
+            using (var card = new UiTheme.PaperPanel("make-card", new Vector2(0, UiTheme.S(250)), note: UiTheme.StickyRose, scrollable: false, noteAngle: 0.6f))
             {
                 if (card.Success)
                 {
@@ -254,7 +254,7 @@ public sealed partial class MainWindow
                 }
             }
             ImGui.TableNextColumn();
-            using (var card = new UiTheme.PaperPanel("public-card", new Vector2(0, UiTheme.S(250)), note: UiTheme.StickySage, scrollable: false))
+            using (var card = new UiTheme.PaperPanel("public-card", new Vector2(0, UiTheme.S(250)), note: UiTheme.StickySage, scrollable: false, noteAngle: -0.4f))
             {
                 if (card.Success)
                 {
@@ -653,17 +653,17 @@ public sealed partial class MainWindow
         return clicked;
     }
 
-    private void OpenProfile()
+    private void OpenProfile(bool editPicture = false)
     {
         if (profile is null) { NotifyStatus("Connect to load your profile first."); return; }
         displayName = profile.DisplayName;
-        avatar.Load(AvatarPresets.Pixels(profile));
-        avatarPreset = profile.AvatarPreset;
-        avatarReset = profile.AvatarPixels is null && avatarPreset is null;
-        avatarHistory.Clear();
+        ResetAvatarDraft();
+        editingAvatar = editPicture;
+        ownProfile = null;
         profileSettingsPage = 0;
         screen = "profile";
         RequestLeaderboard();
+        RequestOwnProfile();
     }
 
     private void ProfileScreen()
@@ -674,9 +674,10 @@ public sealed partial class MainWindow
             ImGui.TableSetupColumn("Portrait", ImGuiTableColumnFlags.WidthStretch, 1.15f);
             ImGui.TableSetupColumn("Details", ImGuiTableColumnFlags.WidthStretch, 1);
             ImGui.TableNextColumn();
-            using (var editor = new UiTheme.PaperPanel("portrait-editor", Vector2.Zero))
+            using (var editor = new UiTheme.PaperPanel(editingAvatar ? "portrait-editor" : "profile-preview", Vector2.Zero))
             {
-                if (editor.Success)
+                if (editor.Success && !editingAvatar) DrawProfilePreview();
+                else if (editor.Success)
                 {
                     UiTheme.Caption("YOUR CANVAS");
                     AvatarChoices();
@@ -687,6 +688,8 @@ public sealed partial class MainWindow
                     UiTheme.Gap(5);
                     if (UiTheme.Button("Use my default avatar", 0, quiet: true) && profile is not null)
                     { avatar.Load(AvatarGenerator.Generate(profile.AvatarSeed)); avatarReset = true; avatarPreset = null; avatarHistory.Clear(); }
+                    ImGui.SameLine();
+                    if (UiTheme.Button("Cancel picture changes", 0, quiet: true)) { ResetAvatarDraft(); editingAvatar = false; }
                 }
             }
             ImGui.TableNextColumn();
@@ -707,12 +710,13 @@ public sealed partial class MainWindow
             }
             UiTheme.Field("Display name", "##profile-name", ref displayName, 40, "Your artist name");
             UiTheme.Wrapped("Character unverified. Your name and avatar are shared with the people in your room.", UiTheme.Muted);
-            if (UiTheme.Button("View my sketchbook", 0, quiet: true)) ViewArtistProfile(device!.AccountId);
             UiTheme.Gap(6);
             using (ImRaii.Disabled(savingProfile || client?.Connected != true || !Protocol.ValidName(displayName)))
                 if (UiTheme.NoteButton(savingProfile ? "Saving..." : "Save my profile", ImGui.GetContentRegionAvail().X, UiTheme.StickyRose, primary: true))
                 {
-                    savingProfile = Send(new("profile", Text: displayName, Avatar: avatarReset || avatarPreset is not null ? null : (byte[])avatar.Pixels.Clone(), ResetAvatar: avatarReset, AvatarPreset: avatarPreset));
+                    savingProfile = Send(new("profile", Text: displayName,
+                        Avatar: !editingAvatar || avatarReset || avatarPreset is not null ? null : (byte[])avatar.Pixels.Clone(),
+                        ResetAvatar: editingAvatar && avatarReset, AvatarPreset: editingAvatar ? avatarPreset : null));
                     if (savingProfile) NotifyStatus("Saving profile...");
                 }
             UiTheme.Rule(); UiTheme.Caption("ACCOUNT RECOVERY");

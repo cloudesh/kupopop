@@ -36,7 +36,10 @@ public sealed partial class MainWindow
                     p.Relationship == "friend" && p.Profile.Id == message.ActorId ? p with { Online = message.Online } : p).ToArray()
                 };
                 return true;
-            case "shared-profile": sharedProfile = message.SharedProfile; openSharedProfile = profileRequested; profileRequested = false; return true;
+            case "shared-profile":
+                sharedProfile = message.SharedProfile;
+                if (sharedProfile?.Profile.Id == profile?.Id) ownProfile = sharedProfile;
+                openSharedProfile = profileRequested; profileRequested = false; return true;
             case "invitation" when message.Invitation is { } invitation:
                 toasts.Show("invite:" + invitation.Id, "A game invitation", invitation.From.DisplayName + " invited you to " + invitation.RoomTitle + ". Open Friends or Play to join.");
                 return true;
@@ -233,20 +236,7 @@ public sealed partial class MainWindow
             }
             else if (view.Stats is { } stats)
             {
-                if (ImGui.BeginTable("lifetime-cards", 2, ImGuiTableFlags.SizingStretchSame))
-                {
-                    foreach (var metric in new[] { ("GAMES PLAYED", stats.Games.ToString("N0")), ("VICTORIES", stats.Wins.ToString("N0")), ("LIFETIME POINTS", stats.Points.ToString("N0")), ("BEST MATCH", stats.BestScore.ToString("N0")) })
-                    {
-                        ImGui.TableNextColumn();
-                        var at = ImGui.GetCursorScreenPos();
-                        var size = new Vector2(ImGui.GetContentRegionAvail().X, UiTheme.S(78));
-                        ImGui.GetWindowDrawList().AddRectFilled(at, at + size, UiTheme.C(UiPresentation.Alpha(UiTheme.Inset, 0.55f)), UiTheme.S(6));
-                        ImGui.SetCursorScreenPos(at + UiTheme.V(12, 9)); UiTheme.Caption(metric.Item1);
-                        ImGui.SetCursorScreenPos(at + UiTheme.V(12, 30)); art.Heading(metric.Item2);
-                        ImGui.SetCursorScreenPos(at); ImGui.Dummy(size);
-                    }
-                    ImGui.EndTable();
-                }
+                LifetimeStatCards(stats);
                 UiTheme.Gap(8);
                 UiTheme.Wrapped("Completed matches since opting in. Victories include ties. Points are a personal record, not currency.", UiTheme.Muted);
             }

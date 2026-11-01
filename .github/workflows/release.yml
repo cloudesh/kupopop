@@ -1,4 +1,4 @@
-name: Build and publish experimental release
+name: Build and publish plugin release
 on:
   push:
     branches: [main]
@@ -38,7 +38,7 @@ jobs:
         shell: pwsh
         run: |
           ./Build-Release.ps1
-      - name: Publish testing release
+      - name: Publish plugin release
         shell: pwsh
         env:
           GH_TOKEN: ${{ github.token }}
@@ -47,7 +47,13 @@ jobs:
           $tag = 'v' + (($manifest[0].AssemblyVersion -split '\.')[0..2] -join '.')
           gh release view $tag *> $null
           if ($LASTEXITCODE -ne 0) {
-            gh release create $tag --target $env:GITHUB_SHA --prerelease --title "Kupo Skribbl $tag - experimental" --notes-file RELEASE_NOTES.md
+            $releaseArgs = @('release','create',$tag,'--target',$env:GITHUB_SHA,'--notes-file','RELEASE_NOTES.md')
+            if (([version]$manifest[0].AssemblyVersion).Major -eq 0) {
+              $releaseArgs += @('--prerelease','--title',"Kupo Skribbl $tag - experimental")
+            } else {
+              $releaseArgs += @('--latest','--title',"Kupo Skribbl $tag")
+            }
+            gh @releaseArgs
             if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
           }
           gh release upload $tag artifacts/testing.zip artifacts/repo.json --clobber

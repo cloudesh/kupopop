@@ -6,6 +6,19 @@ namespace Kupopop;
 /// <summary>Native notebook materials and little ink drawings. No raster art is generated.</summary>
 public static class UiStationery
 {
+    public static void TiltDecoration(ImDrawListPtr draw, int startVertex, Vector2 center, float degrees)
+    {
+        float angle = degrees * MathF.PI / 180;
+        float cosine = MathF.Cos(angle), sine = MathF.Sin(angle);
+        for (int i = startVertex; i < draw.VtxBuffer.Size; i++)
+        {
+            var vertex = draw.VtxBuffer[i];
+            var offset = vertex.Pos - center;
+            vertex.Pos = center + new Vector2(offset.X * cosine - offset.Y * sine, offset.X * sine + offset.Y * cosine);
+            draw.VtxBuffer[i] = vertex;
+        }
+    }
+
     public static void PaperMaterial(ImTextureID texture, Vector2 min, Vector2 max, Vector4? tint = null)
     {
         var material = tint ?? (UiTheme.DarkMode ? UiTheme.Paper : Vector4.One);

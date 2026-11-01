@@ -99,7 +99,7 @@ public sealed partial class MainWindow : Window, IDisposable
         countdown.Reset();
         room = null; profile = null; device = null;
         chat.Clear(); publicRooms = [];
-        social = null; sharedProfile = null; showSharedProfile = false;
+        social = null; sharedProfile = ownProfile = null; showSharedProfile = editingAvatar = false;
         leaderboard = null;
         customWordsText = roomCustomWords = "";
         suggestionText = "";
@@ -224,7 +224,7 @@ public sealed partial class MainWindow : Window, IDisposable
                 profile = message.Profile;
                 if (profile is not null) { sessionReady = serviceAvailable = true; connectionRetry.Connected(); }
                 if (savingProfile)
-                { savingProfile = false; screen = room is null ? "menu" : "game"; NotifyStatus("Profile saved."); }
+                { savingProfile = false; editingAvatar = false; screen = "profile"; displayName = profile?.DisplayName ?? displayName; RequestOwnProfile(); NotifyStatus("Profile saved."); }
                 if (profile is not null && screen != "profile") displayName = profile.DisplayName;
                 break;
             case "state" when message.Room is { } state:
