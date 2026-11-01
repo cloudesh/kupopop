@@ -8,12 +8,22 @@ namespace Kupopop;
 
 public sealed partial class MainWindow
 {
+    private void DrawCanvasTimer(RoomView state)
+    {
+        int left = Math.Max(0, (int)Math.Ceiling((state.Deadline - (DateTimeOffset.UtcNow + serverOffset)).TotalSeconds));
+        string text = left + "s";
+        var size = art.MeasureLarge(text, painting.RenderSize.X);
+        var position = painting.RenderOrigin + new Vector2(Math.Max(UiTheme.S(4), painting.RenderSize.X - size.X - UiTheme.S(10)), UiTheme.S(6));
+        art.DrawLarge(text, position, UiPresentation.Alpha(left <= 15 && state.Phase == "drawing" ? UiTheme.Rose : UiTheme.Ink, 0.62f));
+    }
+
     private void DrawWordChoices(RoomView state)
     {
         var saved = ImGui.GetCursorScreenPos();
-        var panelSize = new Vector2(Math.Max(60, painting.RenderSize.X - UiTheme.S(28)),
-            Math.Max(60, Math.Min(painting.RenderSize.Y - UiTheme.S(28), UiTheme.S(state.WordChoices is null ? 145 : 250))));
-        var origin = painting.RenderOrigin + (painting.RenderSize - panelSize) / 2;
+        var available = new Vector2(painting.RenderSize.X, Math.Max(60, painting.RenderSize.Y - UiTheme.S(46)));
+        var panelSize = new Vector2(Math.Max(60, available.X - UiTheme.S(28)),
+            Math.Max(60, Math.Min(available.Y - UiTheme.S(28), UiTheme.S(250))));
+        var origin = painting.RenderOrigin + new Vector2(0, UiTheme.S(46)) + (available - panelSize) / 2;
         ImGui.SetCursorScreenPos(origin);
         using (ImRaii.PushColor(ImGuiCol.ChildBg, UiPresentation.Alpha(UiTheme.Panel, 0.78f)))
         using (ImRaii.PushColor(ImGuiCol.Border, Vector4.Zero))
@@ -24,7 +34,7 @@ public sealed partial class MainWindow
         {
             if (panel.Success)
             {
-                art.CenteredHeading(state.DrawerId == device?.AccountId ? "Choose your word" : "A little inspiration...", ImGui.GetContentRegionAvail().X);
+                art.CenteredHeading("Choose your word", ImGui.GetContentRegionAvail().X);
                 if (state.WordChoices is { Length: > 0 } choices)
                 {
                     UiPresentation.CenteredLabel("Your drawing timer starts after you choose.", ImGui.GetContentRegionAvail().X, UiTheme.Muted);
@@ -38,8 +48,6 @@ public sealed partial class MainWindow
                         ImGui.EndTable();
                     }
                 }
-                else UiTheme.Wrapped((state.Players.FirstOrDefault(p => p.Profile.Id == state.DrawerId)?.Profile.DisplayName ?? "The drawer") +
-                    " is choosing from four words. The page will open in a moment.", UiTheme.Muted);
             }
         }
         ImGui.SetCursorScreenPos(saved);

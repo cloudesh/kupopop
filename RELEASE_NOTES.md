@@ -1,11 +1,9 @@
-Kupo Skribbl 0.5.1 polishes the game UI following in-game feedback.
+Kupo Skribbl 0.5.2 fixes canvas vote input and makes drawing rooms more compact.
 
-- Timer stays large and right-aligned without a clock icon. Hints have distinct letter slots and word spacing rather than a continuous underline; hover shows the letter count.
-- Chat history has no extra cream child background or borders. Individual cards are translucent over the blue note. Done-mode names/messages are gray with a status icon; server cards retain their information icon.
-- A circle-icon button opens Line, Rectangle and Ellipse. Redundant Square/Circle choices are removed from the menu; protocol 3 compatibility is preserved.
-- The turn recap uses a themed 2-1-3 podium, with first place raised in the center. The current drawer is highlighted in the artists list without an extra text row.
-- Canvas vote buttons are translucent and borderless. Every accepted kick/skip vote announces its tally and how many more votes are required. Duplicate/rejected votes do not generate announcements.
-- Word selection uses a centered translucent panel, softer cards and centered options.
+- Read-only canvases no longer intercept clicks meant for Vote kick / Vote skip. Accepted votes produce the existing server chat announcements with the tally and remaining votes.
+- The countdown is translucent text inside the canvas at top right. Spectators see a blank canvas and selection countdown while the drawer chooses, with the choosing status in chat; the four choices remain private to the drawer.
+- Drawing rooms have a shorter header, tighter top and bottom spacing, and only a small version number in the footer. Round and hint share a compact row.
+- Chat removes the Room chat / Done mode heading, separator and thin adhesive-band line. Message backgrounds are slightly stronger while retaining the blue note tint. Done-mode privacy is still explained on the input and message icons.
 
-Protocol 3 remains compatible with 0.5.0 clients. Profiles, credentials and private word banks are preserved; deploying the server restarts active rooms. File diagnostics still exclude words, credentials, chat and drawing/cursor contents.
+Protocol 3 is unchanged and compatible with 0.5.0/0.5.1. Accounts, private word banks and server-authoritative voting/scoring are unchanged. Server upgrades preserve profiles and restart active rooms.
 

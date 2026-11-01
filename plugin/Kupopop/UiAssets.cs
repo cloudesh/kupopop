@@ -31,6 +31,11 @@ public sealed class UiAssets : IDisposable
         using var font = large.Push();
         if (wrap) ImGui.TextWrapped(text); else ImGui.TextUnformatted(text);
     }
+    public void DrawLarge(string text, Vector2 position, Vector4 color)
+    {
+        using var font = large.Push();
+        ImGui.GetWindowDrawList().AddText(position, UiTheme.C(color), text);
+    }
     public Vector2 MeasureLarge(string text, float width)
     {
         using var font = large.Push();

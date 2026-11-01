@@ -17,6 +17,7 @@ public sealed partial class MainWindow
     private Vector2? pendingWindowPosition;
     private bool topDragActive;
     private static string UiVersion => typeof(Plugin).Assembly.GetName().Version?.ToString(3) ?? "dev";
+    internal bool IsDrawingRoom => ConnectionReady && newRecovery.Length == 0 && !ShowDebug && screen == "game" && room is not null;
 
     public override void PreDraw()
     {
@@ -54,7 +55,7 @@ public sealed partial class MainWindow
         UiTheme.Rule();
         if (ConnectionReady) DrawNotice();
         using (var transparent = ImRaii.PushColor(ImGuiCol.ChildBg, Vector4.Zero))
-        using (var body = ImRaii.Child("page-content", new Vector2(0, Math.Max(UiTheme.S(100), ImGui.GetContentRegionAvail().Y - ImGui.GetTextLineHeightWithSpacing() - UiTheme.S(2))), false))
+        using (var body = ImRaii.Child("page-content", new Vector2(0, Math.Max(UiTheme.S(100), ImGui.GetContentRegionAvail().Y - (IsDrawingRoom ? UiTheme.S(12) : ImGui.GetTextLineHeightWithSpacing() + UiTheme.S(2)))), false))
         {
             if (body.Success)
             {
@@ -69,9 +70,22 @@ public sealed partial class MainWindow
                 else Menu();
             }
         }
-        UiTheme.Caption(room is not null && screen == "game" ? "a page shared is a memory made" : "made for little masterpieces, kupo.");
-        ImGui.SameLine(Math.Max(ImGui.GetCursorPosX() + UiTheme.S(20), ImGui.GetWindowContentRegionMax().X - UiTheme.S(100)));
-        UiTheme.Caption("vol. " + UiVersion);
+        if (IsDrawingRoom)
+        {
+            string version = "v" + UiVersion;
+            var font = ImGui.GetFont();
+            float fontSize = ImGui.GetFontSize() * 0.8f;
+            var labelSize = ImGui.CalcTextSize(version) * 0.8f;
+            ImGui.GetWindowDrawList().AddText(font, fontSize,
+                position + ImGui.GetWindowSize() - new Vector2(UiTheme.S(22) + labelSize.X, UiTheme.S(7) + labelSize.Y),
+                UiTheme.C(UiTheme.Muted), version);
+        }
+        else
+        {
+            UiTheme.Caption("made for little masterpieces, kupo.");
+            ImGui.SameLine(Math.Max(ImGui.GetCursorPosX() + UiTheme.S(20), ImGui.GetWindowContentRegionMax().X - UiTheme.S(100)));
+            UiTheme.Caption("vol. " + UiVersion);
+        }
         if (ConnectionReady && screen == "game" && room?.Phase == "intermission") DrawTurnReveal(room);
         DrawToasts();
     }
@@ -79,6 +93,7 @@ public sealed partial class MainWindow
     private void DrawHeader()
     {
         bool framed = plugin.Config.UseStandardFrame;
+        bool compact = IsDrawingRoom;
         if (!ImGui.BeginTable("brand-paper-controls", framed ? 3 : 4, ImGuiTableFlags.NoPadOuterX)) return;
         try
         {
@@ -88,30 +103,30 @@ public sealed partial class MainWindow
             if (!framed) ImGui.TableSetupColumn("Paper controls", ImGuiTableColumnFlags.WidthFixed, UiTheme.S(64));
             ImGui.TableNextColumn();
             var face = ImGui.GetCursorScreenPos();
-            var move = UiChrome.DragHandle(UiTheme.V(211, 45), IsPinned, !framed);
+            var move = UiChrome.DragHandle(UiTheme.V(211, compact ? 34 : 45), IsPinned, !framed);
             if (move != Vector2.Zero) pendingWindowPosition = ImGui.GetWindowPos() + move;
             var afterBrand = ImGui.GetCursorScreenPos();
-            UiStationery.Moogle(face + UiTheme.V(20, 30), UiTheme.S(14), pom.Angle);
+            UiStationery.Moogle(face + UiTheme.V(20, compact ? 23 : 30), UiTheme.S(14), pom.Angle);
             ImGui.SetCursorScreenPos(face + UiTheme.V(49, 0));
             ImGui.BeginGroup();
             art.Heading("Kupo Skribbl");
-            UiTheme.Caption("THE LITTLE ART BOOK");
+            if (!compact) UiTheme.Caption("THE LITTLE ART BOOK");
             ImGui.EndGroup();
             ImGui.SetCursorScreenPos(afterBrand);
             ImGui.TableNextColumn();
-            UiTheme.Gap(6);
+            UiTheme.Gap(compact ? 1 : 6);
             if (ConnectionReady && newRecovery.Length == 0 && screen != "welcome") Navigation();
             else { ImGui.AlignTextToFramePadding(); UiTheme.Caption("THE DRAWING ROOM"); }
             ImGui.TableNextColumn();
             bool online = ConnectionReady;
-            UiTheme.Gap(6);
+            UiTheme.Gap(compact ? 1 : 6);
             ImGui.AlignTextToFramePadding();
             UiAssets.Glyph(FontAwesomeIcon.Circle, online ? UiTheme.Green : UiTheme.Muted);
             ImGui.SameLine();
             ImGui.TextUnformatted(online ? "Connected" : "Connecting...");
             if (!framed)
             {
-                ImGui.TableNextColumn(); UiTheme.Gap(6);
+                ImGui.TableNextColumn(); UiTheme.Gap(compact ? 1 : 6);
                 if (ToolAction(FontAwesomeIcon.Thumbtack, IsPinned ? "Unpin book" : "Pin book", IsPinned))
                 { IsPinned = !IsPinned; plugin.Config.PaperPinned = IsPinned; plugin.Save(); }
                 ImGui.SameLine();
@@ -151,6 +166,7 @@ public sealed partial class MainWindow
         bool error = status.Contains("failed", StringComparison.OrdinalIgnoreCase) ||
             status.Contains("rejected", StringComparison.OrdinalIgnoreCase) || status.Contains("limit", StringComparison.OrdinalIgnoreCase) ||
             status.Contains("need", StringComparison.OrdinalIgnoreCase) || status.Contains("full", StringComparison.OrdinalIgnoreCase);
+        if (IsDrawingRoom && !error) return;
         if (!error && Environment.TickCount64 > noticeUntil) return;
         if (newRecovery.Length > 0 && !error) return;
         UiTheme.Wrapped(status, error ? UiTheme.Rose : UiTheme.Green);
@@ -418,6 +434,7 @@ public sealed partial class MainWindow
     private void Game()
     {
         var state = room!;
+        using var roomCellPadding = ImRaii.PushStyle(ImGuiStyleVar.CellPadding, UiTheme.V(4, 1));
         bool host = state.HostId == device?.AccountId;
         int online = state.Players.Count(p => p.Connected);
         if (!ImGui.BeginTable("room-caption-compact", 2, ImGuiTableFlags.NoPadOuterX)) return;
@@ -444,37 +461,32 @@ public sealed partial class MainWindow
             else UiTheme.Caption("The host will start the match when everyone is ready.");
         }
         float width = ImGui.GetContentRegionAvail().X;
-        float height = Math.Max(UiTheme.S(120), ImGui.GetContentRegionAvail().Y - UiTheme.S(6));
+        float height = Math.Max(UiTheme.S(120), ImGui.GetContentRegionAvail().Y);
         if (!ImGui.BeginTable("play-layout-canvas-sheet", 3, ImGuiTableFlags.Resizable | ImGuiTableFlags.SizingFixedFit | ImGuiTableFlags.NoPadOuterX, new Vector2(0, height))) return;
         try
         {
             ImGui.TableSetupColumn("Artists", ImGuiTableColumnFlags.WidthFixed, UiTheme.S(width < UiTheme.S(1050) ? 172 : 192));
             ImGui.TableSetupColumn("The page", ImGuiTableColumnFlags.WidthStretch);
             ImGui.TableSetupColumn("Conversation", ImGuiTableColumnFlags.WidthFixed, UiTheme.S(width < UiTheme.S(1050) ? 200 : 220));
-            ImGui.TableNextColumn(); DrawPlayers(state, height - UiTheme.S(6));
-            ImGui.TableNextColumn(); DrawBoard(state, height - UiTheme.S(6));
-            ImGui.TableNextColumn(); ChatScreen(state, height - UiTheme.S(6));
+            ImGui.TableNextColumn(); DrawPlayers(state, height);
+            ImGui.TableNextColumn(); DrawBoard(state, height);
+            ImGui.TableNextColumn(); ChatScreen(state, height);
         }
         finally { ImGui.EndTable(); }
     }
 
     private void DrawTurnHeader(RoomView state)
     {
-        int left = Math.Max(0, (int)Math.Ceiling((state.Deadline - (DateTimeOffset.UtcNow + serverOffset)).TotalSeconds));
         if (!ImGui.BeginTable("turn-header-compact", 2, ImGuiTableFlags.NoPadOuterX)) return;
         try
         {
+            ImGui.TableSetupColumn("Round", ImGuiTableColumnFlags.WidthFixed, UiTheme.S(76));
             ImGui.TableSetupColumn("Word", ImGuiTableColumnFlags.WidthStretch);
-            ImGui.TableSetupColumn("Time", ImGuiTableColumnFlags.WidthFixed, UiTheme.S(114));
-            ImGui.TableNextColumn(); UiTheme.Caption($"ROUND {state.Round} / {state.Options.Rounds}");
-            if (state.Phase == "choosing") art.Heading("Choosing a word...");
-            else if (state.Word is { } word) art.Heading(word);
+            ImGui.TableNextColumn(); UiTheme.Caption($"ROUND {state.Round}/{state.Options.Rounds}");
+            ImGui.TableNextColumn();
+            if (state.Word is { } word) art.Heading(word);
             else art.Hint(state.Hint);
             if (state.Word is not null && ImGui.IsItemHovered()) ImGui.SetTooltip(state.Phase == "intermission" ? "The word was" : "Your word to draw");
-            ImGui.TableNextColumn();
-            float timerWidth = ImGui.GetContentRegionAvail().X;
-            ImGui.SetCursorPosX(ImGui.GetCursorPosX() + Math.Max(0, timerWidth - art.MeasureLarge(left + "s", timerWidth).X));
-            using (ImRaii.PushColor(ImGuiCol.Text, left <= 15 && state.Phase == "drawing" ? UiTheme.Rose : UiTheme.Ink)) art.LargeText(left + "s");
         }
         finally { ImGui.EndTable(); }
     }
@@ -517,14 +529,15 @@ public sealed partial class MainWindow
     {
         bool canDraw = client?.Connected == true && state.Phase == "drawing" && state.DrawerId == device?.AccountId;
         float top = ImGui.GetCursorScreenPos().Y;
-        if (state.Phase is "choosing" or "drawing" or "intermission") DrawTurnHeader(state);
+        if (state.Phase is "drawing" or "intermission") DrawTurnHeader(state);
         if (canDraw) painting.Toolbar("game-tools", undo: () => { if (Send(new("undo", TurnId: state.TurnId))) undoPending = true; }, canUndo: canUndoDrawing && !undoPending);
         float toolsHeight = ImGui.GetCursorScreenPos().Y - top;
         painting.Draw("game-canvas", canvas, new Vector2(ImGui.GetContentRegionAvail().X, Math.Max(UiTheme.S(8), height - toolsHeight)), canDraw && !undoPending, operation =>
         {
             if (Send(new("draw", Draw: operation, TurnId: state.TurnId))) { canvas.Apply(operation); draws++; canUndoDrawing = true; }
         }, canDraw ? pointer => Send(new("cursor", TurnId: state.TurnId, Cursor: pointer)) : null);
-        if (state.Phase == "choosing") DrawWordChoices(state);
+        if (state.Phase == "choosing" && state.DrawerId == device?.AccountId) DrawWordChoices(state);
+        if (state.Phase is "choosing" or "drawing" or "intermission") DrawCanvasTimer(state);
         if (state.Phase == "drawing" && state.DrawerId != device?.AccountId) DrawCanvasVotes(state);
         var size = new Vector2(MathF.Round(painting.RenderSize.X), MathF.Round(painting.RenderSize.Y));
         if (size != lastCanvasSize && Environment.TickCount64 >= nextLayoutLog)
@@ -536,11 +549,8 @@ public sealed partial class MainWindow
 
     private void ChatScreen(RoomView state, float height)
     {
-        using var panel = new UiTheme.PaperPanel("chat-panel", new Vector2(0, height), compact: true, note: UiTheme.StickyBlue);
+        using var panel = new UiTheme.PaperPanel("chat-panel", new Vector2(0, height), compact: true, note: UiTheme.StickyBlue, scrollable: false, plainTop: true);
         if (!panel.Success) return;
-        ImGui.TextUnformatted(state.YouAreDone ? "Done mode" : "Room chat");
-        if (ImGui.IsItemHovered()) ImGui.SetTooltip(state.YouAreDone ? "Only the drawer and correct guessers see your messages." : "Talk and guess in the same chat.");
-        UiTheme.Rule();
         using var messageBackground = ImRaii.PushColor(ImGuiCol.ChildBg, Vector4.Zero);
         using var messageBorder = ImRaii.PushColor(ImGuiCol.Border, Vector4.Zero);
         using var messageBorderSize = ImRaii.PushStyle(ImGuiStyleVar.ChildBorderSize, 0);
@@ -563,6 +573,7 @@ public sealed partial class MainWindow
             ImGui.SetNextItemWidth(Math.Max(UiTheme.S(60), ImGui.GetContentRegionAvail().X - UiTheme.S(48)));
             if (focusChat) { ImGui.SetKeyboardFocusHere(); focusChat = false; }
             bool enter = ImGui.InputTextWithHint("##message", state.YouAreDone ? "Say something..." : "Talk or guess...", ref chatInput, 300, ImGuiInputTextFlags.EnterReturnsTrue);
+            if (ImGui.IsItemHovered()) ImGui.SetTooltip(state.YouAreDone ? "Done mode: only the drawer and correct guessers see your messages." : "Talk and guess in the same chat.");
             if (enter) ImGui.SetKeyboardFocusHere(-1);
             ImGui.SameLine(); bool click = ToolAction(FontAwesomeIcon.PaperPlane, "Send");
             if ((enter || click) && !string.IsNullOrWhiteSpace(chatInput))

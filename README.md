@@ -3,7 +3,7 @@
 A native Dalamud drawing-and-guessing game for Final Fantasy XIV. Draw with
 friends, race to solve the word, and make a little avatar of your own.
 
-**Experimental 0.5.1 — compiled and automatically tested; in-game testing required.**
+**Experimental 0.5.2 — compiled and automatically tested; in-game testing required.**
 
 ## Try it
 
@@ -21,7 +21,7 @@ The installation ID stays `Kupopop` so existing installations update normally.
 This custom release is not an
 official Dalamud repository submission.
 
-Self-hosting/development: [Windows/Linux server packages](https://github.com/cloudesh/kupopop/releases/tag/v0.5.1)
+Self-hosting/development: [Windows/Linux server packages](https://github.com/cloudesh/kupopop/releases/tag/v0.5.2)
 and [unattended Linux deployment](server/deploy/README.md) remain available. The
 stable PC launcher is **[Start-My-Server.cmd](Start-My-Server.cmd)**; its data stays
 in `server/local/`. A development plugin can target localhost by changing

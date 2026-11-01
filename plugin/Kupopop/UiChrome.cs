@@ -5,6 +5,14 @@ namespace Kupopop;
 
 public static class UiChrome
 {
+    public static void CanvasTarget(string id, Vector2 size, bool writable)
+    {
+        // Read-only sheets must not claim mouse input before their overlaid
+        // vote buttons. Only the artist/editor needs an active drawing target.
+        if (writable) ImGui.InvisibleButton(id, size);
+        else ImGui.Dummy(size);
+    }
+
     // Return a move request for the next frame, so the paper and its contents
     // always move together rather than shifting halfway through drawing.
     public static Vector2 DragHandle(Vector2 size, bool locked, bool enabled = true)

@@ -90,7 +90,7 @@ public sealed class CanvasWidget : IDisposable
         ImGui.SetCursorPosX(ImGui.GetCursorPosX() + Math.Max(0, (available.X - size.X) / 2));
         Vector2 top = ImGui.GetCursorScreenPos();
         RenderOrigin = top;
-        ImGui.InvisibleButton(id, size);
+        UiChrome.CanvasTarget(id, size, writable);
         UiTheme.SheetEdges(top, top + size);
         if (canvas.Transparency)
         {

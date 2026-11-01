@@ -57,7 +57,7 @@ public static class UiPresentation
         float height = ImGui.CalcTextSize(line.Text, false, bodyWidth).Y + pad * 2 +
             (line.System ? 0 : ImGui.GetTextLineHeight() + UiTheme.S(2));
         var draw = ImGui.GetWindowDrawList();
-        var fill = line.Done ? Alpha(UiTheme.Muted, 0.08f) : Alpha(UiTheme.White, line.System ? 0.32f : 0.24f);
+        var fill = line.Done ? Alpha(UiTheme.Muted, 0.14f) : Alpha(UiTheme.White, line.System ? 0.48f : 0.40f);
         draw.AddRectFilled(start, start + new Vector2(width, height), UiTheme.C(fill), UiTheme.S(3));
         ImGui.SetCursorScreenPos(start + new Vector2(pad, pad));
         ImGui.BeginGroup();
