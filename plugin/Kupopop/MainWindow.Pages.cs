@@ -41,7 +41,6 @@ public sealed partial class MainWindow
         var position = ImGui.GetWindowPos();
         pom.Step(position.X + position.Y * 0.35f, ImGui.GetIO().DeltaTime, !plugin.Config.ReduceMotion);
         UiStationery.Book(position, position + ImGui.GetWindowSize(), ShowDebug ? ImGui.GetFrameHeight() : 0);
-        UiStationery.PomBookmark(position + UiTheme.V(235, 30) + new Vector2(0, ShowDebug ? ImGui.GetFrameHeight() : 0), pom.Angle);
         DrawHeader();
         UiTheme.Rule();
         using (var transparent = ImRaii.PushColor(ImGuiCol.ChildBg, Vector4.Zero))
@@ -213,7 +212,7 @@ public sealed partial class MainWindow
         var available = ImGui.GetContentRegionAvail();
         float width = Math.Min(available.X, UiTheme.S(900));
         var cover = ImGui.GetCursorScreenPos() + new Vector2(Math.Max(0, (available.X - width) / 2), Math.Max(0, (available.Y - UiTheme.S(402)) / 2));
-        DrawCoverMoogle(cover + UiTheme.V(35, 44));
+        DrawCoverMoogle(cover + UiTheme.V(35, 51));
         UiBrand.Wordmark(cover + UiTheme.V(80, 5), new Vector2(Math.Min(width - UiTheme.S(90), UiTheme.S(440)), UiTheme.S(74)), cover: true);
         var origin = cover + UiTheme.V(0, 92);
         ImGui.SetCursorScreenPos(origin);

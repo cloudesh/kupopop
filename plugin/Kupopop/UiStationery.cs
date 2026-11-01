@@ -106,19 +106,6 @@ public static class UiStationery
         UiTheme.Gap(3);
     }
 
-    public static void PomBookmark(Vector2 root, float angle)
-    {
-        var draw = ImGui.GetWindowDrawList();
-        var ball = root + new Vector2(MathF.Sin(angle) * UiTheme.S(14), -MathF.Cos(angle) * UiTheme.S(14));
-        draw.AddBezierCubic(root, root - UiTheme.V(4, 6), ball + UiTheme.V(3, 6), ball,
-            UiTheme.C(UiTheme.Brass), UiTheme.S(1.5f));
-        draw.AddCircleFilled(root, UiTheme.S(2), UiTheme.C(UiTheme.Brass), 16);
-        draw.AddCircleFilled(ball + UiTheme.V(1, 1), UiTheme.S(6), UiTheme.C(UiPresentation.Alpha(UiTheme.CanvasInk, 0.18f)), 24);
-        draw.AddCircleFilled(ball, UiTheme.S(6), UiTheme.C(UiTheme.RoseHover), 24);
-        draw.AddCircle(ball, UiTheme.S(6), UiTheme.C(UiTheme.Rose), 24, UiTheme.S(1));
-        draw.AddCircleFilled(ball - UiTheme.V(2, 2), UiTheme.S(1.5f), UiTheme.C(UiTheme.White), 12);
-    }
-
     public static void SketchNote(Vector2 min, Vector2 max)
     {
         var draw = ImGui.GetWindowDrawList();
@@ -159,9 +146,9 @@ public static class UiStationery
     }
 
     /// <summary>The moogle artist mark; also exported unchanged for the installer.</summary>
-    public static void Logo(Vector2 center, float radius, float angle = 0)
+    public static void Logo(Vector2 center, float radius, float angle = 0, float pomScale = 1)
     {
-        Moogle(center, radius, angle);
+        Moogle(center, radius, angle, pomScale);
         var draw = ImGui.GetWindowDrawList();
         Vector2 P(float x, float y) => center + new Vector2(x, y) * radius;
         float stroke = Math.Max(UiTheme.S(1), radius * 0.06f);
@@ -183,7 +170,7 @@ public static class UiStationery
         draw.AddLine(P(-1.43f, -0.4f), P(-1.62f, -0.47f), UiTheme.C(UiTheme.Rose), stroke);
     }
 
-    public static void Moogle(Vector2 center, float radius, float angle = 0)
+    public static void Moogle(Vector2 center, float radius, float angle = 0, float pomScale = 1)
     {
         var draw = ImGui.GetWindowDrawList();
         Vector2 P(float x, float y) => center + new Vector2(x, y) * radius;
@@ -205,12 +192,14 @@ public static class UiStationery
         Ellipse(draw, P(0, 0.18f), new Vector2(radius * 0.18f, radius * 0.13f), UiTheme.C(UiTheme.Rose), true);
         draw.AddBezierCubic(P(-0.16f, 0.36f), P(-0.1f, 0.53f), P(0.1f, 0.53f), P(0.16f, 0.36f), ink, stroke);
         var root = P(0, -0.7f);
-        var pom = root + new Vector2(MathF.Sin(angle) * radius * 0.85f, -MathF.Cos(angle) * radius * 0.85f);
-        draw.AddBezierCubic(root, root + new Vector2(radius * 0.15f, -radius * 0.45f), pom + new Vector2(-radius * 0.2f, radius * 0.3f), pom, ink, Math.Max(UiTheme.S(1.2f), stroke));
-        draw.AddCircleFilled(pom + UiTheme.V(1, 1), radius * 0.35f, UiTheme.C(UiTheme.Line));
-        draw.AddCircleFilled(pom, radius * 0.35f, UiTheme.C(UiTheme.RoseHover));
-        draw.AddCircle(pom, radius * 0.35f, UiTheme.C(UiTheme.Rose), 0, stroke);
-        draw.AddCircleFilled(pom + new Vector2(-radius * 0.1f, -radius * 0.1f), radius * 0.09f, UiTheme.C(UiTheme.RoseTint));
+        float stalkLength = radius * 0.85f * (1 + (pomScale - 1) * 0.5f);
+        var pom = root + new Vector2(MathF.Sin(angle), -MathF.Cos(angle)) * stalkLength;
+        draw.AddBezierCubic(root, root + new Vector2(radius * 0.15f, -stalkLength * 0.53f), pom + new Vector2(-radius * 0.2f, stalkLength * 0.35f), pom, ink,
+            Math.Max(UiTheme.S(1.2f), stroke) * pomScale);
+        draw.AddCircleFilled(pom + UiTheme.V(1, 1), radius * 0.35f * pomScale, UiTheme.C(UiTheme.Line));
+        draw.AddCircleFilled(pom, radius * 0.35f * pomScale, UiTheme.C(UiTheme.RoseHover));
+        draw.AddCircle(pom, radius * 0.35f * pomScale, UiTheme.C(UiTheme.Rose), 0, stroke);
+        draw.AddCircleFilled(pom + new Vector2(-radius * 0.1f, -radius * 0.1f) * pomScale, radius * 0.09f * pomScale, UiTheme.C(UiTheme.RoseTint));
     }
 
     private static void Ellipse(ImDrawListPtr draw, Vector2 center, Vector2 radii, uint color, bool fill)

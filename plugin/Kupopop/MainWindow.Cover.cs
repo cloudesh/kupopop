@@ -14,8 +14,8 @@ public sealed partial class MainWindow
         var saved = ImGui.GetCursorScreenPos();
         bool moving = !plugin.Config.ReduceMotion;
         coverPom.Step(0, ImGui.GetIO().DeltaTime, moving);
-        ImGui.SetCursorScreenPos(center - UiTheme.V(34, 44));
-        bool tapped = ImGui.InvisibleButton("tap-cover-moogle", UiTheme.V(70, 68));
+        ImGui.SetCursorScreenPos(center - UiTheme.V(34, 59));
+        bool tapped = ImGui.InvisibleButton("tap-cover-moogle", UiTheme.V(70, 85));
         bool hovered = ImGui.IsItemHovered();
         if (tapped)
         {
@@ -26,9 +26,10 @@ public sealed partial class MainWindow
         if (hovered)
         {
             ImGui.SetMouseCursor(ImGuiMouseCursor.Hand);
-            UiTheme.Tooltip("Give the little artist a tap, kupo.");
+            UiTheme.Tooltip("Poke the big pom, kupo.");
         }
-        UiStationery.Logo(center, UiTheme.S(23), coverPom.Angle);
+        float idle = moving ? MathF.Sin((float)(ImGui.GetTime() * 1.7 % Math.Tau)) * 0.09f : 0;
+        UiStationery.Logo(center, UiTheme.S(23), coverPom.Angle + idle, pomScale: 1.7f);
         float remaining = Math.Clamp((coverTwinkleUntil - Environment.TickCount64) / 850f, 0, 1);
         if (remaining > 0 || hovered)
         {
