@@ -3,7 +3,8 @@ using Kupopop.Shared;
 
 namespace Kupopop.Server;
 
-public sealed class GameEngine(AccountStore accounts, ILogger<GameEngine> log, TimeProvider clock, WordBank? wordBank = null)
+public sealed class GameEngine(AccountStore accounts, ILogger<GameEngine> log, TimeProvider clock, WordBank? wordBank = null,
+    Func<int>? customWordRoll = null)
 {
     private sealed class Member(Guid id)
     {
@@ -27,6 +28,10 @@ public sealed class GameEngine(AccountStore accounts, ILogger<GameEngine> log, T
         public KickBallot? SkipVote;
         public bool SkipVoteUsed;
         public string[] Choices = [];
+        public bool CustomWordAvailable;
+        public string[] Answers = [];
+        public Dictionary<Guid, SolveResult> MatchScores = [];
+        public SolveResult[] Results = [];
         public int[] HintOrder = [];
         public List<SolveResult> Solvers = [];
         public BrushCursor? Cursor;
@@ -154,6 +159,8 @@ public sealed class GameEngine(AccountStore accounts, ILogger<GameEngine> log, T
                         var participants = room.Members.Values.Where(m => m.Connected).Select(m => m.Id).ToArray();
                         if (participants.Length < 2) throw new ArgumentException("At least two connected players are needed.");
                         foreach (var member in room.Members.Values) { member.Score = 0; member.Solved = false; }
+                        room.MatchScores = participants.ToDictionary(id => id, id => new SolveResult(id, accounts.Get(id)!.DisplayName, 0));
+                        room.Results = [];
                         room.Deck = [];
                         for (int i = 0; i < room.Options.Rounds; i++) room.Deck.AddRange(participants);
                         room.RotationSize = participants.Length;
@@ -172,8 +179,26 @@ public sealed class GameEngine(AccountStore accounts, ILogger<GameEngine> log, T
                     case "choose-word":
                         if (room?.Phase != "choosing" || room.Drawer != peer.Id || command.TurnId != room.TurnId ||
                             Now >= room.Deadline || command.Text is null || !room.Choices.Contains(command.Text, StringComparer.Ordinal))
-                            throw new ArgumentException("Choose one of your four offered words before the timer ends.");
+                            throw new ArgumentException("Choose one of your offered words before the timer ends.");
                         BeginDrawing(room, command.Text);
+                        break;
+                    case "choose-custom-word":
+                        if (room?.Phase != "choosing" || room.Drawer != peer.Id || command.TurnId != room.TurnId ||
+                            Now >= room.Deadline || !room.Options.CustomWordsEnabled || !room.CustomWordAvailable)
+                            throw new ArgumentException("A custom word is not available for this turn.");
+                        string custom = command.Text?.Trim() ?? "";
+                        if (!GuessMatching.ValidCustomWord(custom))
+                            throw new ArgumentException("Use 2–48 letters, numbers, spaces, apostrophes or hyphens, with at least two letters.");
+                        BeginDrawing(room, custom, custom: true);
+                        break;
+                    case "configure":
+                        RequireHost(peer, room);
+                        if (room!.Phase is not ("waiting" or "results")) throw new ArgumentException("Change room settings between matches.");
+                        var updated = Validate(command.Options ?? room.Options);
+                        if (updated.MaxPlayers < room.Members.Count) throw new ArgumentException("Capacity cannot be smaller than the current room.");
+                        room.Options = updated;
+                        BroadcastState(room);
+                        peer.Send(new("room-configured"));
                         break;
                     case "cursor":
                         if (room?.Phase != "drawing" || room.Drawer != peer.Id || command.TurnId != room.TurnId || Now >= room.Deadline)
@@ -273,8 +298,8 @@ public sealed class GameEngine(AccountStore accounts, ILogger<GameEngine> log, T
         if (room.Phase == "drawing" && !done)
         {
             if (Now >= room.Deadline) { EndTurn(room); return; }
-            string guess = GuessMatching.Normalize(text), answer = GuessMatching.Normalize(room.Word);
-            if (guess == answer)
+            string guess = GuessMatching.Normalize(text);
+            if (room.Answers.Contains(guess, StringComparer.Ordinal))
             {
                 int rank = room.Solvers.Count + 1;
                 member.Solved = true;
@@ -282,13 +307,15 @@ public sealed class GameEngine(AccountStore accounts, ILogger<GameEngine> log, T
                 member.Score += award;
                 room.Solvers.Add(new(peer.Id, accounts.Get(peer.Id)!.DisplayName, award));
                 if (room.Drawer is { } drawerId && room.Members.TryGetValue(drawerId, out var drawer)) drawer.Score += 100;
+                foreach (var participant in room.Members.Values)
+                    room.MatchScores[participant.Id] = new(participant.Id, accounts.Get(participant.Id)!.DisplayName, participant.Score);
                 SystemMessage(room, $"{accounts.Get(peer.Id)!.DisplayName} guessed the word! (+{award})");
                 log.LogInformation("Correct guess accepted. Rank={Rank}", rank);
                 if (room.Members.Values.Where(m => m.Connected && m.Id != room.Drawer).All(m => m.Solved)) EndTurn(room);
                 else BroadcastState(room);
                 return;
             }
-            if (GuessMatching.IsNear(guess, answer))
+            if (room.Answers.Any(answer => GuessMatching.IsNear(guess, answer)))
             {
                 peer.Send(new("chat", Chat: new(null, "Kupo Skribbl", "So close! Try again.", System: true)));
                 return;
@@ -311,6 +338,8 @@ public sealed class GameEngine(AccountStore accounts, ILogger<GameEngine> log, T
             room.Phase = "results";
             room.Drawer = null;
             room.Deadline = default;
+            room.CustomWordAvailable = false;
+            room.Results = room.MatchScores.Values.OrderByDescending(s => s.Points).ThenBy(s => s.Name, StringComparer.Ordinal).ToArray();
             SystemMessage(room, "Match finished! The host can start another match.");
             BroadcastState(room);
             log.LogInformation("Match finished. Players={Players}", room.Members.Count);
@@ -323,22 +352,25 @@ public sealed class GameEngine(AccountStore accounts, ILogger<GameEngine> log, T
         room.Revealed = 0;
         room.Word = "";
         room.Choices = words.Choices(room.Options.WordLists, room.LastWord, room.Options.WordChoiceCount);
+        room.CustomWordAvailable = room.Options.CustomWordsEnabled && (customWordRoll?.Invoke() ?? RandomNumberGenerator.GetInt32(100)) < 10;
+        room.Answers = [];
         room.Solvers.Clear(); room.HintOrder = [];
         room.Canvas.Clear();
         foreach (var member in room.Members.Values) member.Solved = false;
         BroadcastState(room, reset: true);
-        SystemMessage(room, "The next artist is choosing a word.");
+        SystemMessage(room, $"{accounts.Get(room.Drawer.Value)!.DisplayName} is choosing the next word.");
         log.LogInformation("Word selection started. Round={Round} Players={Players}", room.Position / room.RotationSize + 1, room.Members.Count);
     }
 
-    private void BeginDrawing(Room room, string word)
+    private void BeginDrawing(Room room, string word, bool custom = false)
     {
         room.Word = room.LastWord = word; room.Choices = [];
+        room.CustomWordAvailable = false;
+        room.Answers = custom ? [GuessMatching.Normalize(word)] : words.Answers(word, room.Options.WordLists);
         room.HintOrder = Enumerable.Range(0, word.Length).Where(i => char.IsLetterOrDigit(word[i])).ToArray();
         RandomNumberGenerator.Shuffle(room.HintOrder.AsSpan());
         room.Phase = "drawing"; room.Deadline = Now.AddSeconds(room.Options.TurnSeconds); room.Revealed = 0;
         BroadcastState(room);
-        SystemMessage(room, "A new drawing turn has started.");
         log.LogInformation("Drawing turn started. Players={Players}", room.Members.Count);
     }
 
@@ -346,9 +378,9 @@ public sealed class GameEngine(AccountStore accounts, ILogger<GameEngine> log, T
     {
         if (room.Phase is not ("drawing" or "choosing")) return;
         room.Vote = room.SkipVote = null; room.History.Clear(); room.Cursor = null; room.Choices = [];
+        room.CustomWordAvailable = false;
         room.Phase = "intermission";
         room.Deadline = Now.AddSeconds(6);
-        SystemMessage(room, "Turn finished. The answer is shown above the canvas.");
         BroadcastState(room);
     }
 
@@ -395,7 +427,9 @@ public sealed class GameEngine(AccountStore accounts, ILogger<GameEngine> log, T
             room.SkipVote is { } skip ? new(skip.Target, skip.Votes.Count, skip.Required, skip.Votes.Contains(peer.Id), skip.Expires) : null,
             room.Phase == "drawing" && Now - room.CursorAt < TimeSpan.FromSeconds(2) ? room.Cursor : null,
             room.Options.VoteKickEnabled && (!room.VoteUsed || room.Vote is not null),
-            room.Options.VoteSkipEnabled && (!room.SkipVoteUsed || room.SkipVote is not null))));
+            room.Options.VoteSkipEnabled && (!room.SkipVoteUsed || room.SkipVote is not null),
+            room.Phase == "choosing" && room.Drawer == peer.Id && room.CustomWordAvailable,
+            room.Phase == "results" ? room.Results : null)));
     }
 
     private void BroadcastState(Room room, bool reset = false, Guid? except = null)

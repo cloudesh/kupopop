@@ -13,7 +13,6 @@ public sealed partial class MainWindow
     private long nextLayoutLog;
     private readonly PomMotion pom = new();
     private readonly UiAspectConstraint aspect = new();
-    private readonly UiDragAnchor drag = new();
     private bool topDragActive;
     private static string UiVersion => typeof(Plugin).Assembly.GetName().Version?.ToString(3) ?? "dev";
     internal bool IsDrawingRoom => ConnectionReady && newRecovery.Length == 0 && !ShowDebug && screen == "game" && room is not null;
@@ -23,15 +22,17 @@ public sealed partial class MainWindow
         var display = ImGui.GetIO().DisplaySize;
         Flags = ImGuiWindowFlags.NoScrollbar | ImGuiWindowFlags.NoScrollWithMouse;
         if (!plugin.Config.UseStandardFrame)
-            Flags |= ImGuiWindowFlags.NoTitleBar | ImGuiWindowFlags.NoBackground | ImGuiWindowFlags.NoMove;
+            Flags |= ImGuiWindowFlags.NoTitleBar | ImGuiWindowFlags.NoBackground;
+        ForceMainWindow = true;
         AllowBackgroundBlur = plugin.Config.UseStandardFrame;
         AllowClickthrough = plugin.Config.UseStandardFrame;
         DisableFadeInFadeOut = !plugin.Config.UseStandardFrame;
         if (plugin.Config.PaperPinned is null) { plugin.Config.PaperPinned = IsPinned; plugin.Save(); }
         if (!plugin.Config.UseStandardFrame) IsPinned = plugin.Config.PaperPinned.Value;
         else if (plugin.Config.PaperPinned != IsPinned) { plugin.Config.PaperPinned = IsPinned; plugin.Save(); }
-        Position = drag.Position(ImGui.GetMousePos(), ImGui.IsMouseDown(ImGuiMouseButton.Left), !IsPinned && !plugin.Config.UseStandardFrame);
-        PositionCondition = ImGuiCond.Always;
+        // Native movement owns the entire window tree and viewport. Never fight
+        // it with a second, per-frame SetNextWindowPos controller.
+        Position = null;
         // Supply the native callback directly: WindowSystem's optional bounds
         // would otherwise replace it after PreDraw. Scale exactly once here.
         SizeConstraints = null;
@@ -46,10 +47,10 @@ public sealed partial class MainWindow
         DrawHeader();
         UiChrome.EmptyHeaderDrag(position + UiTheme.V(18, 5),
             new Vector2(position.X + ImGui.GetWindowSize().X - UiTheme.S(18), ImGui.GetCursorScreenPos().Y),
-            ref topDragActive, IsPinned, !plugin.Config.UseStandardFrame, drag);
+            ref topDragActive, IsPinned, !plugin.Config.UseStandardFrame);
         UiTheme.Rule();
         using (var transparent = ImRaii.PushColor(ImGuiCol.ChildBg, Vector4.Zero))
-        using (var body = ImRaii.Child("page-content", new Vector2(0, Math.Max(UiTheme.S(100), ImGui.GetContentRegionAvail().Y - UiTheme.S(12))), false,
+        using (var body = ImRaii.Child("page-content", new Vector2(0, Math.Max(UiTheme.S(100), ImGui.GetContentRegionAvail().Y - UiTheme.S(28))), false,
             IsDrawingRoom ? ImGuiWindowFlags.NoScrollbar | ImGuiWindowFlags.NoScrollWithMouse : ImGuiWindowFlags.None))
         {
             if (body.Success)
@@ -66,14 +67,12 @@ public sealed partial class MainWindow
             }
         }
         UiChrome.Footer(position, position + ImGui.GetWindowSize(), "v" + UiVersion, IsPinned);
-        if (ConnectionReady && screen == "game" && room?.Phase == "intermission") DrawTurnReveal(room);
         DrawToasts();
     }
 
     private void DrawHeader()
     {
         bool framed = plugin.Config.UseStandardFrame;
-        bool compact = IsDrawingRoom;
         if (!ImGui.BeginTable("brand-paper-controls", 4, ImGuiTableFlags.NoPadOuterX)) return;
         try
         {
@@ -83,27 +82,25 @@ public sealed partial class MainWindow
             ImGui.TableSetupColumn("Paper controls", ImGuiTableColumnFlags.WidthFixed, UiTheme.S(framed ? 32 : 100));
             ImGui.TableNextColumn();
             var face = ImGui.GetCursorScreenPos();
-            UiChrome.DragHandle(UiTheme.V(211, compact ? 34 : 45), IsPinned, !framed, drag);
+            UiChrome.DragHandle(UiTheme.V(211, 34), IsPinned, !framed);
             var afterBrand = ImGui.GetCursorScreenPos();
-            UiStationery.Moogle(face + UiTheme.V(20, compact ? 23 : 30), UiTheme.S(14), pom.Angle);
+            UiStationery.Moogle(face + UiTheme.V(20, 23), UiTheme.S(14), pom.Angle);
             ImGui.SetCursorScreenPos(face + UiTheme.V(49, 0));
             ImGui.BeginGroup();
             art.Heading("Kupo Skribbl");
-            if (!compact) UiTheme.Caption("THE LITTLE ART BOOK");
             ImGui.EndGroup();
             ImGui.SetCursorScreenPos(afterBrand);
             ImGui.TableNextColumn();
-            UiTheme.Gap(compact ? 1 : 6);
+            UiTheme.Gap(1);
             if (ConnectionReady && newRecovery.Length == 0 && screen != "welcome") Navigation();
-            else { ImGui.AlignTextToFramePadding(); UiTheme.Caption("THE DRAWING ROOM"); }
             ImGui.TableNextColumn();
             bool online = ConnectionReady;
-            UiTheme.Gap(compact ? 1 : 6);
+            UiTheme.Gap(1);
             ImGui.AlignTextToFramePadding();
             UiAssets.Glyph(FontAwesomeIcon.Circle, online ? UiTheme.Green : UiTheme.Muted);
             ImGui.SameLine();
             ImGui.TextUnformatted(online ? "Connected" : "Connecting...");
-            ImGui.TableNextColumn(); UiTheme.Gap(compact ? 1 : 6);
+            ImGui.TableNextColumn(); UiTheme.Gap(1);
             if (ToolAction(plugin.Config.DarkMode ? FontAwesomeIcon.Sun : FontAwesomeIcon.Moon,
                 plugin.Config.DarkMode ? "Use light paper" : "Use dark paper"))
             { plugin.Config.DarkMode = !plugin.Config.DarkMode; plugin.Save(); }
@@ -274,7 +271,8 @@ public sealed partial class MainWindow
 
     private void CreateRoomScreen()
     {
-        if (PageHeading("Host Room")) return;
+        bool editing = room is not null;
+        if (PageHeading(editing ? "Room settings" : "Host Room")) return;
         var tabs = ImGui.GetCursorScreenPos();
         float tabHeight = UiTheme.S(34);
         ImGui.GetWindowDrawList().AddLine(tabs + new Vector2(0, tabHeight), tabs + new Vector2(ImGui.GetContentRegionAvail().X, tabHeight), UiTheme.C(UiTheme.Line));
@@ -289,7 +287,7 @@ public sealed partial class MainWindow
         {
             if (body.Success)
             {
-                if (roomSetupPage == 1) UiRoomSettings.Advanced(ref hints, ref wordChoiceCount, ref voteKickEnabled, ref voteSkipEnabled);
+                if (roomSetupPage == 1) UiRoomSettings.Advanced(ref hints, ref wordChoiceCount, ref voteKickEnabled, ref voteSkipEnabled, ref customWordsEnabled);
                 else if (roomSetupPage == 2) WordListPage();
                 else
                 {
@@ -305,11 +303,14 @@ public sealed partial class MainWindow
             }
         }
         UiTheme.Gap(4);
-        using (ImRaii.Disabled(client?.Connected != true || !Protocol.ValidName(roomTitle) || selectedWordLists.Count == 0))
-            if (UiTheme.Button("Host Room", UiTheme.S(170), primary: true))
-                Send(new("create", Options: new(roomTitle, publicRoom, Math.Clamp(seconds, 15, 300), Math.Clamp(rounds, 1, 5),
+        using (ImRaii.Disabled(savingRoomSettings || client?.Connected != true || !Protocol.ValidName(roomTitle) || selectedWordLists.Count == 0))
+            if (UiTheme.Button(editing ? "Save settings" : "Host Room", UiTheme.S(170), primary: true))
+            {
+                bool sent = Send(new(editing ? "configure" : "create", Options: new(roomTitle, publicRoom, Math.Clamp(seconds, 15, 300), Math.Clamp(rounds, 1, 5),
                     Math.Clamp(hints, 0, 300), Math.Clamp(capacity, 2, 16), selectedWordLists.ToArray(),
-                    Math.Clamp(wordChoiceCount, 1, 8), voteKickEnabled, voteSkipEnabled)));
+                    Math.Clamp(wordChoiceCount, 1, 8), voteKickEnabled, voteSkipEnabled, customWordsEnabled)));
+                savingRoomSettings = editing && sent;
+            }
         ImGui.SameLine(); ImGui.AlignTextToFramePadding(); UiTheme.Caption($"{selectedWordLists.Count} word lists selected");
     }
 
@@ -345,6 +346,19 @@ public sealed partial class MainWindow
         ShowDebug = false; screen = room is null ? "menu" : "game"; return true;
     }
 
+    private void EditRoomSettings()
+    {
+        if (room is null) return;
+        var options = room.Options;
+        roomTitle = options.Title; publicRoom = options.IsPublic; seconds = options.TurnSeconds;
+        rounds = options.Rounds; hints = options.HintSeconds; capacity = options.MaxPlayers;
+        wordChoiceCount = options.WordChoiceCount; voteKickEnabled = options.VoteKickEnabled;
+        voteSkipEnabled = options.VoteSkipEnabled; customWordsEnabled = options.CustomWordsEnabled;
+        selectedWordLists.Clear();
+        foreach (var id in options.WordLists ?? []) selectedWordLists.Add(id);
+        wordListsChosen = true; roomSetupPage = 0; screen = "create";
+    }
+
     private static void CardActionPosition()
     {
         float bottom = ImGui.GetCursorPosY() + ImGui.GetContentRegionAvail().Y - UiTheme.S(30);
@@ -364,21 +378,42 @@ public sealed partial class MainWindow
         ImGui.SameLine();
         if (UiTheme.Button("None", 0, quiet: true)) { selectedWordLists.Clear(); wordListsChosen = true; }
         UiTheme.Gap(5);
-        int columns = ImGui.GetContentRegionAvail().X >= UiTheme.S(760) ? 3 : 2;
-        if (!ImGui.BeginTable("word-list-buttons", columns, ImGuiTableFlags.SizingStretchSame | ImGuiTableFlags.NoPadOuterX)) return;
-        try
+        foreach (var group in wordLists.GroupBy(l => l.Category))
         {
-            foreach (var list in wordLists)
+            using var categoryId = ImRaii.PushId(group.Key);
+            var members = group.ToArray();
+            int selected = members.Count(l => selectedWordLists.Contains(l.Id));
+            bool included = selected > 0;
+            if (ImGui.Checkbox("##category-enabled", ref included))
             {
-                ImGui.TableNextColumn();
-                bool enabled = selectedWordLists.Contains(list.Id);
-                string detail = $"{list.Count} words" + (list.Complex ? " - Advanced" : "");
-                if (UiTheme.ListButton(list.Id, list.Name, detail, enabled))
-                { if (enabled) selectedWordLists.Remove(list.Id); else selectedWordLists.Add(list.Id); wordListsChosen = true; }
-                if (ImGui.IsItemHovered()) UiTheme.Tooltip(list.Name + "\n" + detail + (list.Complex ? "\nDisabled by default." : ""));
+                bool hasNormal = members.Any(l => l.DefaultEnabled);
+                foreach (var list in members)
+                { if (included && (list.DefaultEnabled || !hasNormal)) selectedWordLists.Add(list.Id); else selectedWordLists.Remove(list.Id); }
+                wordListsChosen = true;
             }
+            if (ImGui.IsItemHovered()) UiTheme.Tooltip("Include or exclude this category. Enabling it selects its normal lists; advanced lists stay optional.");
+            ImGui.SameLine();
+            bool collapsed = collapsedWordCategories.Contains(group.Key);
+            if (UiTheme.Button($"{(collapsed ? ">" : "v")} {group.Key}   {selected}/{members.Length} lists · {members.Sum(l => l.Count):N0} words", 0, quiet: true))
+            { if (collapsed) collapsedWordCategories.Remove(group.Key); else collapsedWordCategories.Add(group.Key); }
+            if (collapsed) continue;
+            int columns = ImGui.GetContentRegionAvail().X >= UiTheme.S(760) ? 3 : 2;
+            if (!ImGui.BeginTable("word-list-buttons", columns, ImGuiTableFlags.SizingStretchSame | ImGuiTableFlags.NoPadOuterX)) continue;
+            try
+            {
+                foreach (var list in members)
+                {
+                    ImGui.TableNextColumn();
+                    bool enabled = selectedWordLists.Contains(list.Id);
+                    string detail = $"{list.Count} words" + (list.Complex ? " - Advanced" : "");
+                    if (UiTheme.ListButton(list.Id, list.Name, detail, enabled))
+                    { if (enabled) selectedWordLists.Remove(list.Id); else selectedWordLists.Add(list.Id); wordListsChosen = true; }
+                    if (ImGui.IsItemHovered()) UiTheme.Tooltip(list.Name + "\n" + detail + (list.Complex ? "\nDisabled by default." : ""));
+                }
+            }
+            finally { ImGui.EndTable(); }
+            UiTheme.Gap(4);
         }
-        finally { ImGui.EndTable(); }
     }
 
     private void PublicRooms()
@@ -426,47 +461,48 @@ public sealed partial class MainWindow
         using var roomCellPadding = ImRaii.PushStyle(ImGuiStyleVar.CellPadding, UiTheme.V(4, 1));
         bool host = state.HostId == device?.AccountId;
         int online = state.Players.Count(p => p.Connected);
-        if (!ImGui.BeginTable("room-caption-compact", 2, ImGuiTableFlags.NoPadOuterX)) return;
-        try
+        var available = ImGui.GetContentRegionAvail();
+        bool playing = state.Phase is "drawing" or "intermission";
+        float startHeight = state.Phase is "waiting" or "results" ? UiTheme.S(34) : 0;
+        float headerHeight = UiTheme.S(30);
+        var layout = UiGameLayout.Fit(available - new Vector2(0, headerHeight + startHeight), UiTheme.Scale);
+        if (playing)
         {
-            ImGui.TableSetupColumn("Name", ImGuiTableColumnFlags.WidthStretch);
-            ImGui.TableSetupColumn("Invitation", ImGuiTableColumnFlags.WidthFixed, UiTheme.S(300));
-            ImGui.TableNextColumn(); ImGui.AlignTextToFramePadding(); UiTheme.Ellipsis(state.Options.Title, ImGui.GetContentRegionAvail().X);
-            ImGui.TableNextColumn();
-            UiTheme.Caption("ROOM " + state.Code);
-            ImGui.SameLine(); if (UiTheme.Button("Copy code", 0, quiet: true)) ImGui.SetClipboardText(state.Code);
-            ImGui.SameLine(); if (UiTheme.Button("Leave", 0, quiet: true)) { Send(new("leave")); return; }
+            for (int i = 0; i < 4; i++)
+            {
+                headerHeight = Math.Max(UiTheme.S(30), art.MeasureWord(state.Word, state.Hint, layout.Canvas).Y + UiTheme.S(4));
+                layout = UiGameLayout.Fit(available - new Vector2(0, headerHeight + startHeight), UiTheme.Scale);
+            }
         }
-        finally { ImGui.EndTable(); }
-
-        if (state.Phase is "waiting" or "results")
+        var top = ImGui.GetCursorScreenPos();
+        string round = state.Round > 0 ? $"Round {state.Round}/{state.Options.Rounds}" : "";
+        ImGui.AlignTextToFramePadding();
+        UiTheme.Ellipsis(state.Options.Title, layout.Artists + layout.Gap - ImGui.CalcTextSize(round).X - UiTheme.S(10));
+        if (round.Length > 0) { ImGui.SameLine(0, UiTheme.S(6)); UiTheme.Caption(round); }
+        if (playing)
+        {
+            ImGui.SetCursorScreenPos(top + new Vector2(layout.Artists + layout.Gap, 0));
+            DrawTurnHeader(state, layout.Canvas);
+        }
+        float right = top.X + available.X;
+        float actionWidth = ImGui.CalcTextSize(state.Code + "Copy codeLeave").X + UiTheme.S(44);
+        ImGui.SetCursorScreenPos(new Vector2(right - actionWidth, top.Y));
+        ImGui.AlignTextToFramePadding(); UiTheme.Caption(state.Code);
+        ImGui.SameLine(0, UiTheme.S(3)); if (UiTheme.Button("Copy code", 0, quiet: true)) ImGui.SetClipboardText(state.Code);
+        ImGui.SameLine(0, UiTheme.S(2)); if (UiTheme.Button("Leave", 0, quiet: true)) { Send(new("leave")); return; }
+        ImGui.SetCursorScreenPos(top + new Vector2(0, headerHeight));
+        if (startHeight > 0)
         {
             if (host)
             {
                 using (ImRaii.Disabled(online < 2 || client?.Connected != true))
-                    if (UiTheme.Button(state.Phase == "results" ? "Play another match" : "Start drawing", 0, primary: true)) Send(new("start"));
-                ImGui.SameLine(); ImGui.AlignTextToFramePadding(); UiTheme.Caption(online < 2 ? "Invite one more artist to begin." : $"{online} artists are ready.");
+                    if (UiTheme.Button(state.Phase == "results" ? "Play again" : "Start drawing", 0, primary: true)) Send(new("start"));
+                ImGui.SameLine(); if (UiTheme.Button("Room settings", 0, quiet: true)) { EditRoomSettings(); return; }
+                if (online < 2) { ImGui.SameLine(); ImGui.AlignTextToFramePadding(); UiTheme.Caption("Invite another artist to begin."); }
             }
-            else UiTheme.Caption("The host will start the match when everyone is ready.");
+            else UiTheme.Caption("Waiting for the host to start.");
         }
-        var available = ImGui.GetContentRegionAvail();
-        var layout = UiGameLayout.Fit(available, UiTheme.Scale);
-        float headerHeight = 0;
-        if (state.Phase is "drawing" or "intermission")
-        {
-            for (int i = 0; i < 4; i++)
-            {
-                layout = UiGameLayout.Fit(available - new Vector2(0, headerHeight), UiTheme.Scale);
-                headerHeight = art.MeasureWord(state.Word, state.Hint, layout.Canvas).Y + UiTheme.S(6);
-            }
-            layout = UiGameLayout.Fit(available - new Vector2(0, headerHeight), UiTheme.Scale);
-            var top = ImGui.GetCursorScreenPos();
-            UiTheme.Caption($"ROUND {state.Round}/{state.Options.Rounds}");
-            ImGui.SetCursorScreenPos(top + new Vector2(layout.Artists + layout.Gap, 0));
-            DrawTurnHeader(state, layout.Canvas);
-            ImGui.SetCursorScreenPos(top + new Vector2(0, headerHeight));
-        }
-        var origin = ImGui.GetCursorScreenPos() + new Vector2(layout.Inset, 0);
+        var origin = top + new Vector2(layout.Inset, headerHeight + startHeight);
         ImGui.SetCursorScreenPos(origin);
         DrawPlayers(state, new Vector2(layout.Artists, layout.Canvas));
         ImGui.SetCursorScreenPos(origin + new Vector2(layout.Artists + layout.Gap, 0));
@@ -534,6 +570,8 @@ public sealed partial class MainWindow
         if (state.Phase is "choosing" or "drawing" or "intermission") DrawCanvasTimer(state);
         if (canDraw) DrawCanvasTools(state);
         if (state.Phase == "drawing" && state.DrawerId != device?.AccountId) DrawCanvasVotes(state);
+        if (state.Phase == "intermission") DrawTurnReveal(state);
+        if (state.Phase == "results" && resultsDismissed != state.TurnId) DrawMatchResults(state);
         var rendered = new Vector2(MathF.Round(painting.RenderSize.X), MathF.Round(painting.RenderSize.Y));
         if (rendered != lastCanvasSize && Environment.TickCount64 >= nextLayoutLog)
         {

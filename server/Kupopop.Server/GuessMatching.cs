@@ -4,6 +4,9 @@ namespace Kupopop.Server;
 
 public static class GuessMatching
 {
+    public static bool ValidCustomWord(string? value) => value is { Length: >= 2 and <= 48 } &&
+        value.Count(char.IsLetter) >= 2 && value.All(c => char.IsLetterOrDigit(c) || c is ' ' or '\'' or '-' or '’');
+
     public static string Normalize(string value)
     {
         var result = new StringBuilder();

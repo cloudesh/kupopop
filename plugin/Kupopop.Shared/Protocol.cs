@@ -47,9 +47,10 @@ public sealed record PlayerProfile(Guid Id, string DisplayName, int AvatarSeed, 
 
 public sealed record RoomOptions(string Title, bool IsPublic = false, int TurnSeconds = 90,
     int Rounds = 2, int HintSeconds = 30, int MaxPlayers = 16, string[]? WordLists = null,
-    int WordChoiceCount = 4, bool VoteKickEnabled = true, bool VoteSkipEnabled = true);
+    int WordChoiceCount = 4, bool VoteKickEnabled = true, bool VoteSkipEnabled = true,
+    bool CustomWordsEnabled = true);
 
-public sealed record WordListInfo(string Id, string Name, int Count, bool DefaultEnabled, bool Complex);
+public sealed record WordListInfo(string Id, string Name, int Count, bool DefaultEnabled, bool Complex, string Category = "FFXIV");
 public sealed record KickVoteView(Guid Target, int Votes, int Required, bool YouVoted, DateTimeOffset ExpiresAt);
 public sealed record SolveResult(Guid PlayerId, string Name, int Points);
 public sealed record BrushCursor(int X, int Y, string Tool, byte Color = 1, int Size = 3, bool Visible = true);
@@ -63,7 +64,8 @@ public sealed record RoomView(string Code, RoomOptions Options, string Phase, Gu
     PlayerView[] Players, DateTimeOffset ServerTime, byte[]? Canvas = null, bool ResetCanvas = false,
     bool CanUndo = false, KickVoteView? KickVote = null, string[]? WordChoices = null,
     SolveResult[]? FirstGuessers = null, KickVoteView? SkipVote = null, BrushCursor? Cursor = null,
-    bool KickVoteAvailable = true, bool SkipVoteAvailable = true);
+    bool KickVoteAvailable = true, bool SkipVoteAvailable = true,
+    bool CustomWordAvailable = false, SolveResult[]? MatchResults = null);
 
 public sealed record DrawOperation(string Tool, int X1, int Y1, int X2, int Y2, byte Color = 1, int Size = 3, Guid StrokeId = default);
 public sealed record ClientCommand(string Type, string? Text = null, RoomOptions? Options = null,

@@ -25,7 +25,7 @@ public static class UiRoomSettings
         finally { ImGui.EndTable(); }
     }
 
-    public static void Advanced(ref int hints, ref int choices, ref bool voteKick, ref bool voteSkip)
+    public static void Advanced(ref int hints, ref int choices, ref bool voteKick, ref bool voteSkip, ref bool customWords)
     {
         if (ImGui.BeginTable("room-options-advanced", 2, ImGuiTableFlags.SizingStretchSame | ImGuiTableFlags.NoPadOuterX))
         {
@@ -44,6 +44,8 @@ public static class UiRoomSettings
         ImGui.Checkbox("Allow vote skip", ref voteSkip);
         ImGui.Checkbox("Allow vote kick", ref voteKick);
         if (ImGui.IsItemHovered()) UiTheme.Tooltip("Below five players, everyone except the drawer must agree. With five or more, 70% must agree.");
+        ImGui.Checkbox("Allow rare custom words", ref customWords);
+        if (ImGui.IsItemHovered()) UiTheme.Tooltip("A 10% chance each turn to offer the drawer a word of their own. Nothing is added to the word bank.");
     }
 
     private static void Number(string id, ref int value, int minimum, int maximum)

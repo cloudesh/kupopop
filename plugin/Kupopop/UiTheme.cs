@@ -184,7 +184,7 @@ public static class UiTheme
         var start = ImGui.GetCursorScreenPos();
         var size = new Vector2(ImGui.CalcTextSize(label).X + S(30), S(34));
         bool clicked = ImGui.InvisibleButton(label, size);
-        var fill = selected ? Panel : ImGui.IsItemHovered() ? RoseTint : Inset;
+        var fill = selected ? Paper : ImGui.IsItemHovered() ? RoseTint : Inset;
         var draw = ImGui.GetWindowDrawList();
         draw.AddRectFilled(start, start + size, C(fill), S(5), ImDrawFlags.RoundCornersTop);
         if (selected)
@@ -272,7 +272,7 @@ public static class UiTheme
                     draw.AddRectFilled(min + V(1, 3), max + V(1, 3), C(shadow));
                 }
                 else if (!attachedTabs) SheetEdges(min, max);
-                draw.AddRectFilled(min, max, C(surface), S(1));
+                if (!attachedTabs) draw.AddRectFilled(min, max, C(surface), S(1));
                 var outline = note.HasValue ? Vector4.Lerp(surface, Brass, 0.3f) : Line;
                 if (attachedTabs)
                 {
@@ -281,7 +281,7 @@ public static class UiTheme
                     draw.AddLine(max, new Vector2(max.X, min.Y), C(outline));
                 }
                 else draw.AddRect(min, max, C(outline), S(1));
-                PaperGrain(min, max, note);
+                if (!attachedTabs) PaperGrain(min, max, note);
                 if (note.HasValue && !plainTop)
                 {
                     var glue = Ink; glue.W = 0.035f;
@@ -290,9 +290,12 @@ public static class UiTheme
                     draw.AddLine(min + V(1, 13), new Vector2(max.X - S(1), min.Y + S(13)), C(edge));
                 }
                 if (taped) UiStationery.Tape(new Vector2(min.X + (max.X - min.X) * 0.5f - S(25), min.Y + S(2)), S(50));
-                var curl = note.HasValue ? Vector4.Lerp(surface, Inset, 0.4f) : Inset;
-                draw.AddTriangleFilled(max - V(12, 0), max - V(0, 12), max, C(curl));
-                draw.AddLine(max - V(12, 0), max - V(0, 12), C(Line));
+                if (!attachedTabs)
+                {
+                    var curl = note.HasValue ? Vector4.Lerp(surface, Inset, 0.4f) : Inset;
+                    draw.AddTriangleFilled(max - V(12, 0), max - V(0, 12), max, C(curl));
+                    draw.AddLine(max - V(12, 0), max - V(0, 12), C(Line));
+                }
                 draw.PopClipRect();
             }
         }

@@ -13,13 +13,13 @@ public static class UiChrome
         else ImGui.Dummy(size);
     }
 
-    // The book records an anchor on activation and moves before Begin in
-    // PreDraw. The delta return also supports independent small callers.
-    public static Vector2 DragHandle(Vector2 size, bool locked, bool enabled = true, UiDragAnchor? anchor = null)
+    // Use the same move controller as ImGui's native title bar. It moves root,
+    // children, clip rectangles and viewport together before rendering starts.
+    public static Vector2 DragHandle(Vector2 size, bool locked, bool enabled = true)
     {
         ImGui.InvisibleButton("paper-drag", size);
         if (enabled && !locked && ImGui.IsItemActivated() && ImGui.IsMouseDown(ImGuiMouseButton.Left))
-            anchor?.Begin(ImGui.GetWindowPos(), ImGui.GetMousePos());
+            ImGuiP.StartMouseMovingWindow(ImGuiP.GetCurrentWindow());
         if (ImGui.IsItemHovered())
         {
             if (enabled && !locked) ImGui.SetMouseCursor(ImGuiMouseCursor.ResizeAll);
@@ -29,7 +29,7 @@ public static class UiChrome
             ? ImGui.GetIO().MouseDelta : Vector2.Zero;
     }
 
-    public static Vector2 EmptyHeaderDrag(Vector2 min, Vector2 max, ref bool active, bool locked, bool enabled = true, UiDragAnchor? anchor = null)
+    public static Vector2 EmptyHeaderDrag(Vector2 min, Vector2 max, ref bool active, bool locked, bool enabled = true)
     {
         if (!enabled || max.X <= min.X || max.Y <= min.Y) { active = false; return Vector2.Zero; }
         // Submitted after header controls: their hover/active IDs take priority.
@@ -40,7 +40,7 @@ public static class UiChrome
         var cursor = ImGui.GetCursorScreenPos();
         ImGui.SetCursorScreenPos(min);
         ImGui.PushID("empty-header");
-        var movement = DragHandle(max - min, locked, enabled, anchor);
+        var movement = DragHandle(max - min, locked, enabled);
         active = ImGui.IsItemActive();
         ImGui.PopID();
         ImGui.SetCursorScreenPos(cursor);

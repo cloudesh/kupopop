@@ -8,6 +8,31 @@ namespace Kupopop;
 
 public static class UiPresentation
 {
+    public static void DrawCenteredText(string text, Vector2 origin, Vector2 size)
+    {
+        var lines = new List<string>();
+        foreach (var paragraph in text.Split('\n'))
+        {
+            string line = "";
+            foreach (var word in paragraph.Split(' ', StringSplitOptions.RemoveEmptyEntries))
+            {
+                string next = line.Length == 0 ? word : line + " " + word;
+                if (line.Length > 0 && ImGui.CalcTextSize(next).X > size.X) { lines.Add(line); line = word; }
+                else line = next;
+            }
+            lines.Add(line);
+        }
+        float height = ImGui.GetTextLineHeight(), y = origin.Y + Math.Max(0, (size.Y - height * lines.Count) / 2);
+        var draw = ImGui.GetWindowDrawList();
+        draw.PushClipRect(origin, origin + size, true);
+        foreach (var line in lines)
+        {
+            draw.AddText(new Vector2(origin.X + Math.Max(0, (size.X - ImGui.CalcTextSize(line).X) / 2), y), UiTheme.C(UiTheme.Ink), line);
+            y += height;
+        }
+        draw.PopClipRect();
+    }
+
     public static Vector4 Alpha(Vector4 color, float alpha) => new(color.X, color.Y, color.Z, alpha);
 
     private static (Vector2 Size, List<(char Letter, Vector2 Offset)> Slots) HintLayout(string hint, float width)
@@ -99,27 +124,37 @@ public static class UiPresentation
         ImGui.Dummy(new Vector2(width, 0));
     }
 
-    public static void Podium(SolveResult[] winners, float width)
+    public static void Podium(SolveResult[] winners, float width, bool totals = false, Action<SolveResult, Vector2, float>? portrait = null)
     {
         var origin = ImGui.GetCursorScreenPos();
-        float column = width / 3, baseline = UiTheme.S(112);
+        float column = width / 3, baseline = UiTheme.S(154);
         var draw = ImGui.GetWindowDrawList();
         for (int slot = 0; slot < 3; slot++)
         {
             int rank = slot == 0 ? 1 : slot == 1 ? 0 : 2;
             if (rank >= winners.Length) continue;
             var winner = winners[rank];
-            float height = UiTheme.S(rank == 0 ? 54 : rank == 1 ? 38 : 27);
+            float height = UiTheme.S(rank == 0 ? 62 : rank == 1 ? 44 : 32);
             var position = origin + new Vector2(slot * column + UiTheme.S(4), baseline - height);
             var size = new Vector2(column - UiTheme.S(8), height);
             var tint = rank == 0 ? UiTheme.StickyYellow : rank == 1 ? UiTheme.StickyBlue : UiTheme.StickyRose;
             draw.AddRectFilled(position, position + size, UiTheme.C(Alpha(tint, 0.84f)), UiTheme.S(3));
-            string number = (rank + 1).ToString();
+            int place = totals ? Array.FindIndex(winners, w => w.Points == winner.Points) + 1 : rank + 1;
+            string number = place.ToString();
             draw.AddText(position + (size - ImGui.CalcTextSize(number)) / 2, UiTheme.C(UiTheme.Ink), number);
+            var portraitAt = position + new Vector2((size.X - UiTheme.S(32)) / 2, -UiTheme.S(75));
+            draw.AddCircleFilled(portraitAt + UiTheme.V(16, 16), UiTheme.S(19), UiTheme.C(Alpha(tint, 0.8f)));
+            portrait?.Invoke(winner, portraitAt, UiTheme.S(32));
+            if (rank == 0)
+            {
+                var crown = portraitAt + UiTheme.V(8, -9);
+                draw.AddQuadFilled(crown, crown + UiTheme.V(16, 0), crown + UiTheme.V(14, 7), crown + UiTheme.V(2, 7), UiTheme.C(UiTheme.Brass));
+                for (int point = 0; point < 3; point++) draw.AddTriangleFilled(crown + UiTheme.V(point * 6, 1), crown + UiTheme.V(point * 6 + 2, -5), crown + UiTheme.V(point * 6 + 4, 1), UiTheme.C(UiTheme.Brass));
+            }
             ImGui.SetCursorScreenPos(position + new Vector2(0, -ImGui.GetTextLineHeightWithSpacing() * 2 - UiTheme.S(4)));
             CenteredLabel(winner.Name, size.X, UiTheme.Ink);
             ImGui.SetCursorScreenPos(new Vector2(position.X, position.Y - ImGui.GetTextLineHeightWithSpacing() - UiTheme.S(2)));
-            CenteredLabel("+" + winner.Points, size.X, UiTheme.Muted);
+            CenteredLabel((totals ? "" : "+") + winner.Points.ToString("N0") + (totals ? " pts" : ""), size.X, UiTheme.Muted);
         }
         ImGui.SetCursorScreenPos(origin);
         ImGui.Dummy(new Vector2(width, baseline + UiTheme.S(4)));

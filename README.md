@@ -3,7 +3,7 @@
 A native Dalamud drawing-and-guessing game for Final Fantasy XIV. Draw with
 friends, race to solve the word, and make a little avatar of your own.
 
-**Experimental 0.6.2 — compiled and automatically tested; in-game testing required.**
+**Experimental 0.7.0 — compiled and automatically tested; in-game testing required.**
 
 ## Try it
 
@@ -21,7 +21,7 @@ The installation ID stays `Kupopop` so existing installations update normally.
 This custom release is not an
 official Dalamud repository submission.
 
-Self-hosting/development: [Windows/Linux server packages](https://github.com/cloudesh/kupopop/releases/tag/v0.6.2)
+Self-hosting/development: [Windows/Linux server packages](https://github.com/cloudesh/kupopop/releases/tag/v0.7.0)
 and [unattended Linux deployment](server/deploy/README.md) remain available. The
 stable PC launcher is **[Start-My-Server.cmd](Start-My-Server.cmd)**; its data stays
 in `server/local/`. A development plugin can target localhost by changing
@@ -50,9 +50,10 @@ credential and server data remain intact.
   current drawer and correct guessers.
 - Self-contained Windows x64/Linux x64 server packages and file diagnostics.
 
-The maintained service has 19 private word lists with 511 entries. Standard
-categories default on; advanced mechanics/terminology/ultimate/actions lists
-default off. Room hosts multi-select lists by name/count; full word banks never
+The maintained service has 39 private word lists with 2,631 entries across FFXIV,
+General (1,586 everyday prompts), Internet Memes and Video Games. Normal lists
+default on; specialist lists default off. Hosts select lists/categories and can
+disable the 10% rare custom-word offer. Full word banks and answer aliases never
 travel in the catalog. Private word data is configured separately from open
 server source; see [word-list hosting](server/WORD_LISTS.md).
 

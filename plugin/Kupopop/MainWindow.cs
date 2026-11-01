@@ -50,7 +50,11 @@ public sealed partial class MainWindow : Window, IDisposable
     private int seconds = 90, rounds = 2, hints = 30, capacity = 16;
     private int wordChoiceCount = 4;
     private int roomSetupPage;
-    private bool voteKickEnabled = true, voteSkipEnabled = true;
+    private bool voteKickEnabled = true, voteSkipEnabled = true, customWordsEnabled = true;
+    private readonly HashSet<string> collapsedWordCategories = [];
+    private string customWordInput = "";
+    private Guid customWordTurn, resultsDismissed;
+    private bool enteringCustomWord, savingRoomSettings;
     private long heartbeatAt, statsAt, lastSync;
     private int received, draws;
     private TimeSpan serverOffset;
@@ -128,7 +132,7 @@ public sealed partial class MainWindow : Window, IDisposable
                     { painting.RemoteCursor = brush; remoteCursorAt = Environment.TickCount64; }
                     room = state;
                     serverOffset = state.ServerTime - DateTimeOffset.UtcNow;
-                    if (screen != "profile") screen = "game";
+                    if (screen != "profile" && !(screen == "create" && !differentRoom && state.Phase is "waiting" or "results")) screen = "game";
                     log.Write($"room.state phase={state.Phase} round={state.Round} players={state.Players.Length} canvas_reset={state.ResetCanvas}");
                     break;
                 case "draw" when message.Draw is { } op:
@@ -149,6 +153,9 @@ public sealed partial class MainWindow : Window, IDisposable
                     }
                     break;
                 case "rooms": publicRooms = message.Rooms ?? []; NotifyStatus($"{publicRooms.Length} public room(s)."); break;
+                case "room-configured":
+                    savingRoomSettings = false; screen = "game"; NotifyStatus("Room settings saved.");
+                    break;
                 case "chat" when message.Chat is { } line:
                     chat.Add(line); if (chat.Count > 200) chat.RemoveAt(0); scrollChat = true;
                     break;
@@ -156,6 +163,7 @@ public sealed partial class MainWindow : Window, IDisposable
                 case "error":
                     NotifyStatus(message.Error ?? "Server rejected the action.", error: true);
                     if (message.RejectedCommand == "profile") savingProfile = false;
+                    if (message.RejectedCommand == "configure") savingRoomSettings = false;
                     if (message.RejectedCommand == "undo") { undoPending = false; canUndoDrawing = false; Send(new("sync")); }
                     log.Write("server.action_rejected action=" + SafeCommand(message.RejectedCommand) + " reason=" + SafeReason(message.Error));
                     if (room is not null && message.RejectedCommand == "draw" && Environment.TickCount64 - lastSync > 1000)
@@ -268,7 +276,7 @@ public sealed partial class MainWindow : Window, IDisposable
     private void NotifyStatus(string message, bool error = false)
     {
         if (string.IsNullOrWhiteSpace(message)) return;
-        toasts.Show("status", error ? "Unable to complete action" : "Kupo Skribbl", message, TimeSpan.FromSeconds(error ? 10 : 6));
+        toasts.Show("status", error ? "Unable to complete action" : "", message, TimeSpan.FromSeconds(error ? 10 : 6));
     }
 
     private bool Send(ClientCommand command)

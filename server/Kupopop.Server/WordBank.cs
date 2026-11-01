@@ -5,7 +5,8 @@ using Kupopop.Shared;
 
 namespace Kupopop.Server;
 
-public sealed record ServerWordList(string Id, string Name, bool DefaultEnabled, bool Complex, string[] Words);
+public sealed record ServerWordList(string Id, string Name, bool DefaultEnabled, bool Complex, string[] Words,
+    string Category = "FFXIV", Dictionary<string, string[]>? Aliases = null);
 
 /// <summary>Private host data. Only catalog metadata may cross the protocol boundary.</summary>
 public sealed class WordBank
@@ -13,25 +14,33 @@ public sealed class WordBank
     private readonly ServerWordList[] lists;
     public WordBank(ServerWordList[] source)
     {
-        if (source.Length is < 1 or > 32) throw new InvalidDataException("Word-list count must be 1 to 32.");
+        if (source.Length is < 1 or > 64) throw new InvalidDataException("Word-list count must be 1 to 64.");
         var ids = new HashSet<string>(StringComparer.Ordinal);
         lists = source.Select(list =>
         {
             if (list is null || !Regex.IsMatch(list.Id ?? "", "^[a-z0-9-]{1,40}$") || !ids.Add(list.Id!) ||
-                !Protocol.ValidName(list.Name) || list.Words is null || list.Words.Length is < 2 or > 2000 ||
+                !Protocol.ValidName(list.Name) || !Protocol.ValidName(list.Category) || list.Words is null || list.Words.Length is < 2 or > 2000 ||
                 list.Words.Any(w => string.IsNullOrWhiteSpace(w) || w.Length > 64 || w.Any(char.IsControl)))
                 throw new InvalidDataException("Invalid word-list metadata or entries.");
             var words = list.Words.Select(w => w.Trim()).Distinct(StringComparer.OrdinalIgnoreCase).ToArray();
             if (words.Length < 2) throw new InvalidDataException("Each list needs two distinct words.");
-            return list with { Words = words };
+            if (list.Aliases is not null && (list.Aliases.Count > words.Length || list.Aliases.Any(pair =>
+                !words.Contains(pair.Key, StringComparer.OrdinalIgnoreCase) || pair.Value is null || pair.Value.Length > 12 ||
+                pair.Value.Any(a => string.IsNullOrWhiteSpace(a) || a.Length > 64 || a.Any(char.IsControl)))))
+                throw new InvalidDataException("Invalid private answer aliases.");
+            return list with { Words = words, Aliases = list.Aliases?.ToDictionary(p => p.Key,
+                p => (string[])p.Value.Clone(), StringComparer.OrdinalIgnoreCase) };
         }).ToArray();
         if (!lists.Any(l => l.DefaultEnabled)) throw new InvalidDataException("Enable at least one default list.");
     }
-    public WordListInfo[] Catalog => lists.Select(l => new WordListInfo(l.Id, l.Name, l.Words.Length, l.DefaultEnabled, l.Complex)).ToArray();
+    public WordListInfo[] Catalog => lists.Select(l => new WordListInfo(l.Id, l.Name, l.Words.Length, l.DefaultEnabled, l.Complex, l.Category)).ToArray();
+    public string[] Answers(string word, string[]? selection) => lists.Where(l => selection is not null && selection.Contains(l.Id))
+        .Where(l => l.Aliases is not null && l.Aliases.ContainsKey(word)).SelectMany(l => l.Aliases![word])
+        .Append(word).Select(GuessMatching.Normalize).Distinct(StringComparer.Ordinal).ToArray();
     public string[] Selection(string[]? requested)
     {
         var selected = requested ?? lists.Where(l => l.DefaultEnabled).Select(l => l.Id).ToArray();
-        if (selected.Length is < 1 or > 32 || selected.Any(id => !lists.Any(l => l.Id == id)) ||
+        if (selected.Length is < 1 or > 64 || selected.Any(id => !lists.Any(l => l.Id == id)) ||
             selected.Distinct(StringComparer.Ordinal).Count() != selected.Length)
             throw new ArgumentException("Choose at least one valid word list.");
         return (string[])selected.Clone();

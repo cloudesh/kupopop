@@ -11,7 +11,7 @@ public sealed partial class MainWindow
     private (Vector2 Min, Vector2 Max) CanvasToolsRect(Vector2 origin, Vector2 size)
     {
         bool collapsed = plugin.Config.CanvasToolsCollapsed;
-        var panel = new Vector2(Math.Min(size.X - UiTheme.S(16), UiTheme.S(collapsed ? 94 : 340)), UiTheme.S(collapsed ? 40 : 76));
+        var panel = new Vector2(Math.Min(size.X - UiTheme.S(16), UiTheme.S(collapsed ? 36 : 350)), UiTheme.S(36));
         var min = origin + new Vector2(UiTheme.S(8), size.Y - panel.Y - UiTheme.S(8));
         return (min, min + panel);
     }
@@ -23,7 +23,8 @@ public sealed partial class MainWindow
         bool collapsed = plugin.Config.CanvasToolsCollapsed;
         ImGui.SetCursorScreenPos(rect.Min);
         using (ImRaii.PushColor(ImGuiCol.ChildBg, UiPresentation.Alpha(UiTheme.Panel, UiTheme.DarkMode ? 0.88f : 0.82f)))
-        using (ImRaii.PushStyle(ImGuiStyleVar.WindowPadding, UiTheme.V(6, 6)))
+        using (ImRaii.PushStyle(ImGuiStyleVar.WindowPadding, UiTheme.V(4, 4)))
+        using (ImRaii.PushStyle(ImGuiStyleVar.ItemSpacing, UiTheme.V(4, 2)))
         using (ImRaii.PushStyle(ImGuiStyleVar.ChildBorderSize, 0))
         using (ImRaii.PushStyle(ImGuiStyleVar.ChildRounding, UiTheme.S(5)))
         using (var panel = ImRaii.Child("canvas-tools", rect.Max - rect.Min, true,
@@ -31,11 +32,13 @@ public sealed partial class MainWindow
         {
             if (panel.Success)
             {
-                ImGui.AlignTextToFramePadding(); UiTheme.Caption("Tools");
-                ImGui.SameLine(Math.Max(ImGui.GetCursorPosX(), rect.Max.X - rect.Min.X - UiTheme.S(34)));
-                if (ToolAction(collapsed ? FontAwesomeIcon.ChevronUp : FontAwesomeIcon.ChevronDown, collapsed ? "Expand tools" : "Collapse tools"))
+                if (ToolAction(collapsed ? FontAwesomeIcon.ChevronRight : FontAwesomeIcon.ChevronLeft, collapsed ? "Expand tools" : "Collapse tools"))
                 { plugin.Config.CanvasToolsCollapsed = !collapsed; plugin.Save(); }
-                if (!collapsed) painting.Toolbar("game-tools", undo: () => { if (Send(new("undo", TurnId: state.TurnId))) undoPending = true; }, canUndo: canUndoDrawing && !undoPending);
+                if (!collapsed)
+                {
+                    ImGui.SameLine();
+                    painting.Toolbar("game-tools", undo: () => { if (Send(new("undo", TurnId: state.TurnId))) undoPending = true; }, canUndo: canUndoDrawing && !undoPending, compact: true);
+                }
             }
         }
         ImGui.SetCursorScreenPos(saved);
@@ -53,34 +56,51 @@ public sealed partial class MainWindow
     private void DrawWordChoices(RoomView state)
     {
         var saved = ImGui.GetCursorScreenPos();
-        var available = new Vector2(painting.RenderSize.X, Math.Max(60, painting.RenderSize.Y - UiTheme.S(46)));
-        var panelSize = new Vector2(Math.Max(60, available.X - UiTheme.S(28)),
-            Math.Max(60, Math.Min(available.Y - UiTheme.S(28), UiTheme.S(state.WordChoices?.Length > 4 ? 370 : 250))));
-        var origin = painting.RenderOrigin + new Vector2(0, UiTheme.S(46)) + (available - panelSize) / 2;
+        if (customWordTurn != state.TurnId)
+        { customWordTurn = state.TurnId; customWordInput = ""; enteringCustomWord = false; }
+        var available = painting.RenderSize;
+        int offerCount = (state.WordChoices?.Length ?? 0) + (state.CustomWordAvailable ? 1 : 0);
+        float desiredHeight = enteringCustomWord ? 200 : 64 + ((offerCount + 1) / 2) * 60;
+        var panelSize = new Vector2(Math.Max(60, available.X - UiTheme.S(32)),
+            Math.Max(60, Math.Min(available.Y - UiTheme.S(32), UiTheme.S(desiredHeight))));
+        var origin = painting.RenderOrigin + (available - panelSize) / 2;
         ImGui.SetCursorScreenPos(origin);
         using (ImRaii.PushColor(ImGuiCol.ChildBg, UiPresentation.Alpha(UiTheme.Panel, 0.78f)))
         using (ImRaii.PushColor(ImGuiCol.Border, Vector4.Zero))
         using (ImRaii.PushStyle(ImGuiStyleVar.ChildBorderSize, 0))
         using (ImRaii.PushStyle(ImGuiStyleVar.ChildRounding, UiTheme.S(8)))
         using (ImRaii.PushStyle(ImGuiStyleVar.WindowPadding, UiTheme.V(12, 12)))
-        using (var panel = ImRaii.Child("word-choices", panelSize, true))
+        using (var panel = ImRaii.Child("word-choices", panelSize, true,
+            ImGuiWindowFlags.AlwaysUseWindowPadding | ImGuiWindowFlags.NoMove))
         {
             if (panel.Success)
             {
                 art.CenteredHeading("Choose your word", ImGui.GetContentRegionAvail().X);
-                if (state.WordChoices is { Length: > 0 } choices)
+                if (enteringCustomWord && state.CustomWordAvailable)
                 {
-                    if (choices.Length <= 4 && panelSize.Y >= UiTheme.S(230))
-                        UiPresentation.CenteredLabel("Your drawing timer starts after you choose.", ImGui.GetContentRegionAvail().X, UiTheme.Muted);
-                    int columns = choices.Length == 1 ? 1 : 2, rows = (choices.Length + columns - 1) / columns;
+                    UiTheme.Caption("RARE · A WORD OF YOUR OWN");
+                    ImGui.SetNextItemWidth(-1);
+                    bool submitted = ImGui.InputTextWithHint("##custom-word", "Something everyone can draw and guess", ref customWordInput, 48, ImGuiInputTextFlags.EnterReturnsTrue);
+                    using (ImRaii.Disabled(string.IsNullOrWhiteSpace(customWordInput)))
+                        if (UiTheme.Button("Draw this word", ImGui.GetContentRegionAvail().X, primary: true)) submitted = true;
+                    if (submitted && !string.IsNullOrWhiteSpace(customWordInput)) Send(new("choose-custom-word", Text: customWordInput, TurnId: state.TurnId));
+                    if (UiTheme.Button("Back to word choices", 0, quiet: true)) enteringCustomWord = false;
+                }
+                else if (state.WordChoices is { Length: > 0 } choices)
+                {
+                    int columns = offerCount == 1 ? 1 : 2, rows = (offerCount + columns - 1) / columns;
                     float rowSpacing = ImGui.GetStyle().ItemSpacing.Y + ImGui.GetStyle().CellPadding.Y * 2;
                     float cardHeight = Math.Clamp((ImGui.GetContentRegionAvail().Y - rowSpacing * rows - UiTheme.S(4)) / rows, UiTheme.S(32), UiTheme.S(66));
                     if (ImGui.BeginTable("word-offers", columns, ImGuiTableFlags.SizingStretchSame))
                     {
-                        for (int i = 0; i < choices.Length; i++)
+                        for (int i = 0; i < offerCount; i++)
                         {
                             ImGui.TableNextColumn();
-                            if (WordCard("word-" + i, choices[i], i, cardHeight)) Send(new("choose-word", Text: choices[i], TurnId: state.TurnId));
+                            if (i < choices.Length)
+                            {
+                                if (WordCard("word-" + i, choices[i], i, cardHeight)) Send(new("choose-word", Text: choices[i], TurnId: state.TurnId));
+                            }
+                            else if (WordCard("custom-word-offer", "Rare\nYour own word", 4, cardHeight)) enteringCustomWord = true;
                         }
                         ImGui.EndTable();
                     }
@@ -98,13 +118,10 @@ public sealed partial class MainWindow
         bool clicked = ImGui.InvisibleButton(id, size);
         bool hovered = ImGui.IsItemHovered();
         var end = ImGui.GetCursorScreenPos();
-        var color = new[] { UiTheme.StickyYellow, UiTheme.StickyRose, UiTheme.StickySage, UiTheme.StickyBlue }[index % 4];
+        var color = index == 4 ? UiTheme.Tape : new[] { UiTheme.StickyYellow, UiTheme.StickyRose, UiTheme.StickySage, UiTheme.StickyBlue }[index % 4];
         var draw = ImGui.GetWindowDrawList();
         draw.AddRectFilled(start, start + size, UiTheme.C(UiPresentation.Alpha(color, hovered ? 0.94f : 0.74f)), UiTheme.S(4));
-        var textSize = ImGui.CalcTextSize(word, false, Math.Max(20, size.X - UiTheme.S(14)));
-        ImGui.SetCursorScreenPos(start + new Vector2(Math.Max(UiTheme.S(7), (size.X - textSize.X) / 2), (size.Y - textSize.Y) / 2));
-        ImGui.PushTextWrapPos(ImGui.GetCursorPosX() + size.X - UiTheme.S(14));
-        ImGui.TextUnformatted(word); ImGui.PopTextWrapPos();
+        UiPresentation.DrawCenteredText(word, start + UiTheme.V(7, 2), size - UiTheme.V(14, 4));
         ImGui.SetCursorScreenPos(end);
         return clicked;
     }
@@ -137,35 +154,67 @@ public sealed partial class MainWindow
 
     private static void DrawChatCard(ChatLine line) => UiPresentation.ChatCard(line);
 
-    private void DrawTurnReveal(RoomView state)
+    private void DrawTurnReveal(RoomView state) => DrawVictoryCard(state, match: false);
+
+    private void DrawMatchResults(RoomView state) => DrawVictoryCard(state, match: true);
+
+    private void DrawVictoryCard(RoomView state, bool match)
     {
         var saved = ImGui.GetCursorScreenPos();
-        var origin = ImGui.GetWindowPos() + UiTheme.V(18, 8);
-        var size = ImGui.GetWindowSize() - UiTheme.V(36, 16);
+        var origin = painting.RenderOrigin;
+        var size = painting.RenderSize;
         ImGui.SetCursorScreenPos(origin);
         using (ImRaii.PushColor(ImGuiCol.ChildBg, Vector4.Zero))
-        using (var shade = ImRaii.Child("turn-reveal-overlay", size, false, ImGuiWindowFlags.NoInputs | ImGuiWindowFlags.NoScrollbar | ImGuiWindowFlags.NoScrollWithMouse))
+        using (var shade = ImRaii.Child(match ? "match-victory-overlay" : "turn-reveal-overlay", size, false,
+            ImGuiWindowFlags.NoScrollbar | ImGuiWindowFlags.NoScrollWithMouse | (match ? ImGuiWindowFlags.None : ImGuiWindowFlags.NoInputs)))
         {
             if (shade.Success)
             {
                 var draw = ImGui.GetWindowDrawList();
                 draw.AddRectFilled(origin, origin + size, ImGui.GetColorU32(new Vector4(0.18f, 0.18f, 0.22f, 0.28f)));
-                float cardWidth = Math.Min(UiTheme.S(520), size.X - UiTheme.S(36));
-                float contentHeight = art.MeasureLarge(state.Word ?? "", cardWidth - UiTheme.S(36)).Y + UiTheme.S(84) +
-                    (state.FirstGuessers is { Length: > 0 } ? UiTheme.S(122) : ImGui.GetTextLineHeightWithSpacing());
-                var card = new Vector2(cardWidth, Math.Min(Math.Max(UiTheme.S(180), contentHeight), size.Y - UiTheme.S(40)));
+                var winners = match ? state.MatchResults ?? [] : state.FirstGuessers ?? [];
+                float cardWidth = size.X - UiTheme.S(24);
+                float wordHeight = match ? 0 : art.MeasureLarge(state.Word ?? "", cardWidth - UiTheme.S(28)).Y;
+                float contentHeight = UiTheme.S(match ? 290 : winners.Length > 0 ? 236 : 110) + wordHeight;
+                var card = new Vector2(cardWidth, Math.Min(contentHeight, size.Y - UiTheme.S(24)));
                 var position = origin + (size - card) / 2;
                 draw.AddRectFilled(position, position + card, UiTheme.C(UiTheme.Panel), UiTheme.S(3));
                 draw.AddRect(position, position + card, UiTheme.C(UiTheme.Brass), UiTheme.S(3));
-                ImGui.SetCursorScreenPos(position + UiTheme.V(18, 16));
+                ImGui.SetCursorScreenPos(position + UiTheme.V(14, 12));
                 ImGui.BeginGroup();
-                art.Heading(string.IsNullOrEmpty(state.Word) ? "The turn ended" : "The word was...");
-                ImGui.PushTextWrapPos(ImGui.GetCursorPosX() + card.X - UiTheme.S(36));
-                art.LargeText(state.Word ?? "", wrap: true);
-                ImGui.PopTextWrapPos(); UiTheme.Gap(10);
-                if (state.FirstGuessers is { Length: > 0 } winners)
-                    UiPresentation.Podium(winners, card.X - UiTheme.S(36));
-                else UiTheme.Caption("A fresh page is coming up.");
+                float inside = card.X - UiTheme.S(28);
+                var contentOrigin = ImGui.GetCursorScreenPos();
+                art.CenteredHeading(match ? "The final masterpiece" : "The word was...", inside);
+                ImGui.SetCursorPosX(contentOrigin.X - ImGui.GetWindowPos().X);
+                if (!match)
+                {
+                    var measured = art.MeasureLarge(state.Word ?? "", inside);
+                    ImGui.SetCursorScreenPos(new Vector2(contentOrigin.X + Math.Max(0, (inside - measured.X) / 2), ImGui.GetCursorScreenPos().Y));
+                    ImGui.PushTextWrapPos(contentOrigin.X - ImGui.GetWindowPos().X + inside);
+                    art.LargeText(state.Word ?? "", wrap: true); ImGui.PopTextWrapPos();
+                }
+                else if (winners.Length > 0)
+                {
+                    bool tied = winners.Length > 1 && winners[1].Points == winners[0].Points;
+                    string victory = tied ? "A shared victory!" : winners[0].Name + " wins!";
+                    ImGui.SetCursorPosX(contentOrigin.X - ImGui.GetWindowPos().X);
+                    UiPresentation.CenteredLabel(victory, inside, UiTheme.Rose);
+                }
+                UiTheme.Gap(6);
+                ImGui.SetCursorPosX(contentOrigin.X - ImGui.GetWindowPos().X);
+                if (winners.Length > 0) UiPresentation.Podium(winners.Take(3).ToArray(), inside, totals: match,
+                    portrait: (winner, at, extent) =>
+                    {
+                        var player = state.Players.FirstOrDefault(p => p.Profile.Id == winner.PlayerId);
+                        if (player is not null) ImGui.GetWindowDrawList().AddImage(avatars.Get(player.Profile).Handle, at, at + new Vector2(extent));
+                        else UiStationery.Moogle(at + new Vector2(extent / 2), extent * 0.35f);
+                    });
+                else UiPresentation.CenteredLabel("A fresh page is coming up.", inside, UiTheme.Muted);
+                if (match)
+                {
+                    ImGui.SetCursorPosX(contentOrigin.X - ImGui.GetWindowPos().X);
+                    if (UiTheme.Button("Back to the room", inside, quiet: true)) resultsDismissed = state.TurnId;
+                }
                 ImGui.EndGroup();
             }
         }
@@ -181,7 +230,8 @@ public sealed partial class MainWindow
         for (int i = messages.Length - 1; i >= 0; i--)
         {
             var toast = messages[i];
-            float height = ImGui.CalcTextSize(toast.Message, false, width - UiTheme.S(24)).Y + UiTheme.S(44);
+            bool titled = !string.IsNullOrEmpty(toast.Title);
+            float height = ImGui.CalcTextSize(toast.Message, false, width - UiTheme.S(titled ? 24 : 50)).Y + UiTheme.S(titled ? 44 : 22);
             ImGui.SetCursorScreenPos(window + new Vector2(size.X - width - UiTheme.S(24), size.Y - UiTheme.S(30) - height));
             using (ImRaii.PushStyle(ImGuiStyleVar.WindowPadding, UiTheme.V(10, 7)))
             using (ImRaii.PushColor(ImGuiCol.ChildBg, UiTheme.Panel))
@@ -189,15 +239,18 @@ public sealed partial class MainWindow
             {
                 if (child.Success)
                 {
-                    ImGui.TextColored(UiTheme.Rose, toast.Title);
-                    ImGui.SameLine(Math.Max(ImGui.GetCursorPosX(), width - UiTheme.S(35)));
+                    var content = ImGui.GetCursorScreenPos();
+                    if (titled) ImGui.TextColored(UiTheme.Rose, toast.Title);
+                    ImGui.SetCursorScreenPos(new Vector2(content.X + width - UiTheme.S(48), content.Y));
                     if (ToolAction(FontAwesomeIcon.Times, "Dismiss notification"))
                     {
                         toasts.Dismiss(toast.Id);
                         if (toast.Id.StartsWith("update:", StringComparison.Ordinal))
                         { plugin.Config.DismissedUpdate = toast.Id[7..]; plugin.Save(); }
                     }
-                    UiTheme.Wrapped(toast.Message);
+                    if (!titled) ImGui.SetCursorScreenPos(content);
+                    ImGui.PushTextWrapPos(ImGui.GetCursorPosX() + width - UiTheme.S(titled ? 24 : 50));
+                    ImGui.TextUnformatted(toast.Message); ImGui.PopTextWrapPos();
                 }
             }
             size.Y -= height + UiTheme.S(6);

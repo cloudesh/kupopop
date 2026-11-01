@@ -101,6 +101,7 @@ var accounts = new AccountStore(Path.Combine(working, "accounts"));
 FeatureChecks.Run(working, Check);
 RoundFlowChecks.Run(working, Check);
 RoomRulesChecks.Run(working, Check);
+PolishChecks.Run(working, Check);
 RateLimitChecks.Run(Check);
 var credentials = Enumerable.Range(0, 18).Select(i => accounts.Create("Artist " + i)).ToArray();
 string accountFile = File.ReadAllText(Path.Combine(working, "accounts", "accounts.json"));

@@ -28,7 +28,7 @@ public sealed class CanvasWidget : IDisposable
     public BrushCursor? RemoteCursor;
     public Vector4? InputBlock;
 
-    public void Toolbar(string id, bool transparency = false, Action? undo = null, bool canUndo = false)
+    public void Toolbar(string id, bool transparency = false, Action? undo = null, bool canUndo = false, bool compact = false)
     {
         ImGui.PushID(id);
         try
@@ -57,7 +57,7 @@ public sealed class CanvasWidget : IDisposable
                     if (ImGui.Selectable(char.ToUpperInvariant(shape[0]) + shape[1..], Tool == shape)) Tool = shape;
                 ImGui.EndPopup();
             }
-            if (available >= UiTheme.S(300)) ImGui.SameLine();
+            if (compact || available >= UiTheme.S(300)) ImGui.SameLine();
             ImGui.SetNextItemWidth(brushWidth);
             ImGui.SliderInt("##brush-size", ref Size, 1, 20, "%d px");
             if (ImGui.IsItemHovered() || ImGui.IsItemFocused()) UiTheme.Tooltip("Brush size");
