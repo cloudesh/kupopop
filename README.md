@@ -1,10 +1,10 @@
 <p align="center">
-  <img src="plugin/images/banner.png" alt="Kupo Skribbl — a moogle's drawing book" width="100%" />
+  <img src="plugin/images/banner.png" alt="Kupo Skribbl — a Pictionary-style FFXIV drawing game" width="100%" />
 </p>
 
-<h1 align="center">Kupo Skribbl · FFXIV Drawing Game for Dalamud</h1>
+<h1 align="center">Kupo Skribbl · FFXIV Pictionary for Dalamud</h1>
 
-<p align="center">Turn your next get-together into a drawing party.<br />Pick a word, draw something questionable, and let your friends guess — a party for 2–16 players, right inside Final Fantasy XIV.</p>
+<p align="center">A multiplayer Pictionary-style drawing and guessing game inside Final Fantasy XIV.<br />Pick a word, draw something questionable, and let your friends guess — a party for 2–16 players.</p>
 
 <p align="center">
   <a href="#install-in-dalamud"><strong>Install in Dalamud</strong></a> ·
@@ -39,7 +39,7 @@
 3. Find **Kupo Skribbl** in the plugin installer and install it.
 4. Type **`/kupo`** to open your drawing book. **`/kuposkribbl`** and **`/kupopop`** work too.
 
-Create your profile, save its private recovery code, and invite a friend. Everyone connects automatically to the same service. Keep the recovery code somewhere safe and never share it.
+Create your profile, save its private recovery code, and invite a friend. Everyone connects automatically to our shared server; no server setup is needed. Keep the recovery code somewhere safe and never share it.
 
 **Custom repository:** Version 1.0 is available through the link above, added under Dalamud's **Experimental** settings. It is not currently listed in the official Dalamud repository. All players need Dalamud/XIVLauncher and their own copy of the plugin.
 

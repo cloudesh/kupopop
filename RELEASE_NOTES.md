@@ -1,8 +1,6 @@
-Kupo Skribbl 1.0.1
+Kupo Skribbl 1.0.2
 
-- Tooltips now require a full second of hovering over the same control.
-- Fixed tooltips following a previously clicked tool after the mouse moved elsewhere. Keyboard focus alone no longer displays them.
-- Moving between controls, leaving and returning, or clicking starts a fresh hover delay.
-- The resize-corner hint follows the same delay and covers the visible corner.
+- Updated the installer description and search tags to clearly describe Kupo Skribbl as a multiplayer Pictionary-style game inside FFXIV.
+- Clarified that all players connect automatically to one shared server; no server setup is required.
 
-API 15; plugin-only update through the existing custom repository. No backend or account changes. Native pointer/focus regression checks run outside FFXIV; in-game verification remains necessary.
+API 15; metadata update through the existing custom repository. Gameplay, accounts and server remain unchanged. In-game verification remains necessary.

@@ -2,13 +2,13 @@
   <PropertyGroup>
     <Author>cloudesh</Author>
     <Name>Kupo Skribbl</Name>
-    <Punchline>A drawing and guessing party game, right inside FFXIV.</Punchline>
-    <Description>Kupo Skribbl is a drawing and guessing pictionary game. Each player takes turns to draw their chosen word and others have to guess it to gain points! The person with the most points is the winner!
+    <Punchline>A multiplayer Pictionary-style drawing game inside FFXIV.</Punchline>
+    <Description>Kupo Skribbl is a multiplayer Pictionary-style drawing and guessing game inside Final Fantasy XIV for 2–16 players. Take turns choosing a word and drawing it while everyone else guesses; the player with the most points wins. Includes private rooms, public lobbies, friends and custom drawn portraits. Everyone connects automatically to our shared server—no server setup required.
 
 Open with /kupo, /kupopop or /kuposkribbl.</Description>
     <IconUrl>https://raw.githubusercontent.com/cloudesh/kupopop/main/plugin/images/icon.png?v=$(Version)</IconUrl>
     <RepoUrl>https://github.com/cloudesh/kupopop</RepoUrl>
-    <Tags>drawing;game;multiplayer;social</Tags>
+    <Tags>pictionary;drawing;game;multiplayer;social</Tags>
     <Use_Dalamud_FFXIVClientStructs>false</Use_Dalamud_FFXIVClientStructs>
     <Use_Dalamud_Lumina>false</Use_Dalamud_Lumina>
     <Use_Dalamud_Lumina_Excel>false</Use_Dalamud_Lumina_Excel>
