@@ -42,7 +42,6 @@ public sealed partial class MainWindow : Window, IDisposable
     private string roomTitle = "A kupo drawing room";
     private string chatInput = "";
     private string screen = "welcome";
-    private string status = "";
     private bool busy, disposed, publicRoom, savedRecovery, revealRecovery, avatarReset, scrollChat, savingProfile;
     private bool serviceAvailable, sessionReady;
     private readonly ConnectionRetry connectionRetry = new();
@@ -85,7 +84,7 @@ public sealed partial class MainWindow : Window, IDisposable
             catch (Exception ex)
             {
                 log.Write("client.credential_unavailable", ex);
-                status = "This device could not open its saved sign-in. Use your private recovery code to recover your profile.";
+                NotifyStatus("This device could not open its saved sign-in. Use your private recovery code to recover your profile.", error: true);
                 returningArtist = true;
             }
             screen = device is null ? "welcome" : "menu";
@@ -113,7 +112,7 @@ public sealed partial class MainWindow : Window, IDisposable
                     profile = message.Profile;
                     if (profile is not null) { sessionReady = serviceAvailable = true; connectionRetry.Connected(); }
                     if (savingProfile)
-                    { savingProfile = false; screen = room is null ? "menu" : "game"; status = "Profile saved."; }
+                    { savingProfile = false; screen = room is null ? "menu" : "game"; NotifyStatus("Profile saved."); }
                     if (profile is not null && screen != "profile") displayName = profile.DisplayName;
                     break;
                 case "state" when message.Room is { } state:
@@ -149,13 +148,13 @@ public sealed partial class MainWindow : Window, IDisposable
                         foreach (var list in wordLists.Where(l => l.DefaultEnabled)) selectedWordLists.Add(list.Id);
                     }
                     break;
-                case "rooms": publicRooms = message.Rooms ?? []; status = $"{publicRooms.Length} public room(s)."; break;
+                case "rooms": publicRooms = message.Rooms ?? []; NotifyStatus($"{publicRooms.Length} public room(s)."); break;
                 case "chat" when message.Chat is { } line:
                     chat.Add(line); if (chat.Count > 200) chat.RemoveAt(0); scrollChat = true;
                     break;
-                case "left": room = null; chat.Clear(); screen = "menu"; status = message.Error ?? "You left the room."; break;
+                case "left": room = null; chat.Clear(); screen = "menu"; NotifyStatus(message.Error ?? "You left the room."); break;
                 case "error":
-                    status = message.Error ?? "Server rejected the action.";
+                    NotifyStatus(message.Error ?? "Server rejected the action.", error: true);
                     if (message.RejectedCommand == "profile") savingProfile = false;
                     if (message.RejectedCommand == "undo") { undoPending = false; canUndoDrawing = false; Send(new("sync")); }
                     log.Write("server.action_rejected action=" + SafeCommand(message.RejectedCommand) + " reason=" + SafeReason(message.Error));
@@ -236,7 +235,7 @@ public sealed partial class MainWindow : Window, IDisposable
             connectionRetry.Connected();
         });
         await client!.ConnectAsync(result.AccessToken);
-        actions.Enqueue(() => status = "Account ready. Save the recovery code below.");
+        actions.Enqueue(() => NotifyStatus("Account ready. Save the recovery code below."));
     }
 
     private void Connect()
@@ -266,6 +265,12 @@ public sealed partial class MainWindow : Window, IDisposable
 
     private bool ConnectionReady => serviceAvailable && (device is null || (client?.Connected == true && sessionReady));
 
+    private void NotifyStatus(string message, bool error = false)
+    {
+        if (string.IsNullOrWhiteSpace(message)) return;
+        toasts.Show("status", error ? "Unable to complete action" : "Kupo Skribbl", message, TimeSpan.FromSeconds(error ? 10 : 6));
+    }
+
     private bool Send(ClientCommand command)
     {
         bool sent = client?.Send(command) == true;
@@ -281,7 +286,7 @@ public sealed partial class MainWindow : Window, IDisposable
     {
         if (busy) return;
         busy = true;
-        if (label != "Connecting") status = label + "...";
+        if (label != "Connecting") NotifyStatus(label + "...");
         _ = Task.Run(async () =>
         {
             try { await operation().ConfigureAwait(false); }
@@ -290,7 +295,7 @@ public sealed partial class MainWindow : Window, IDisposable
                 log.Write("client.operation_failed category=" + label, ex);
                 actions.Enqueue(() =>
                 {
-                    if (label != "Connecting") status = $"{label} failed. Please try again. Details were saved to the diagnostic log.";
+                    if (label != "Connecting") NotifyStatus($"{label} failed. Please try again. Details were saved to the diagnostic log.", error: true);
                     if (label == "Connecting" || ex is HttpRequestException { StatusCode: null } or OperationCanceledException)
                     {
                         sessionReady = serviceAvailable = false;
@@ -302,7 +307,7 @@ public sealed partial class MainWindow : Window, IDisposable
                             // Keep the encrypted file for recovery; never silently reuse another server's credentials.
                             device = null; profile = null; room = null; chat.Clear(); screen = "welcome";
                             returningArtist = true;
-                            status = "Your saved sign-in is no longer valid. Recover your profile using your private code.";
+                            NotifyStatus("Your saved sign-in is no longer valid. Recover your profile using your private code.", error: true);
                         }
                     }
                 });

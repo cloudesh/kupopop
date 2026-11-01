@@ -9,13 +9,11 @@ namespace Kupopop;
 public sealed partial class MainWindow
 {
     private bool returningArtist, focusChat;
-    private string lastNotice = "";
-    private long noticeUntil;
     private Vector2 lastCanvasSize;
     private long nextLayoutLog;
     private readonly PomMotion pom = new();
     private readonly UiAspectConstraint aspect = new();
-    private Vector2? pendingWindowPosition;
+    private readonly UiDragAnchor drag = new();
     private bool topDragActive;
     private static string UiVersion => typeof(Plugin).Assembly.GetName().Version?.ToString(3) ?? "dev";
     internal bool IsDrawingRoom => ConnectionReady && newRecovery.Length == 0 && !ShowDebug && screen == "game" && room is not null;
@@ -28,12 +26,12 @@ public sealed partial class MainWindow
             Flags |= ImGuiWindowFlags.NoTitleBar | ImGuiWindowFlags.NoBackground | ImGuiWindowFlags.NoMove;
         AllowBackgroundBlur = plugin.Config.UseStandardFrame;
         AllowClickthrough = plugin.Config.UseStandardFrame;
+        DisableFadeInFadeOut = !plugin.Config.UseStandardFrame;
         if (plugin.Config.PaperPinned is null) { plugin.Config.PaperPinned = IsPinned; plugin.Save(); }
         if (!plugin.Config.UseStandardFrame) IsPinned = plugin.Config.PaperPinned.Value;
         else if (plugin.Config.PaperPinned != IsPinned) { plugin.Config.PaperPinned = IsPinned; plugin.Save(); }
-        Position = !IsPinned && !plugin.Config.UseStandardFrame ? pendingWindowPosition : null;
+        Position = drag.Position(ImGui.GetMousePos(), ImGui.IsMouseDown(ImGuiMouseButton.Left), !IsPinned && !plugin.Config.UseStandardFrame);
         PositionCondition = ImGuiCond.Always;
-        pendingWindowPosition = null;
         // Supply the native callback directly: WindowSystem's optional bounds
         // would otherwise replace it after PreDraw. Scale exactly once here.
         SizeConstraints = null;
@@ -46,14 +44,12 @@ public sealed partial class MainWindow
         pom.Step(position.X + position.Y * 0.35f, ImGui.GetIO().DeltaTime, !plugin.Config.ReduceMotion);
         UiStationery.Book(position, position + ImGui.GetWindowSize(), plugin.Config.UseStandardFrame ? ImGui.GetFrameHeight() : 0);
         DrawHeader();
-        var move = UiChrome.EmptyHeaderDrag(position + UiTheme.V(18, 5),
+        UiChrome.EmptyHeaderDrag(position + UiTheme.V(18, 5),
             new Vector2(position.X + ImGui.GetWindowSize().X - UiTheme.S(18), ImGui.GetCursorScreenPos().Y),
-            ref topDragActive, IsPinned, !plugin.Config.UseStandardFrame);
-        if (move != Vector2.Zero) pendingWindowPosition = position + move;
+            ref topDragActive, IsPinned, !plugin.Config.UseStandardFrame, drag);
         UiTheme.Rule();
-        if (ConnectionReady) DrawNotice();
         using (var transparent = ImRaii.PushColor(ImGuiCol.ChildBg, Vector4.Zero))
-        using (var body = ImRaii.Child("page-content", new Vector2(0, Math.Max(UiTheme.S(100), ImGui.GetContentRegionAvail().Y - (IsDrawingRoom ? UiTheme.S(12) : ImGui.GetTextLineHeightWithSpacing() + UiTheme.S(2)))), false,
+        using (var body = ImRaii.Child("page-content", new Vector2(0, Math.Max(UiTheme.S(100), ImGui.GetContentRegionAvail().Y - UiTheme.S(12))), false,
             IsDrawingRoom ? ImGuiWindowFlags.NoScrollbar | ImGuiWindowFlags.NoScrollWithMouse : ImGuiWindowFlags.None))
         {
             if (body.Success)
@@ -69,22 +65,7 @@ public sealed partial class MainWindow
                 else Menu();
             }
         }
-        if (IsDrawingRoom)
-        {
-            string version = "v" + UiVersion;
-            var font = ImGui.GetFont();
-            float fontSize = ImGui.GetFontSize() * 0.8f;
-            var labelSize = ImGui.CalcTextSize(version) * 0.8f;
-            ImGui.GetWindowDrawList().AddText(font, fontSize,
-                position + ImGui.GetWindowSize() - new Vector2(UiTheme.S(22) + labelSize.X, UiTheme.S(7) + labelSize.Y),
-                UiTheme.C(UiTheme.Muted), version);
-        }
-        else
-        {
-            UiTheme.Caption("made for little masterpieces, kupo.");
-            ImGui.SameLine(Math.Max(ImGui.GetCursorPosX() + UiTheme.S(20), ImGui.GetWindowContentRegionMax().X - UiTheme.S(100)));
-            UiTheme.Caption("vol. " + UiVersion);
-        }
+        UiChrome.Footer(position, position + ImGui.GetWindowSize(), "v" + UiVersion, IsPinned);
         if (ConnectionReady && screen == "game" && room?.Phase == "intermission") DrawTurnReveal(room);
         DrawToasts();
     }
@@ -102,8 +83,7 @@ public sealed partial class MainWindow
             ImGui.TableSetupColumn("Paper controls", ImGuiTableColumnFlags.WidthFixed, UiTheme.S(framed ? 32 : 100));
             ImGui.TableNextColumn();
             var face = ImGui.GetCursorScreenPos();
-            var move = UiChrome.DragHandle(UiTheme.V(211, compact ? 34 : 45), IsPinned, !framed);
-            if (move != Vector2.Zero) pendingWindowPosition = ImGui.GetWindowPos() + move;
+            UiChrome.DragHandle(UiTheme.V(211, compact ? 34 : 45), IsPinned, !framed, drag);
             var afterBrand = ImGui.GetCursorScreenPos();
             UiStationery.Moogle(face + UiTheme.V(20, compact ? 23 : 30), UiTheme.S(14), pom.Angle);
             ImGui.SetCursorScreenPos(face + UiTheme.V(49, 0));
@@ -167,64 +147,30 @@ public sealed partial class MainWindow
         }
     }
 
-    private void DrawNotice()
-    {
-        if (string.IsNullOrWhiteSpace(status)) return;
-        if (status != lastNotice) { lastNotice = status; noticeUntil = Environment.TickCount64 + 7000; }
-        bool error = status.Contains("failed", StringComparison.OrdinalIgnoreCase) ||
-            status.Contains("rejected", StringComparison.OrdinalIgnoreCase) || status.Contains("limit", StringComparison.OrdinalIgnoreCase) ||
-            status.Contains("need", StringComparison.OrdinalIgnoreCase) || status.Contains("full", StringComparison.OrdinalIgnoreCase);
-        if (IsDrawingRoom && !error) return;
-        if (!error && Environment.TickCount64 > noticeUntil) return;
-        if (newRecovery.Length > 0 && !error) return;
-        UiTheme.Wrapped(status, error ? UiTheme.Rose : UiTheme.Green);
-        UiTheme.Gap(3);
-    }
-
     private void Welcome()
     {
-        if (!ImGui.BeginTable("welcome-layout", 2)) return;
-        try
+        var available = ImGui.GetContentRegionAvail();
+        var size = new Vector2(Math.Min(available.X, UiTheme.S(480)), Math.Min(available.Y, UiTheme.S(returningArtist ? 420 : 280)));
+        ImGui.SetCursorScreenPos(ImGui.GetCursorScreenPos() + Vector2.Max(Vector2.Zero, (available - size) / 2));
+        using var panel = new UiTheme.PaperPanel("welcome-card", size);
+        if (!panel.Success) return;
+        UiTheme.Caption("Welcome, kupo.");
+        UiTheme.Gap(6);
+        using (ImRaii.Disabled(busy || client is null))
         {
-            ImGui.TableSetupColumn("Letter", ImGuiTableColumnFlags.WidthStretch, 1.05f);
-            ImGui.TableSetupColumn("Account", ImGuiTableColumnFlags.WidthStretch, 1);
-            ImGui.TableNextColumn();
-            UiTheme.Gap(14);
-            UiStationery.PageMark("a fresh sketchbook");
-            UiTheme.Gap(12);
-            art.Heading("A little imagination.");
-            art.Heading("A lot of kupo.");
-            UiTheme.Gap(16);
-            UiTheme.Wrapped("An empty page, a few friends, and a word worth guessing. Welcome to your little drawing room in Eorzea.", UiTheme.Muted);
-            UiTheme.Gap(24);
-            art.Mascot(88);
-            UiTheme.Gap(14);
-            UiTheme.Caption("Draw a little. Guess together. Make it yours.");
-            ImGui.TableNextColumn();
-            using var panel = new UiTheme.PaperPanel("welcome-card", Vector2.Zero, taped: true);
-            if (!panel.Success) return;
-            UiTheme.Caption("FIRST VISIT");
-            art.Heading("Make yourself at home");
-            UiTheme.Gap(7);
-            UiTheme.Wrapped("Choose a name for your Kupopop profile. You can draw your own avatar next.", UiTheme.Muted);
-            UiTheme.Gap(9);
-            using (ImRaii.Disabled(busy || client is null))
+            UiTheme.Field("Display name", "##new-name", ref displayName, 40, "Your character or artist name");
+            using (ImRaii.Disabled(!Protocol.ValidName(displayName)))
+                if (UiTheme.Button(busy ? "Creating your profile..." : "Create my profile", ImGui.GetContentRegionAvail().X, primary: true)) CreateAccount(false);
+            UiTheme.Gap(3);
+            UiTheme.Wrapped("Your name is unverified. Players see your chosen name and avatar when you share a room.", UiTheme.Muted);
+            UiTheme.Rule();
+            if (UiTheme.Button(returningArtist ? "Hide account recovery" : "Already have a profile?", ImGui.GetContentRegionAvail().X, quiet: true)) returningArtist = !returningArtist;
+            if (returningArtist)
             {
-                UiTheme.Field("Display name", "##new-name", ref displayName, 40, "Your character or artist name");
-                using (ImRaii.Disabled(!Protocol.ValidName(displayName)))
-                    if (UiTheme.Button(busy ? "Creating your profile..." : "Create my profile", ImGui.GetContentRegionAvail().X, primary: true)) CreateAccount(false);
-                UiTheme.Gap(3);
-                UiTheme.Wrapped("Your name is unverified. Players see your chosen name and avatar when you share a room.", UiTheme.Muted);
-                UiTheme.Rule();
-                if (UiTheme.Button(returningArtist ? "Hide account recovery" : "Already have a profile?", ImGui.GetContentRegionAvail().X, quiet: true)) returningArtist = !returningArtist;
-                if (returningArtist)
-                {
-                    UiTheme.Field("Private recovery code", "##recover", ref recoveryInput, 128, "Paste your saved recovery code", ImGuiInputTextFlags.Password);
-                    if (UiTheme.Button("Recover my profile", ImGui.GetContentRegionAvail().X)) CreateAccount(true);
-                }
+                UiTheme.Field("Private recovery code", "##recover", ref recoveryInput, 128, "Paste your saved recovery code", ImGuiInputTextFlags.Password);
+                if (UiTheme.Button("Recover my profile", ImGui.GetContentRegionAvail().X)) CreateAccount(true);
             }
         }
-        finally { ImGui.EndTable(); }
     }
 
     private void RecoveryScreen()
@@ -429,7 +375,7 @@ public sealed partial class MainWindow
                 string detail = $"{list.Count} words" + (list.Complex ? " - Advanced" : "");
                 if (UiTheme.ListButton(list.Id, list.Name, detail, enabled))
                 { if (enabled) selectedWordLists.Remove(list.Id); else selectedWordLists.Add(list.Id); wordListsChosen = true; }
-                if (ImGui.IsItemHovered()) ImGui.SetTooltip(list.Name + "\n" + detail + (list.Complex ? "\nDisabled by default." : ""));
+                if (ImGui.IsItemHovered()) UiTheme.Tooltip(list.Name + "\n" + detail + (list.Complex ? "\nDisabled by default." : ""));
             }
         }
         finally { ImGui.EndTable(); }
@@ -503,12 +449,23 @@ public sealed partial class MainWindow
             }
             else UiTheme.Caption("The host will start the match when everyone is ready.");
         }
-        if (state.Phase is "drawing" or "intermission") DrawTurnHeader(state);
-        bool canDraw = client?.Connected == true && state.Phase == "drawing" && state.DrawerId == device?.AccountId;
-        if (canDraw) painting.Toolbar("game-tools", undo: () => { if (Send(new("undo", TurnId: state.TurnId))) undoPending = true; }, canUndo: canUndoDrawing && !undoPending);
-
         var available = ImGui.GetContentRegionAvail();
         var layout = UiGameLayout.Fit(available, UiTheme.Scale);
+        float headerHeight = 0;
+        if (state.Phase is "drawing" or "intermission")
+        {
+            for (int i = 0; i < 4; i++)
+            {
+                layout = UiGameLayout.Fit(available - new Vector2(0, headerHeight), UiTheme.Scale);
+                headerHeight = art.MeasureWord(state.Word, state.Hint, layout.Canvas).Y + UiTheme.S(6);
+            }
+            layout = UiGameLayout.Fit(available - new Vector2(0, headerHeight), UiTheme.Scale);
+            var top = ImGui.GetCursorScreenPos();
+            UiTheme.Caption($"ROUND {state.Round}/{state.Options.Rounds}");
+            ImGui.SetCursorScreenPos(top + new Vector2(layout.Artists + layout.Gap, 0));
+            DrawTurnHeader(state, layout.Canvas);
+            ImGui.SetCursorScreenPos(top + new Vector2(0, headerHeight));
+        }
         var origin = ImGui.GetCursorScreenPos() + new Vector2(layout.Inset, 0);
         ImGui.SetCursorScreenPos(origin);
         DrawPlayers(state, new Vector2(layout.Artists, layout.Canvas));
@@ -520,20 +477,14 @@ public sealed partial class MainWindow
         ImGui.Dummy(new Vector2(layout.Width, layout.Canvas + UiTheme.S(10)));
     }
 
-    private void DrawTurnHeader(RoomView state)
+    private void DrawTurnHeader(RoomView state, float width)
     {
-        if (!ImGui.BeginTable("turn-header-compact", 2, ImGuiTableFlags.NoPadOuterX)) return;
-        try
-        {
-            ImGui.TableSetupColumn("Round", ImGuiTableColumnFlags.WidthFixed, UiTheme.S(76));
-            ImGui.TableSetupColumn("Word", ImGuiTableColumnFlags.WidthStretch);
-            ImGui.TableNextColumn(); UiTheme.Caption($"ROUND {state.Round}/{state.Options.Rounds}");
-            ImGui.TableNextColumn();
-            if (state.Word is { } word) art.Heading(word);
-            else art.Hint(state.Hint);
-            if (state.Word is not null && ImGui.IsItemHovered()) ImGui.SetTooltip(state.Phase == "intermission" ? "The word was" : "Your word to draw");
-        }
-        finally { ImGui.EndTable(); }
+        var measured = art.MeasureWord(state.Word, state.Hint, width);
+        float inset = Math.Max(0, (width - measured.X) / 2);
+        ImGui.SetCursorPosX(ImGui.GetCursorPosX() + inset);
+        if (state.Word is { } word) art.WordHeading(word, width - inset);
+        else art.Hint(state.Hint, width);
+        if (state.Word is not null && ImGui.IsItemHovered()) UiTheme.Tooltip(state.Phase == "intermission" ? "The word was" : "Your word to draw");
     }
 
     private void DrawPlayers(RoomView state, Vector2 size)
@@ -555,7 +506,7 @@ public sealed partial class MainWindow
             }
             ImGui.BeginGroup();
             ImGui.Image(texture.Handle, UiTheme.V(40, 40));
-            if (drawing && ImGui.IsItemHovered()) ImGui.SetTooltip("Current drawer");
+            if (drawing && ImGui.IsItemHovered()) UiTheme.Tooltip("Current drawer");
             ImGui.SameLine(); ImGui.BeginGroup();
             UiTheme.Ellipsis(player.Profile.DisplayName, Math.Max(UiTheme.S(35), ImGui.GetContentRegionAvail().X));
             ImGui.TextColored(player.Solved ? UiTheme.Green : UiTheme.Muted, $"{player.Score:N0} pts");
@@ -573,12 +524,15 @@ public sealed partial class MainWindow
     private void DrawBoard(RoomView state, Vector2 size)
     {
         bool canDraw = client?.Connected == true && state.Phase == "drawing" && state.DrawerId == device?.AccountId;
+        var tools = CanvasToolsRect(ImGui.GetCursorScreenPos(), size - UiTheme.V(9, 10));
+        painting.InputBlock = canDraw ? new Vector4(tools.Min.X, tools.Min.Y, tools.Max.X, tools.Max.Y) : null;
         painting.Draw("game-canvas", canvas, size, canDraw && !undoPending, operation =>
         {
             if (Send(new("draw", Draw: operation, TurnId: state.TurnId))) { canvas.Apply(operation); draws++; canUndoDrawing = true; }
         }, canDraw ? pointer => Send(new("cursor", TurnId: state.TurnId, Cursor: pointer)) : null);
         if (state.Phase == "choosing" && state.DrawerId == device?.AccountId) DrawWordChoices(state);
         if (state.Phase is "choosing" or "drawing" or "intermission") DrawCanvasTimer(state);
+        if (canDraw) DrawCanvasTools(state);
         if (state.Phase == "drawing" && state.DrawerId != device?.AccountId) DrawCanvasVotes(state);
         var rendered = new Vector2(MathF.Round(painting.RenderSize.X), MathF.Round(painting.RenderSize.Y));
         if (rendered != lastCanvasSize && Environment.TickCount64 >= nextLayoutLog)
@@ -611,10 +565,13 @@ public sealed partial class MainWindow
         }
         using (ImRaii.Disabled(client?.Connected != true))
         {
+            using var inputColor = ImRaii.PushColor(ImGuiCol.FrameBg, Vector4.Lerp(UiTheme.StickyBlue, UiTheme.Panel, UiTheme.DarkMode ? 0.50f : 0.60f));
+            using var inputHover = ImRaii.PushColor(ImGuiCol.FrameBgHovered, Vector4.Lerp(UiTheme.StickyBlue, UiTheme.Panel, 0.75f));
+            using var inputActive = ImRaii.PushColor(ImGuiCol.FrameBgActive, Vector4.Lerp(UiTheme.StickyBlue, UiTheme.Panel, 0.85f));
             ImGui.SetNextItemWidth(Math.Max(UiTheme.S(60), ImGui.GetContentRegionAvail().X - UiTheme.S(48)));
             if (focusChat) { ImGui.SetKeyboardFocusHere(); focusChat = false; }
             bool enter = ImGui.InputTextWithHint("##message", state.YouAreDone ? "Say something..." : "Talk or guess...", ref chatInput, 300, ImGuiInputTextFlags.EnterReturnsTrue);
-            if (ImGui.IsItemHovered()) ImGui.SetTooltip(state.YouAreDone ? "Done mode: only the drawer and correct guessers see your messages." : "Talk and guess in the same chat.");
+            if (ImGui.IsItemHovered()) UiTheme.Tooltip(state.YouAreDone ? "Done mode: only the drawer and correct guessers see your messages." : "Talk and guess in the same chat.");
             if (enter) ImGui.SetKeyboardFocusHere(-1);
             ImGui.SameLine(); bool click = ToolAction(FontAwesomeIcon.PaperPlane, "Send");
             if ((enter || click) && !string.IsNullOrWhiteSpace(chatInput))
@@ -628,14 +585,14 @@ public sealed partial class MainWindow
         using (Plugin.PluginInterface.UiBuilder.IconFontFixedWidthHandle.Push())
         using (ImRaii.PushColor(ImGuiCol.Button, selected ? UiTheme.RoseTint : Vector4.Zero))
         using (ImRaii.PushColor(ImGuiCol.Text, selected ? UiTheme.Rose : UiTheme.Ink))
-            clicked = ImGui.Button(icon.ToIconString() + "##" + label, UiTheme.V(28, 28));
-        if (ImGui.IsItemHovered() || ImGui.IsItemFocused()) ImGui.SetTooltip(label);
+            clicked = UiTheme.GlyphButton(label, icon.ToIconString(), UiTheme.V(28, 28));
+        if (ImGui.IsItemHovered() || ImGui.IsItemFocused()) UiTheme.Tooltip(label);
         return clicked;
     }
 
     private void OpenProfile()
     {
-        if (profile is null) { status = "Connect to load your profile first."; return; }
+        if (profile is null) { NotifyStatus("Connect to load your profile first."); return; }
         displayName = profile.DisplayName;
         avatar.Load(AvatarPresets.Pixels(profile));
         avatarPreset = profile.AvatarPreset;
@@ -646,9 +603,6 @@ public sealed partial class MainWindow
 
     private void ProfileScreen()
     {
-        if (PageHeading("A little face. Entirely yours.")) return;
-        UiTheme.Wrapped("Draw your own signature character, or keep the face we made for you.", UiTheme.Muted);
-        UiTheme.Gap(10);
         if (!ImGui.BeginTable("profile-layout", 2)) return;
         try
         {
@@ -682,7 +636,10 @@ public sealed partial class MainWindow
             ImGui.TableNextColumn();
             using var card = new UiTheme.PaperPanel("profile-details", Vector2.Zero, note: UiTheme.StickyRose);
             if (!card.Success) return;
-            UiTheme.Caption("A NAME TO REMEMBER");
+            float backWidth = ImGui.CalcTextSize(room is null ? "< Back to home" : "< Back to room").X + UiTheme.S(16);
+            ImGui.SetCursorPosX(ImGui.GetCursorPosX() + Math.Max(0, ImGui.GetContentRegionAvail().X - backWidth));
+            if (BackButton()) return;
+            UiTheme.Gap(4);
             UiTheme.Field("Display name", "##profile-name", ref displayName, 40, "Your artist name");
             UiTheme.Wrapped("Character unverified. Your name and avatar are shared with the people in your room.", UiTheme.Muted);
             UiTheme.Gap(6);
@@ -690,7 +647,7 @@ public sealed partial class MainWindow
                 if (UiTheme.NoteButton(savingProfile ? "Saving..." : "Save my profile", ImGui.GetContentRegionAvail().X, UiTheme.StickyRose, primary: true))
                 {
                     savingProfile = Send(new("profile", Text: displayName, Avatar: avatarReset || avatarPreset is not null ? null : (byte[])avatar.Pixels.Clone(), ResetAvatar: avatarReset, AvatarPreset: avatarPreset));
-                    if (savingProfile) status = "Saving profile...";
+                    if (savingProfile) NotifyStatus("Saving profile...");
                 }
             UiTheme.Rule(); UiTheme.Caption("ACCOUNT RECOVERY");
             UiTheme.Wrapped("Lost your saved code? Replace it while this device still has access. Your previous code stops working and other devices are signed out.", UiTheme.Muted);

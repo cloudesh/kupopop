@@ -8,6 +8,39 @@ namespace Kupopop;
 
 public sealed partial class MainWindow
 {
+    private (Vector2 Min, Vector2 Max) CanvasToolsRect(Vector2 origin, Vector2 size)
+    {
+        bool collapsed = plugin.Config.CanvasToolsCollapsed;
+        var panel = new Vector2(Math.Min(size.X - UiTheme.S(16), UiTheme.S(collapsed ? 94 : 340)), UiTheme.S(collapsed ? 40 : 76));
+        var min = origin + new Vector2(UiTheme.S(8), size.Y - panel.Y - UiTheme.S(8));
+        return (min, min + panel);
+    }
+
+    private void DrawCanvasTools(RoomView state)
+    {
+        var saved = ImGui.GetCursorScreenPos();
+        var rect = CanvasToolsRect(painting.RenderOrigin, painting.RenderSize);
+        bool collapsed = plugin.Config.CanvasToolsCollapsed;
+        ImGui.SetCursorScreenPos(rect.Min);
+        using (ImRaii.PushColor(ImGuiCol.ChildBg, UiPresentation.Alpha(UiTheme.Panel, UiTheme.DarkMode ? 0.88f : 0.82f)))
+        using (ImRaii.PushStyle(ImGuiStyleVar.WindowPadding, UiTheme.V(6, 6)))
+        using (ImRaii.PushStyle(ImGuiStyleVar.ChildBorderSize, 0))
+        using (ImRaii.PushStyle(ImGuiStyleVar.ChildRounding, UiTheme.S(5)))
+        using (var panel = ImRaii.Child("canvas-tools", rect.Max - rect.Min, true,
+            ImGuiWindowFlags.NoMove | ImGuiWindowFlags.NoScrollbar | ImGuiWindowFlags.NoScrollWithMouse | ImGuiWindowFlags.AlwaysUseWindowPadding))
+        {
+            if (panel.Success)
+            {
+                ImGui.AlignTextToFramePadding(); UiTheme.Caption("Tools");
+                ImGui.SameLine(Math.Max(ImGui.GetCursorPosX(), rect.Max.X - rect.Min.X - UiTheme.S(34)));
+                if (ToolAction(collapsed ? FontAwesomeIcon.ChevronUp : FontAwesomeIcon.ChevronDown, collapsed ? "Expand tools" : "Collapse tools"))
+                { plugin.Config.CanvasToolsCollapsed = !collapsed; plugin.Save(); }
+                if (!collapsed) painting.Toolbar("game-tools", undo: () => { if (Send(new("undo", TurnId: state.TurnId))) undoPending = true; }, canUndo: canUndoDrawing && !undoPending);
+            }
+        }
+        ImGui.SetCursorScreenPos(saved);
+    }
+
     private void DrawCanvasTimer(RoomView state)
     {
         int left = Math.Max(0, (int)Math.Ceiling((state.Deadline - (DateTimeOffset.UtcNow + serverOffset)).TotalSeconds));
@@ -90,14 +123,14 @@ public sealed partial class MainWindow
         {
             using (ImRaii.Disabled(!state.KickVoteAvailable || state.KickVote?.YouVoted == true))
                 if (UiPresentation.SoftButton(kick)) Send(new("vote-kick", TurnId: state.TurnId));
-            if (ImGui.IsItemHovered()) ImGui.SetTooltip("Vote to remove the drawer. Under 5: all other players; 5+: 70%, rounded up. Ballot lasts 30s.");
+            if (ImGui.IsItemHovered()) UiTheme.Tooltip("Vote to remove the drawer. Under 5: all other players; 5+: 70%, rounded up. Ballot lasts 30s.");
         }
         if (showKick && showSkip) ImGui.SameLine();
         if (showSkip)
         {
             using (ImRaii.Disabled(!state.SkipVoteAvailable || state.SkipVote?.YouVoted == true))
                 if (UiPresentation.SoftButton(skip)) Send(new("vote-skip", TurnId: state.TurnId));
-            if (ImGui.IsItemHovered()) ImGui.SetTooltip("Vote to skip this turn without removing its drawer. Same threshold as a kick vote.");
+            if (ImGui.IsItemHovered()) UiTheme.Tooltip("Vote to skip this turn without removing its drawer. Same threshold as a kick vote.");
         }
         ImGui.SetCursorScreenPos(saved);
     }

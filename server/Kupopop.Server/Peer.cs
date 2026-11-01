@@ -16,10 +16,8 @@ public interface IGamePeer
 public sealed class Peer(Guid id, WebSocket socket) : IGamePeer
 {
     private readonly Channel<byte[]> queue = Channel.CreateBounded<byte[]>(128);
-    private DateTimeOffset window = DateTimeOffset.UtcNow;
-    private int commands, drawing, fills, cursors, shapes;
+    private readonly InputRateLimiter limits = new();
     private int queuedBytes;
-    private DateTimeOffset profileAt;
     public Guid Id { get; } = id;
     public string? RoomCode { get; set; }
     public WebSocket Socket { get; } = socket;
@@ -31,21 +29,7 @@ public sealed class Peer(Guid id, WebSocket socket) : IGamePeer
         { Interlocked.Add(ref queuedBytes, -bytes.Length); Socket.Abort(); }
     }
 
-    public bool Allow(string type)
-    {
-        if (type == "profile")
-        {
-            if ((DateTimeOffset.UtcNow - profileAt).TotalSeconds < 5) return false;
-            profileAt = DateTimeOffset.UtcNow;
-        }
-        if ((DateTimeOffset.UtcNow - window).TotalSeconds >= 1)
-        { window = DateTimeOffset.UtcNow; commands = drawing = fills = cursors = shapes = 0; }
-        if (type == "cursor") return ++cursors <= 25;
-        if (type == "shape") return ++shapes <= 4;
-        if (type == "draw") return ++drawing <= 90;
-        if (type == "fill") return ++fills <= 4;
-        return ++commands <= 8;
-    }
+    public bool Allow(string type) => limits.Allow(type);
 
     public async Task PumpAsync(CancellationToken cancel)
     {

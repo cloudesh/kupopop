@@ -63,7 +63,7 @@ public static class UiTheme
             Color(ImGuiCol.TextSelectedBg, RoseTint); Color(ImGuiCol.TableHeaderBg, Inset);
             Color(ImGuiCol.TableBorderLight, Line); Color(ImGuiCol.TableBorderStrong, Line);
             Color(ImGuiCol.ResizeGrip, Vector4.Zero); Color(ImGuiCol.ResizeGripHovered, Brass); Color(ImGuiCol.ResizeGripActive, Rose);
-            Style(ImGuiStyleVar.WindowPadding, V(34, compactRoom ? 8 : 18)); Style(ImGuiStyleVar.FramePadding, V(8, 5));
+            Style(ImGuiStyleVar.WindowPadding, V(34, 8)); Style(ImGuiStyleVar.FramePadding, V(8, 5));
             Style(ImGuiStyleVar.ItemSpacing, V(6, 6)); Style(ImGuiStyleVar.ItemInnerSpacing, V(5, 4));
             Style(ImGuiStyleVar.CellPadding, V(4, 3));
             Style(ImGuiStyleVar.WindowRounding, S(6)); Style(ImGuiStyleVar.ChildRounding, S(2));
@@ -88,6 +88,41 @@ public static class UiTheme
     }
     public static void Gap(float size = 4) => ImGui.Dummy(V(0, size));
     public static void Rule() => ImGui.Separator();
+
+    public static void Tooltip(string text)
+    {
+        if (ImGui.IsMouseDown(ImGuiMouseButton.Left) || ImGui.IsMouseDown(ImGuiMouseButton.Right)) return;
+        using var padding = ImRaii.PushStyle(ImGuiStyleVar.WindowPadding, V(8, 5));
+        using var rounding = ImRaii.PushStyle(ImGuiStyleVar.WindowRounding, S(4));
+        ImGui.BeginTooltip();
+        ImGui.PushTextWrapPos(ImGui.GetCursorPosX() + S(300));
+        ImGui.TextUnformatted(text); ImGui.PopTextWrapPos(); ImGui.EndTooltip();
+    }
+
+    public static unsafe bool GlyphButton(string id, string glyph, Vector2 size)
+    {
+        using var padding = ImRaii.PushStyle(ImGuiStyleVar.FramePadding, Vector2.Zero);
+        using var align = ImRaii.PushStyle(ImGuiStyleVar.ButtonTextAlign, new Vector2(0.5f));
+        bool clicked = ImGui.Button("##" + id, size);
+        var min = ImGui.GetItemRectMin(); var max = ImGui.GetItemRectMax();
+        var font = ImGui.GetFont();
+        var inkMin = Vector2.Zero; var inkSize = ImGui.CalcTextSize(glyph);
+        if (glyph.Length == 1)
+        {
+            var metric = font.FindGlyph(glyph[0]);
+            if (metric != null)
+            {
+                float scale = ImGui.GetFontSize() / font.FontSize;
+                inkMin = new Vector2(metric->X0, metric->Y0) * scale;
+                inkSize = new Vector2(metric->X1 - metric->X0, metric->Y1 - metric->Y0) * scale;
+            }
+        }
+        var draw = ImGui.GetWindowDrawList();
+        draw.PushClipRect(min, max, true);
+        draw.AddText(min + (max - min - inkSize) / 2 - inkMin, ImGui.GetColorU32(ImGuiCol.Text), glyph);
+        draw.PopClipRect();
+        return clicked;
+    }
 
     // Deterministic native geometry, not a generated or downloaded bitmap. Keep it
     // sparse and stationary, and keep the synchronized drawing pixels untouched.
@@ -167,15 +202,10 @@ public static class UiTheme
         using var normal = ImRaii.PushColor(ImGuiCol.Button, selected ? RoseTint : UiPresentation.Alpha(Inset, 0.55f));
         using var hover = ImRaii.PushColor(ImGuiCol.ButtonHovered, Vector4.Lerp(RoseTint, Rose, 0.12f));
         using var text = ImRaii.PushColor(ImGuiCol.Text, selected ? Ink : Muted);
-        using var padding = ImRaii.PushStyle(ImGuiStyleVar.FramePadding, V(29, 7));
+        using var padding = ImRaii.PushStyle(ImGuiStyleVar.FramePadding, V(12, 7));
         using var align = ImRaii.PushStyle(ImGuiStyleVar.ButtonTextAlign, new Vector2(0, 0.5f));
         using var rounding = ImRaii.PushStyle(ImGuiStyleVar.FrameRounding, S(5));
         bool clicked = ImGui.Button(name + "\n" + detail + "##list", new Vector2(ImGui.GetContentRegionAvail().X, S(52)));
-        var min = ImGui.GetItemRectMin();
-        var point = min + V(14, 26);
-        var draw = ImGui.GetWindowDrawList();
-        draw.AddCircle(point, S(5), C(selected ? Rose : Muted), 16, S(1));
-        if (selected) draw.AddCircleFilled(point, S(2.5f), C(Rose), 12);
         return clicked;
     }
 
@@ -213,7 +243,7 @@ public static class UiTheme
             if (ImGui.CalcTextSize(candidate).X <= width) low = mid; else high = mid - 1;
         }
         ImGui.TextUnformatted(text[..(low == elements.Length ? text.Length : elements[low])] + "...");
-        if (ImGui.IsItemHovered()) ImGui.SetTooltip(text.Replace("%", "%%"));
+        if (ImGui.IsItemHovered()) UiTheme.Tooltip(text);
     }
 
     public ref struct PaperPanel

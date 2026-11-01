@@ -1,11 +1,11 @@
-Kupo Skribbl 0.6.1 cleans up navigation and room setup and adds dark paper.
+Kupo Skribbl 0.6.2 refines drawing and removes UI clutter.
 
-- The window resizes at a locked 3:2 ratio (990 x 660 default), with a square canvas and matching-height side panels. Old saved window shapes are corrected through native size constraints.
-- Home choices are centered; the old headline/subheading are removed. Main navigation uses a consistent grouped style.
-- Host Room has a left-aligned title and a right-aligned Back to home action. Basic, Advanced and Word Lists tabs join the settings panel directly.
-- Numeric room controls are sliders with live values below. Word lists have their own selectable button grid with Normal lists / All / None shortcuts, and the hosting action stays visible while lists scroll.
-- Lobby Refresh moves to the top right. Empty lobbies show a plain invitation and Host Room, which opens public Basic setup for review before creation.
-- A saved light/dark paper setting is available through the header moon/sun and preferences. Dark mode covers panels, controls and popups while retaining drawing/portrait colors and readable canvas overlays.
+- Frameless dragging uses a current-pointer anchor applied before rendering; paper and child content move together. Snapshot fades are disabled for the transparent book. Native geometry checks pass; FFXIV/DX ghosting still requires owner confirmation.
+- Room sliders use equal-width handles with live values underneath and no limit captions. Word-list buttons no longer have radio circles. Icon ink is centered within buttons; tooltips use compact padding.
+- Initial profile setup and avatar editing have simpler headers. All pages use a small version label and visible resize-corner marks instead of a motto footer.
+- Chat input matches the blue/gray note. Leave/save/error messages are temporary, dismissible toasts inside the plugin rather than a notice that moves the layout.
+- The word and hint are centered directly above the square canvas. Drawing tools sit in a translucent bottom-left panel that can collapse and remembers its state. Tool/popup interaction does not paint through to the canvas.
+- The backend accepts bounded drawing-delivery bursts while retaining its sustained drawing, shape/fill, cursor and ordinary-command budgets. Profile writes retain their five-second cooldown. A 16-client check sends 120 drawing operations to all 15 viewers.
 
-Protocol 4 is unchanged and the existing 0.6.0 hosted backend remains compatible. This UI update does not require restarting live rooms or migrating accounts/word lists. Windows/Linux self-host packages are rebuilt from current source; Start-My-Server.cmd and permanent local data are preserved.
+Protocol 4 remains compatible with 0.6.0/0.6.1. Deploy the 0.6.2 backend for the improved drawing limiter. Server upgrades preserve accounts and word lists and end active rooms. Start-My-Server.cmd and permanent local state are preserved.
 

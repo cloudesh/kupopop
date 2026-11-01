@@ -101,6 +101,7 @@ var accounts = new AccountStore(Path.Combine(working, "accounts"));
 FeatureChecks.Run(working, Check);
 RoundFlowChecks.Run(working, Check);
 RoomRulesChecks.Run(working, Check);
+RateLimitChecks.Run(Check);
 var credentials = Enumerable.Range(0, 18).Select(i => accounts.Create("Artist " + i)).ToArray();
 string accountFile = File.ReadAllText(Path.Combine(working, "accounts", "accounts.json"));
 Check(!accountFile.Contains(credentials[0].AccessToken) && !accountFile.Contains(credentials[0].RecoveryCode), "account persistence contains credential verifiers, not bearer secrets");
@@ -289,11 +290,11 @@ try
         await WaitEvent(loadClients[0], e => e.Room?.Players.Length == 16);
         loadClients[0].Send(new("start"));
         var loadTurn = await WaitEvent(loadClients[0], e => e.Room?.Phase == "drawing");
-        for (int i = 0; i < 50; i++)
+        for (int i = 0; i < 120; i++)
             loadClients[0].Send(new("draw", Draw: new("pencil", i, 10, i + 1, 10, 5), TurnId: loadTurn.Room!.TurnId));
         for (int i = 1; i < 16; i++)
-            await WaitEvent(loadClients[i], e => e.Draw?.X2 == 50);
-        Check(true, "sixteen real WebSocket clients join and all fifteen viewers receive a 50-operation drawing burst");
+            await WaitEvent(loadClients[i], e => e.Draw?.X2 == 120);
+        Check(true, "sixteen real WebSocket clients join and all fifteen viewers receive a 120-operation drawing burst");
     }
     finally { foreach (var c in loadClients) { await c.DisconnectAsync(); c.Dispose(); } }
     string logText = string.Join('\n', Directory.GetFiles(Path.Combine(liveDirectory, "logs")).Select(ReadShared));

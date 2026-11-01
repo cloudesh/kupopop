@@ -10,20 +10,33 @@ public static class UiPresentation
 {
     public static Vector4 Alpha(Vector4 color, float alpha) => new(color.X, color.Y, color.Z, alpha);
 
-    public static void Hint(string hint)
+    private static (Vector2 Size, List<(char Letter, Vector2 Offset)> Slots) HintLayout(string hint, float width)
     {
-        var origin = ImGui.GetCursorScreenPos();
-        float width = Math.Max(UiTheme.S(20), ImGui.GetContentRegionAvail().X);
+        width = Math.Max(UiTheme.S(20), width);
         float cell = Math.Max(UiTheme.S(14), ImGui.GetFontSize() * 0.68f), gap = UiTheme.S(4);
-        float rowHeight = ImGui.GetTextLineHeight() + UiTheme.S(5), x = 0, y = 0;
-        var draw = ImGui.GetWindowDrawList();
+        float rowHeight = ImGui.GetTextLineHeight() + UiTheme.S(5), x = 0, y = 0, used = 0;
+        var slots = new List<(char, Vector2)>(hint.Length);
         foreach (char letter in hint)
         {
             float advance = char.IsWhiteSpace(letter) ? cell * 0.65f : cell + gap;
             if (x > 0 && x + cell > width) { x = 0; y += rowHeight; }
-            if (!char.IsWhiteSpace(letter))
-            {
-                var position = origin + new Vector2(x, y);
+            if (!char.IsWhiteSpace(letter)) slots.Add((letter, new Vector2(x, y)));
+            x += advance; used = Math.Max(used, x);
+        }
+        return (new Vector2(Math.Min(width, used), y + rowHeight), slots);
+    }
+
+    public static Vector2 MeasureHint(string hint, float width) => HintLayout(hint, width).Size;
+
+    public static void Hint(string hint, float width = 0)
+    {
+        var origin = ImGui.GetCursorScreenPos();
+        var layout = HintLayout(hint, width > 0 ? width : ImGui.GetContentRegionAvail().X);
+        float cell = Math.Max(UiTheme.S(14), ImGui.GetFontSize() * 0.68f), rowHeight = ImGui.GetTextLineHeight() + UiTheme.S(5);
+        var draw = ImGui.GetWindowDrawList();
+        foreach (var (letter, offset) in layout.Slots)
+        {
+                var position = origin + offset;
                 if (letter == '_')
                     draw.AddLine(position + new Vector2(2, rowHeight - UiTheme.S(5)),
                         position + new Vector2(cell - 2, rowHeight - UiTheme.S(5)), UiTheme.C(UiTheme.Muted), UiTheme.S(1.5f));
@@ -32,11 +45,9 @@ public static class UiPresentation
                     string text = char.ToUpperInvariant(letter).ToString();
                     draw.AddText(position + new Vector2((cell - ImGui.CalcTextSize(text).X) / 2, 0), UiTheme.C(UiTheme.Ink), text);
                 }
-            }
-            x += advance;
         }
-        ImGui.Dummy(new Vector2(width, y + rowHeight));
-        if (ImGui.IsItemHovered()) ImGui.SetTooltip($"{hint.Count(c => c == '_' || char.IsLetterOrDigit(c))} letters");
+        ImGui.Dummy(layout.Size);
+        if (ImGui.IsItemHovered()) UiTheme.Tooltip($"{hint.Count(c => c == '_' || char.IsLetterOrDigit(c))} letters");
     }
 
     public static bool SoftButton(string label)
@@ -66,7 +77,7 @@ public static class UiPresentation
             if (line.System)
             {
                 UiAssets.Glyph(FontAwesomeIcon.InfoCircle, UiTheme.Green);
-                if (ImGui.IsItemHovered()) ImGui.SetTooltip("Game / server message");
+                if (ImGui.IsItemHovered()) UiTheme.Tooltip("Game / server message");
                 ImGui.SameLine(0, UiTheme.S(4));
             }
             else
@@ -74,7 +85,7 @@ public static class UiPresentation
                 if (line.Done)
                 {
                     UiAssets.Glyph(FontAwesomeIcon.CheckCircle, UiTheme.Muted);
-                    if (ImGui.IsItemHovered()) ImGui.SetTooltip("Done mode: drawer and correct guessers only");
+                    if (ImGui.IsItemHovered()) UiTheme.Tooltip("Done mode: drawer and correct guessers only");
                     ImGui.SameLine(0, UiTheme.S(4));
                 }
                 using var name = ImRaii.PushColor(ImGuiCol.Text, line.Done ? UiTheme.Muted : UiTheme.Brass);
@@ -121,6 +132,6 @@ public static class UiPresentation
         if (text.Length < label.Length && text.Length > 2) text = text[..^2] + "..";
         ImGui.SetCursorPosX(ImGui.GetCursorPosX() + Math.Max(0, (width - ImGui.CalcTextSize(text).X) / 2));
         ImGui.TextColored(color, text);
-        if (ImGui.IsItemHovered() && text != label) ImGui.SetTooltip(label);
+        if (ImGui.IsItemHovered() && text != label) UiTheme.Tooltip(label);
     }
 }

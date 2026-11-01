@@ -5,4 +5,5 @@
   <ItemGroup><Compile Include="../../plugin/Kupopop/PomMotion.cs" Link="PomMotion.cs" /></ItemGroup>
   <ItemGroup><Compile Include="../../plugin/Kupopop/UiGameLayout.cs" Link="UiGameLayout.cs" /></ItemGroup>
   <ItemGroup><Compile Include="../../plugin/Kupopop/UiWindowGeometry.cs" Link="UiWindowGeometry.cs" /></ItemGroup>
+  <ItemGroup><Compile Include="../../plugin/Kupopop/UiDragAnchor.cs" Link="UiDragAnchor.cs" /></ItemGroup>
 </Project>

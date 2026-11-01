@@ -6,6 +6,14 @@ static class RoomRulesChecks
 {
     public static void Run(string working, Action<bool, string> check)
     {
+        var drag = new Kupopop.UiDragAnchor();
+        drag.Begin(new(40, 60), new(100, 100));
+        check(drag.Position(new(120, 130), true, true) == new System.Numerics.Vector2(60, 90), "drag uses the current pointer position before drawing the frame");
+        check(drag.Position(new(120, 130), true, true) == new System.Numerics.Vector2(60, 90), "repeated drag frames cannot accumulate movement twice");
+        check(drag.Position(new(200, 180), true, true) == new System.Numerics.Vector2(140, 140), "drag remains anchored after dropped or uneven frames");
+        check(drag.Position(new(200, 180), false, true) is null && drag.Position(new(210, 190), true, true) is null, "mouse release ends the drag until a new handle activation");
+        drag.Begin(new(40, 60), new(100, 100));
+        check(drag.Position(new(200, 180), true, false) is null && drag.Position(new(210, 190), true, true) is null, "pinning or switching to the standard frame cancels the custom drag");
         var accounts = new AccountStore(Path.Combine(working, "room-rules"));
         var ids = Enumerable.Range(0, 3).Select(i => accounts.Create("Rules artist " + i)).ToArray();
         var bank = new WordBank([new("rules", "Rules test", true, false,

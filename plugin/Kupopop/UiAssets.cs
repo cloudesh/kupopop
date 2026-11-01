@@ -41,7 +41,17 @@ public sealed class UiAssets : IDisposable
         using var font = large.Push();
         return ImGui.CalcTextSize(text, false, width);
     }
-    public void Hint(string hint) { using var font = title.Push(); UiPresentation.Hint(hint); }
+    public void Hint(string hint, float width = 0) { using var font = title.Push(); UiPresentation.Hint(hint, width); }
+    public Vector2 MeasureWord(string? word, string hint, float width)
+    {
+        using var font = title.Push();
+        return word is null ? UiPresentation.MeasureHint(hint, width) : ImGui.CalcTextSize(word, false, width);
+    }
+    public void WordHeading(string word, float width)
+    {
+        using var font = title.Push();
+        ImGui.PushTextWrapPos(ImGui.GetCursorPosX() + width); ImGui.TextWrapped(word); ImGui.PopTextWrapPos();
+    }
     public void CenteredHeading(string text, float width)
     { using var font = title.Push(); UiPresentation.CenteredLabel(text, width, UiTheme.Ink); }
 

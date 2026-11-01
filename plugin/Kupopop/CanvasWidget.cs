@@ -26,6 +26,7 @@ public sealed class CanvasWidget : IDisposable
     public Vector2 RenderSize { get; private set; }
     public Vector2 RenderOrigin { get; private set; }
     public BrushCursor? RemoteCursor;
+    public Vector4? InputBlock;
 
     public void Toolbar(string id, bool transparency = false, Action? undo = null, bool canUndo = false)
     {
@@ -41,15 +42,15 @@ public sealed class CanvasWidget : IDisposable
                 using var text = ImRaii.PushColor(ImGuiCol.Text, Tool == tool ? UiTheme.Rose : UiTheme.Ink);
                 var icon = tool == "pencil" ? FontAwesomeIcon.PencilAlt : tool == "fill" ? FontAwesomeIcon.FillDrip : FontAwesomeIcon.Eraser;
                 using (Plugin.PluginInterface.UiBuilder.IconFontFixedWidthHandle.Push())
-                    if (ImGui.Button(icon.ToIconString() + "##" + tool, UiTheme.V(28, 28))) Tool = tool;
+                    if (UiTheme.GlyphButton(tool, icon.ToIconString(), UiTheme.V(28, 28))) Tool = tool;
                 if (ImGui.IsItemHovered() || ImGui.IsItemFocused())
-                    ImGui.SetTooltip(tool == "pencil" ? "Pencil" : tool == "fill" ? "Fill bucket" : transparency ? "Erase to transparent" : "Eraser");
+                    UiTheme.Tooltip(tool == "pencil" ? "Pencil" : tool == "fill" ? "Fill bucket" : transparency ? "Erase to transparent" : "Eraser");
             }
             ImGui.SameLine();
             using (Plugin.PluginInterface.UiBuilder.IconFontFixedWidthHandle.Push())
             using (ImRaii.PushColor(ImGuiCol.Button, DrawingTools.Shape(Tool) ? UiTheme.RoseTint : UiTheme.Inset))
-                if (ImGui.Button(FontAwesomeIcon.Circle.ToIconString() + "##shapes", UiTheme.V(28, 28))) ImGui.OpenPopup("shape-menu");
-            if (ImGui.IsItemHovered()) ImGui.SetTooltip("Shapes");
+                if (UiTheme.GlyphButton("shapes", FontAwesomeIcon.Circle.ToIconString(), UiTheme.V(28, 28))) ImGui.OpenPopup("shape-menu");
+            if (ImGui.IsItemHovered()) UiTheme.Tooltip("Shapes");
             if (ImGui.BeginPopup("shape-menu"))
             {
                 foreach (string shape in new[] { "line", "rectangle", "ellipse" })
@@ -59,12 +60,12 @@ public sealed class CanvasWidget : IDisposable
             if (available >= UiTheme.S(300)) ImGui.SameLine();
             ImGui.SetNextItemWidth(brushWidth);
             ImGui.SliderInt("##brush-size", ref Size, 1, 20, "%d px");
-            if (ImGui.IsItemHovered() || ImGui.IsItemFocused()) ImGui.SetTooltip("Brush size");
+            if (ImGui.IsItemHovered() || ImGui.IsItemFocused()) UiTheme.Tooltip("Brush size");
             ImGui.SameLine();
             using (ImRaii.Disabled(!canUndo || undo is null))
             using (Plugin.PluginInterface.UiBuilder.IconFontFixedWidthHandle.Push())
-                if (ImGui.Button(FontAwesomeIcon.Undo.ToIconString() + "##undo", UiTheme.V(28, 28))) { dragging = false; undo?.Invoke(); }
-            if (ImGui.IsItemHovered() || ImGui.IsItemFocused()) ImGui.SetTooltip("Undo last stroke");
+                if (UiTheme.GlyphButton("undo", FontAwesomeIcon.Undo.ToIconString(), UiTheme.V(28, 28))) { dragging = false; undo?.Invoke(); }
+            if (ImGui.IsItemHovered() || ImGui.IsItemFocused()) UiTheme.Tooltip("Undo last stroke");
             ImGui.SameLine(); UiPalette.Button(ref Color, transparency);
         }
         finally { ImGui.PopID(); }
@@ -90,7 +91,9 @@ public sealed class CanvasWidget : IDisposable
         ImGui.SetCursorPosX(ImGui.GetCursorPosX() + Math.Max(0, (available.X - size.X) / 2));
         Vector2 top = ImGui.GetCursorScreenPos();
         RenderOrigin = top;
-        UiChrome.CanvasTarget(id, size, writable);
+        var mousePosition = ImGui.GetMousePos();
+        bool blocked = InputBlock is { } block && mousePosition.X >= block.X && mousePosition.Y >= block.Y && mousePosition.X <= block.Z && mousePosition.Y <= block.W;
+        UiChrome.CanvasTarget(id, size, writable && !blocked);
         UiTheme.SheetEdges(top, top + size);
         if (canvas.Transparency)
         {
@@ -104,11 +107,11 @@ public sealed class CanvasWidget : IDisposable
         }
         ImGui.GetWindowDrawList().AddImage(texture.Handle, top, top + size);
         ImGui.GetWindowDrawList().AddRect(top - UiTheme.V(1, 1), top + size + UiTheme.V(1, 1), UiTheme.C(UiTheme.Line));
-        bool down = writable && ImGui.IsItemActive() && ImGui.IsMouseDown(ImGuiMouseButton.Left);
+        bool down = writable && !blocked && ImGui.IsItemActive() && ImGui.IsMouseDown(ImGuiMouseButton.Left);
         Vector2 mouse = ImGui.GetMousePos() - top;
         int nx = Math.Clamp((int)(mouse.X / size.X * canvas.Width), 0, canvas.Width - 1);
         int ny = Math.Clamp((int)(mouse.Y / size.Y * canvas.Height), 0, canvas.Height - 1);
-        var cursor = new BrushCursor(nx, ny, Tool, Color, Size, writable && (ImGui.IsItemHovered() || down));
+        var cursor = new BrushCursor(nx, ny, Tool, Color, Size, writable && !blocked && (ImGui.IsItemHovered() || down));
         bool pointerChanged = cursor.Visible ? lastPointer != cursor : lastPointer?.Visible == true;
         if (pointer is not null && (pointerChanged && now - pointerAt >= 60 || now - pointerAt >= 1000 && cursor.Visible))
         { pointer(cursor); lastPointer = cursor; pointerAt = now; }
@@ -123,7 +126,7 @@ public sealed class CanvasWidget : IDisposable
                 x = nx; y = ny; sentAt = now;
             }
         }
-        else if (dragging && writable && ImGui.IsMouseReleased(ImGuiMouseButton.Left))
+        else if (dragging && writable && !blocked && ImGui.IsMouseReleased(ImGuiMouseButton.Left))
         {
             if (DrawingTools.Shape(Tool)) submit(new(Tool, anchorX, anchorY, nx, ny, Color, Size, stroke));
             else if (Tool != "fill" && (nx != x || ny != y)) submit(new(Tool, x, y, nx, ny, Color, Size, stroke));

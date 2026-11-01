@@ -21,10 +21,6 @@ public static class UiRoomSettings
             ImGui.TableSetColumnIndex(0); Number("duration", ref seconds, 15, 300);
             ImGui.TableSetColumnIndex(1); Number("rounds", ref rounds, 1, 5);
             ImGui.TableSetColumnIndex(2); Number("capacity", ref capacity, 2, 16);
-            ImGui.TableNextRow();
-            ImGui.TableSetColumnIndex(0); UiTheme.Caption("15 to 300 seconds");
-            ImGui.TableSetColumnIndex(1); UiTheme.Caption("1 to 5 rounds");
-            ImGui.TableSetColumnIndex(2); UiTheme.Caption("2 to 16, including you");
         }
         finally { ImGui.EndTable(); }
     }
@@ -41,24 +37,24 @@ public static class UiRoomSettings
                 ImGui.TableNextRow();
                 ImGui.TableSetColumnIndex(0); Number("hints", ref hints, 0, 300);
                 ImGui.TableSetColumnIndex(1); Number("word choices", ref choices, 1, 8);
-                ImGui.TableNextRow();
-                ImGui.TableSetColumnIndex(0); UiTheme.Caption("Seconds; 0 hides the letters");
-                ImGui.TableSetColumnIndex(1); UiTheme.Caption("1 to 8 private choices");
             }
             finally { ImGui.EndTable(); }
         }
         UiTheme.Gap(10);
         ImGui.Checkbox("Allow vote skip", ref voteSkip);
         ImGui.Checkbox("Allow vote kick", ref voteKick);
-        UiTheme.Wrapped("Below five players, everyone except the drawer must agree. With five or more, 70% must agree.", UiTheme.Muted);
+        if (ImGui.IsItemHovered()) UiTheme.Tooltip("Below five players, everyone except the drawer must agree. With five or more, 70% must agree.");
     }
 
     private static void Number(string id, ref int value, int minimum, int maximum)
     {
         using var unique = ImRaii.PushId(id);
         value = Math.Clamp(value, minimum, maximum);
+        float sliding = value;
+        using var grab = ImRaii.PushStyle(ImGuiStyleVar.GrabMinSize, UiTheme.S(12));
         ImGui.SetNextItemWidth(-1);
-        ImGui.SliderInt("##value", ref value, minimum, maximum, "", ImGuiSliderFlags.AlwaysClamp | ImGuiSliderFlags.NoInput);
+        if (ImGui.SliderFloat("##value", ref sliding, minimum, maximum, "", ImGuiSliderFlags.AlwaysClamp | ImGuiSliderFlags.NoInput | ImGuiSliderFlags.NoRoundToFormat))
+            value = Math.Clamp((int)MathF.Round(sliding), minimum, maximum);
         UiPresentation.CenteredLabel(value == 0 && id == "hints" ? "Off" : value.ToString(), ImGui.GetContentRegionAvail().X, UiTheme.Ink);
     }
 }
