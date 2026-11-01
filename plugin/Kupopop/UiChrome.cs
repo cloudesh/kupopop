@@ -16,7 +16,7 @@ public static class UiChrome
     public static void ResizeCorner(Vector2 min, Vector2 max, bool locked)
     {
         var draw = ImGui.GetWindowDrawList();
-        bool hovered = ImGui.IsWindowHovered(ImGuiHoveredFlags.RootAndChildWindows) && ImGui.IsMouseHoveringRect(max - UiTheme.V(24, 24), max);
+        bool hovered = ImGui.IsWindowHovered(ImGuiHoveredFlags.RootAndChildWindows) && ImGui.IsMouseHoveringRect(max - UiTheme.V(24, 24), max, false);
         var color = locked ? UiTheme.Muted : hovered ? UiTheme.Rose : UiTheme.Brass;
         color.W = locked ? 0.35f : 0.8f;
         draw.PushClipRect(min + Vector2.One, max - Vector2.One, false);
@@ -30,7 +30,7 @@ public static class UiChrome
         if (hovered)
         {
             if (!locked) ImGui.SetMouseCursor(ImGuiMouseCursor.ResizeNwse);
-            UiTheme.Tooltip(locked ? "Unpin to resize." : "Drag to resize.");
+            UiTheme.RegionTooltip("resize-corner", max - UiTheme.V(24, 24), max, locked ? "Unpin to resize." : "Drag to resize.");
         }
     }
 

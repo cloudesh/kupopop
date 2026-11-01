@@ -39,7 +39,7 @@ public sealed class CanvasWidget : IDisposable
             {
                 if (tool != "pencil") ImGui.SameLine();
                 if (UiToolArt.Button(tool, Tool == tool)) Tool = tool;
-                if (ImGui.IsItemHovered() || ImGui.IsItemFocused())
+                if (ImGui.IsItemHovered())
                     UiTheme.Tooltip(tool == "pencil" ? "Pencil" : tool == "fill" ? "Fill bucket" : transparency ? "Erase to transparent" : "Eraser");
             }
             ImGui.SameLine();
@@ -54,12 +54,12 @@ public sealed class CanvasWidget : IDisposable
             if (compact || available >= UiTheme.S(300)) ImGui.SameLine();
             ImGui.SetNextItemWidth(brushWidth);
             ImGui.SliderInt("##brush-size", ref Size, 1, 20, "%d px");
-            if (ImGui.IsItemHovered() || ImGui.IsItemFocused()) UiTheme.Tooltip("Brush size");
+            if (ImGui.IsItemHovered()) UiTheme.Tooltip("Brush size");
             ImGui.SameLine();
             using (ImRaii.Disabled(!canUndo || undo is null))
             using (Plugin.PluginInterface.UiBuilder.IconFontFixedWidthHandle.Push())
                 if (UiTheme.GlyphButton("undo", FontAwesomeIcon.Undo.ToIconString(), UiTheme.V(28, 28))) { dragging = false; undo?.Invoke(); }
-            if (ImGui.IsItemHovered() || ImGui.IsItemFocused()) UiTheme.Tooltip("Undo last stroke");
+            if (ImGui.IsItemHovered()) UiTheme.Tooltip("Undo last stroke");
             ImGui.SameLine(); UiPalette.Button(ref Color, transparency);
         }
         finally { ImGui.PopID(); }

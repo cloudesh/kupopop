@@ -649,7 +649,7 @@ public sealed partial class MainWindow
         using (ImRaii.PushColor(ImGuiCol.Button, selected ? UiTheme.RoseTint : Vector4.Zero))
         using (ImRaii.PushColor(ImGuiCol.Text, selected ? UiTheme.Rose : UiTheme.Ink))
             clicked = UiTheme.GlyphButton(label, icon.ToIconString(), UiTheme.V(28, 28));
-        if (ImGui.IsItemHovered() || ImGui.IsItemFocused()) UiTheme.Tooltip(label);
+        if (ImGui.IsItemHovered()) UiTheme.Tooltip(label);
         return clicked;
     }
 

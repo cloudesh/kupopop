@@ -9,6 +9,12 @@ namespace Kupopop;
 /// <summary>Window-scoped stationery palette. No global Dalamud style is changed.</summary>
 public static class UiTheme
 {
+    private const double TooltipDelaySeconds = 1;
+    private static uint tooltipTarget;
+    private static Vector2 tooltipMin, tooltipMax;
+    private static int tooltipFrame = -1;
+    private static double tooltipStartedAt;
+
     public static bool DarkMode { get; private set; }
     public static Vector4 Paper => Hex(DarkMode ? 0x22252D : 0xF1E8D3);
     public static Vector4 Panel => Hex(DarkMode ? 0x2B303B : 0xFBF6E8);
@@ -100,7 +106,29 @@ public static class UiTheme
 
     public static void Tooltip(string text)
     {
-        if (ImGui.IsMouseDown(ImGuiMouseButton.Left) || ImGui.IsMouseDown(ImGuiMouseButton.Right)) return;
+        if (!ImGui.IsItemHovered(ImGuiHoveredFlags.NoNavOverride)) return;
+        HoverTooltip(ImGui.GetID(text), ImGui.GetItemRectMin(), ImGui.GetItemRectMax(), text);
+    }
+
+    public static void RegionTooltip(string id, Vector2 min, Vector2 max, string text)
+    {
+        if (!ImGui.IsWindowHovered(ImGuiHoveredFlags.RootAndChildWindows) || !ImGui.IsMouseHoveringRect(min, max, false)) return;
+        HoverTooltip(ImGui.GetID(id), min, max, text);
+    }
+
+    private static void HoverTooltip(uint target, Vector2 min, Vector2 max, string text)
+    {
+        if (ImGui.IsMouseDown(ImGuiMouseButton.Left) || ImGui.IsMouseDown(ImGuiMouseButton.Right) || ImGui.IsMouseDown(ImGuiMouseButton.Middle))
+        { tooltipFrame = -1; return; }
+        int frame = ImGui.GetFrameCount();
+        double now = ImGui.GetTime();
+        // A gap means the pointer left this target, even if it returns to the
+        // same control. Changing target, layout or page starts a fresh delay.
+        if (target != tooltipTarget || min != tooltipMin || max != tooltipMax ||
+            (tooltipFrame != frame && tooltipFrame != frame - 1) || now < tooltipStartedAt)
+            tooltipStartedAt = now;
+        tooltipTarget = target; tooltipMin = min; tooltipMax = max; tooltipFrame = frame;
+        if (now - tooltipStartedAt < TooltipDelaySeconds) return;
         using var padding = ImRaii.PushStyle(ImGuiStyleVar.WindowPadding, V(8, 5));
         using var rounding = ImRaii.PushStyle(ImGuiStyleVar.WindowRounding, S(4));
         ImGui.BeginTooltip();
