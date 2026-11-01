@@ -25,3 +25,12 @@ DALAMUD_COMPLIANCE.md
 *.db
 *.db-*
 *.sqlite*
+Build-Maintainer-Release.ps1
+Start-My-Server.cmd
+server/Start-Local.ps1
+server/Server-Tools.ps1
+server/Test-ServerTools.ps1
+server/HOSTING.md
+server/WORD_LISTS.md
+server/hosting/
+server/deploy/

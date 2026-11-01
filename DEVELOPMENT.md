@@ -8,16 +8,13 @@ folder. The plugin SDK locates the launcher installation; CI sets `DALAMUD_HOME`
 ```powershell
 dotnet build plugin/Kupopop/Kupopop.csproj -c Release
 dotnet run --project server/Kupopop.Tests -c Release
-powershell.exe -NoProfile -ExecutionPolicy Bypass -File server/Test-ServerTools.ps1
 ./Build-Release.ps1
 ```
 
 The test runner covers storage, protocol privacy, drawing rules, credentials,
-scoring and sixteen real WebSocket clients. After packaging, run it again to
-include the self-contained Windows TLS executable. Linux runs in CI.
+scoring and sixteen real WebSocket clients. Windows and Linux run in CI.
 
-`artifacts/` contains the candidate feed, plugin ZIP and Windows/Linux server
-bundles. `plugin/releases/testing.zip` remains a local convenience output and is
+`artifacts/` contains the candidate feed and plugin ZIP. `plugin/releases/testing.zip` remains a local convenience output and is
 not tracked. `plugin/releases/repo.json` is the live installer feed. The release
 workflow uploads and verifies assets before promoting that feed; feed-only
 commits do not trigger another release build. Bump `Directory.Build.props` for
@@ -42,7 +39,6 @@ updates. Never publish private runtime state with a package.
 | `WordBank.cs`, `GuessMatching.cs` | Private host configuration, offers and accepted guesses |
 | `InputRateLimiter.cs`, `FileLog.cs` | Account budgets and private operational diagnostics |
 | `server/Kupopop.Tests/` | Storage, rules, privacy and live transport regression checks |
-| `server/hosting/`, `server/deploy/` | Packaged launchers and unattended deployment templates |
 
 Small helpers remain separate where they have distinct ownership or independently
 testable behavior. There is no downloaded game code, frontend web server, ORM,
@@ -65,7 +61,7 @@ SQLite uses indexed primary/access/recovery keys, prepared parameters, WAL and
 full synchronous commits. Each write is transactional and becomes visible only
 after commit. Reads return independent pixel arrays. The store serializes access
 to its connection; independent connections still observe committed rows. Schema
-versions reject unsupported databases. See HOSTING.md for migration/backup steps.
+versions reject unsupported databases. Deployment and account maintenance are managed privately.
 Private word lists remain an editable configuration file, separate from account
 records and never exposed as a word-bank endpoint.
 

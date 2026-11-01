@@ -1,10 +1,10 @@
-param([switch]$SkipPlugin, [switch]$SkipServers, [string]$Output = 'artifacts')
+param([switch]$SkipPlugin, [string]$Output = 'artifacts')
 $ErrorActionPreference = 'Stop'
 Set-Location -LiteralPath $PSScriptRoot
 $env:DOTNET_CLI_TELEMETRY_OPTOUT = '1'
 $taskOutput = [IO.Path]::GetFullPath((Join-Path $PSScriptRoot $Output))
 New-Item -ItemType Directory -Path $taskOutput -Force | Out-Null
-. (Join-Path $PSScriptRoot 'server/Server-Tools.ps1')
+
 
 function Invoke-Dotnet {
     param([string[]]$Arguments)
@@ -30,44 +30,5 @@ if (-not $SkipPlugin) {
     # The live feed is promoted only after GitHub has uploaded and verified the
     # matching ZIP. Advertising a still-building release caused installer 404s.
     [IO.File]::WriteAllText((Join-Path $taskOutput 'repo.json'), $taskJson, (New-Object Text.UTF8Encoding($false)))
-}
-if (-not $SkipServers) {
-    foreach ($taskRuntime in @('win-x64','linux-x64')) {
-        $taskFolder = Join-Path $taskOutput "server-$taskRuntime"
-        Invoke-Dotnet @('publish','server/Kupopop.Server/Kupopop.Server.csproj','-c','Release','-r',$taskRuntime,
-            '--self-contained','true','-p:PublishSingleFile=true','-p:IncludeNativeLibrariesForSelfExtract=true',
-            '-p:DebugType=None','-p:UseSharedCompilation=false','-m:1','-o',$taskFolder)
-        Remove-StandalonePublishExtras -Root $taskFolder
-        if ($taskRuntime -eq 'win-x64') {
-            Copy-Item -Path 'server/hosting/*.cmd','server/hosting/*.ps1' -Destination $taskFolder -Force
-        } else { Copy-Item -Path 'server/hosting/*.sh' -Destination $taskFolder -Force }
-        Copy-Item -LiteralPath 'server/HOSTING.md' -Destination (Join-Path $taskFolder 'README.md') -Force
-        Copy-Item -LiteralPath 'server/WORD_LISTS.md' -Destination $taskFolder -Force
-        $taskDeployment = Join-Path $taskFolder 'deploy'
-        New-Item -ItemType Directory -Path $taskDeployment -Force | Out-Null
-        foreach ($taskTemplate in @('Dockerfile','compose.yaml','.dockerignore','Caddyfile.example')) {
-            Copy-Item -LiteralPath (Join-Path 'server/deploy' $taskTemplate) -Destination $taskDeployment -Force
-        }
-        Copy-Item -LiteralPath 'LICENSE','THIRD_PARTY_NOTICES.md' -Destination $taskFolder -Force
-        # Runtime licenses are distribution requirements, not development output.
-        $taskNugetRoot = $env:NUGET_PACKAGES
-        if (-not $taskNugetRoot) {
-            $taskNugetRoot = ((& dotnet nuget locals global-packages --list --force-english-output) -replace '^global-packages:\s*','').Trim()
-        }
-        $taskRuntimeConfig = Get-Content -LiteralPath "server/Kupopop.Server/bin/Release/net10.0/$taskRuntime/Kupopop.Server.runtimeconfig.json" -Raw | ConvertFrom-Json
-        $taskNoticeHashes = New-Object 'System.Collections.Generic.HashSet[string]'
-        foreach ($taskFramework in $taskRuntimeConfig.runtimeOptions.includedFrameworks) {
-            $taskPack = Join-Path $taskNugetRoot ($taskFramework.name.ToLowerInvariant() + '.runtime.' + $taskRuntime + '/' + $taskFramework.version)
-            foreach ($taskNoticeName in @('LICENSE.txt','THIRD-PARTY-NOTICES.TXT')) {
-                $taskNoticePath = Join-Path $taskPack $taskNoticeName
-                if (-not (Test-Path -LiteralPath $taskNoticePath)) { throw "Missing runtime distribution notice: $taskNoticeName" }
-                if ($taskNoticeHashes.Add((Get-FileHash -LiteralPath $taskNoticePath -Algorithm SHA256).Hash)) {
-                    Add-Content -LiteralPath (Join-Path $taskFolder 'THIRD_PARTY_NOTICES.md') -Value ("`n## " + $taskFramework.name + ' ' + $taskFramework.version + ' / ' + $taskNoticeName + "`n") -Encoding utf8
-                    Add-Content -LiteralPath (Join-Path $taskFolder 'THIRD_PARTY_NOTICES.md') -Value (Get-Content -LiteralPath $taskNoticePath -Raw) -Encoding utf8
-                }
-            }
-        }
-        Zip-Directory -Source $taskFolder -Destination (Join-Path $taskOutput "Kupopop.Server-$taskRuntime.zip") -Linux:($taskRuntime -eq 'linux-x64')
-    }
 }
 Write-Host "Release files: $taskOutput"

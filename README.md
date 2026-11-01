@@ -1,57 +1,50 @@
-# Kupo Skribbl
+<p align="center">
+  <img src="plugin/images/icon.png" alt="Kupo Skribbl moogle" width="112" />
+</p>
 
-A native Dalamud drawing-and-guessing game for Final Fantasy XIV.
+<h1 align="center">Kupo Skribbl</h1>
 
-**Experimental 0.8.1 · Dalamud API 15 · Protocol 4.**
+<p align="center">A little drawing. A little guessing. A lot of questionable art.<br />A multiplayer drawing and guessing game, right inside Final Fantasy XIV.</p>
 
-## Install
+<p align="center">
+  <a href="https://github.com/cloudesh/kupopop/releases"><img src="https://img.shields.io/github/downloads/cloudesh/kupopop/total?style=flat-square&amp;color=9a506b&amp;label=downloads" alt="GitHub release downloads" /></a>
+  <a href="https://github.com/cloudesh/kupopop/releases"><img src="https://img.shields.io/github/v/release/cloudesh/kupopop?include_prereleases&amp;style=flat-square&amp;color=42766b&amp;label=latest" alt="Latest experimental release" /></a>
+  <a href="https://github.com/cloudesh/kupopop/issues"><img src="https://img.shields.io/github/issues/cloudesh/kupopop?style=flat-square&amp;color=9c7844" alt="Open issues" /></a>
+</p>
 
-Add this under Dalamud Settings → Experimental → Custom Plugin Repositories:
+## Install & play
 
-`https://raw.githubusercontent.com/cloudesh/kupopop/main/plugin/releases/repo.json`
+In Dalamud, open **Settings → Experimental → Custom Plugin Repositories**. Paste the link below, save, then find **Kupo Skribbl** in the plugin installer.
 
-Install **Kupo Skribbl**, then open `/kuposkribbl` (`/kupopop` is an alias).
-Clients connect automatically to `https://play.kupopop.com`. The stable installation
-ID is `Kupopop`, preserving existing configuration and device credentials.
-This is a custom repository release; official listing has not been requested.
+```text
+https://raw.githubusercontent.com/cloudesh/kupopop/main/plugin/releases/repo.json
+```
 
-## Play
+**Open the game with `/kupopop` or `/kuposkribbl`.** Everyone connects automatically—create your profile and you're ready to play.
 
-- Create a profile and save its private recovery code. Draw an avatar or use a
-  moogle face or a locally loaded job emblem.
-- Join via code, host a room, or browse opt-in public lobbies.
-- Up to 16 players; defaults are 90 seconds per drawer and two rounds.
-- Draw with pencil, fill, eraser, shapes, 32 colors and stroke undo.
-- Choose privately from four words by default. A rare 10% custom-word option
-  can be disabled by the host. Selection lasts 15 seconds before drawing time.
-- FFXIV, General, Internet Memes and Video Games themes contain 39 private lists
-  and 2,631 entries. Select whole categories or individual lists.
-- Server-owned scoring, random letter hints, recaps and final-match podiums.
-  Accepted spelling/name variants score normally; other close guesses get
-  private feedback. Done-mode chat reaches the drawer and correct guessers only.
-- Leader moderation and configurable room votes. Under five players, all other
-  voters must agree; five or more requires 70%, rounded up.
-- Light/dark paper themes, collapsible tools, compact notifications and a 3:2 window.
+This is an experimental plugin distributed through a custom repository. It is not currently listed in the official Dalamud repository.
 
-Profiles persist in SQLite. Rooms, drawings, chat and match scores are ephemeral.
-Persistent currency, shops and Lodestone verification are outside this release.
-The plugin performs no automated FFXIV-server interactions or player scans.
+## How to play
 
-## Build and host
+1. **Find your group.** Join a friend with a room code, host a room, or browse public lobbies. Bring up to 16 players.
+2. **Pick and draw.** When it's your turn, choose a word and bring it to life on the canvas. Artistic talent is entirely optional.
+3. **Guess in chat.** When someone else draws, type your guesses into the room chat. Solve earlier to earn more points; drawers earn points when others get it right.
+4. **Celebrate the winner.** Everyone takes a turn each round. The player with the most points at the end wins!
 
-- [Development, architecture, review findings and testing](DEVELOPMENT.md)
-- [Windows/Linux server setup, deployment and backups](server/HOSTING.md)
-- [Private word-list configuration](server/WORD_LISTS.md)
-- [Latest release and server downloads](https://github.com/cloudesh/kupopop/releases/latest)
+## Make it your own
 
-Run **Start-My-Server.cmd** for PC development hosting. It incrementally builds
-current source and preserves `server/local/`. Public plugin installations use the
-maintained service; a source build can change `OfficialService.Origin` for local
-hosting. Accounts belong to their originating backend.
+- Choose from FFXIV, everyday things, internet memes, and video games.
+- Set your room's timer, rounds, and word lists.
+- Draw your own profile picture or choose a moogle face or job emblem.
+- Use pencils, shapes, fill, a colour palette, and undo to rescue your masterpiece.
+- Pick light or dark paper to suit your setup.
 
-Source lives under `plugin/` and `server/`; build output is ignored. The live
-installer feed is promoted only after its matching release ZIP is verified.
+Save your private recovery code when you create your profile. Keep it somewhere safe and don't share it.
 
-MIT licensed. Not affiliated with Square Enix or skribbl.io. See
-[component notices](THIRD_PARTY_NOTICES.md). In-game rendering, dragging and
-unload/reload behavior require owner verification; automated checks run outside FFXIV.
+## Something gone wonky?
+
+[Report a bug or suggest an idea](https://github.com/cloudesh/kupopop/issues). For bugs, tell us what happened and what you expected. Please leave passwords and recovery codes out of reports.
+
+Download badges count release-asset downloads, including repeat downloads and older releases; they aren't a player count.
+
+Not affiliated with Square Enix or skribbl.io.

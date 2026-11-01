@@ -34,17 +34,10 @@ jobs:
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
           dotnet server/Kupopop.Tests/bin/Release/net10.0/Kupopop.Tests.dll
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
-      - name: Build plugin and self-contained servers
+      - name: Build plugin package
         shell: pwsh
         run: |
-          powershell.exe -NoProfile -ExecutionPolicy Bypass -File server/Test-ServerTools.ps1
-          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
           ./Build-Release.ps1
-      - name: Verify packaged Windows TLS server
-        shell: pwsh
-        run: |
-          dotnet server/Kupopop.Tests/bin/Release/net10.0/Kupopop.Tests.dll
-          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
       - name: Publish testing release
         shell: pwsh
         env:
@@ -57,7 +50,7 @@ jobs:
             gh release create $tag --target $env:GITHUB_SHA --prerelease --title "Kupo Skribbl $tag - experimental" --notes-file RELEASE_NOTES.md
             if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
           }
-          gh release upload $tag artifacts/testing.zip artifacts/repo.json artifacts/Kupopop.Server-win-x64.zip artifacts/Kupopop.Server-linux-x64.zip --clobber
+          gh release upload $tag artifacts/testing.zip artifacts/repo.json --clobber
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
       - name: Verify download and publish installer feed
         shell: pwsh
@@ -93,7 +86,6 @@ jobs:
           path: |
             artifacts/testing.zip
             artifacts/repo.json
-            artifacts/Kupopop.Server-*.zip
   linux-test:
     runs-on: ubuntu-latest
     steps:
@@ -105,4 +97,3 @@ jobs:
         run: |
           dotnet build server/Kupopop.Tests/Kupopop.Tests.csproj -c Release
           dotnet server/Kupopop.Tests/bin/Release/net10.0/Kupopop.Tests.dll
-          bash -n server/hosting/start-server.sh server/hosting/start-local.sh
