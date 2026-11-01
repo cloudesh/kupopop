@@ -69,7 +69,6 @@ public sealed partial class MainWindow
 
     private void FriendsScreen()
     {
-        if (PageHeading("Friends")) return;
         var tabs = ImGui.GetCursorScreenPos();
         foreach (var tab in new[] { ("incoming", "Requests"), ("friend", "Friends"), ("outgoing", "Sent"), ("recent", "Recently played") })
         {

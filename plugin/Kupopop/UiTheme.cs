@@ -177,13 +177,13 @@ public static class UiTheme
         return clicked;
     }
 
-    public static bool Tab(string label, bool selected)
+    public static bool Tab(string label, bool selected, float? padding = null)
     {
         using var fill = ImRaii.PushColor(ImGuiCol.Button, selected ? Panel : Vector4.Zero);
         using var hover = ImRaii.PushColor(ImGuiCol.ButtonHovered, RoseTint);
         using var rounding = ImRaii.PushStyle(ImGuiStyleVar.FrameRounding, S(5));
         using var text = ImRaii.PushColor(ImGuiCol.Text, selected ? Rose : Muted);
-        bool clicked = ImGui.Button(label, new Vector2(ImGui.CalcTextSize(label).X + S(26), S(30)));
+        bool clicked = ImGui.Button(label, new Vector2(ImGui.CalcTextSize(label).X + (padding ?? S(26)), S(30)));
         if (selected) ImGui.GetWindowDrawList().AddRect(ImGui.GetItemRectMin(), ImGui.GetItemRectMax(), C(UiPresentation.Alpha(Line, 0.55f)), S(5));
         return clicked;
     }

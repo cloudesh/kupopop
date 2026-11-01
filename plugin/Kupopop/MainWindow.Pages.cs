@@ -116,20 +116,22 @@ public sealed partial class MainWindow
     {
         string play = room is null ? "Play" : "Your room";
         var start = ImGui.GetCursorScreenPos();
-        float width = ImGui.CalcTextSize(play).X + ImGui.CalcTextSize("ProfileFriendsLeaderboards").X + UiTheme.S(112);
+        float textWidth = ImGui.CalcTextSize(play).X + ImGui.CalcTextSize("ProfileFriendsLeaderboards").X;
+        float tabPadding = Math.Clamp((ImGui.GetContentRegionAvail().X - textWidth - UiTheme.S(12)) / 4, UiTheme.S(8), UiTheme.S(26));
+        float width = textWidth + tabPadding * 4 + UiTheme.S(8);
         ImGui.GetWindowDrawList().AddRectFilled(start - UiTheme.V(3, 3), start + new Vector2(width, UiTheme.S(33)),
             UiTheme.C(UiPresentation.Alpha(UiTheme.Inset, 0.55f)), UiTheme.S(7));
-        if (UiTheme.Tab(play, !ShowDebug && screen is not ("profile" or "friends" or "leaderboards")))
+        if (UiTheme.Tab(play, !ShowDebug && screen is not ("profile" or "friends" or "leaderboards"), tabPadding))
         { ShowDebug = false; screen = room is null ? "menu" : "game"; }
         ImGui.SameLine(0, UiTheme.S(2));
         using (ImRaii.Disabled(profile is null))
-            if (UiTheme.Tab("Profile", !ShowDebug && screen == "profile")) { ShowDebug = false; OpenProfile(); }
+            if (UiTheme.Tab("Profile", !ShowDebug && screen == "profile", tabPadding)) { ShowDebug = false; OpenProfile(); }
         ImGui.SameLine(0, UiTheme.S(2));
         using (ImRaii.Disabled(profile is null))
-            if (UiTheme.Tab("Friends", !ShowDebug && screen == "friends")) OpenFriends();
+            if (UiTheme.Tab("Friends", !ShowDebug && screen == "friends", tabPadding)) OpenFriends();
         ImGui.SameLine(0, UiTheme.S(2));
         using (ImRaii.Disabled(profile is null))
-            if (UiTheme.Tab("Leaderboards", !ShowDebug && screen == "leaderboards"))
+            if (UiTheme.Tab("Leaderboards", !ShowDebug && screen == "leaderboards", tabPadding))
             { ShowDebug = false; screen = "leaderboards"; RequestLeaderboard(); }
     }
 
