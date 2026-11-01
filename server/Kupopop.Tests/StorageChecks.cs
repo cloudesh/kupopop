@@ -60,9 +60,9 @@ static class StorageChecks
                 check(failed && store.Authenticate(rotated.AccessToken)?.Id == id, "failed credential rotation leaves the last committed token valid");
                 trigger.CommandText = "DROP TRIGGER reject_updates"; trigger.ExecuteNonQuery();
             }
-            store.Update(id, "Migration artist", null, true, "job-paladin");
-            store.Update(id, null, null, false, "job-paladin");
-            check(store.Get(id) is { AvatarPreset: "job-paladin", AvatarPixels: null }, "SQLite stores an allow-listed job preset without artwork");
+            store.Update(id, "Migration artist", null, true, "moogle-1");
+            store.Update(id, null, null, false, "moogle-1");
+            check(store.Get(id) is { AvatarPreset: "moogle-1", AvatarPixels: null }, "SQLite stores native moogle preset identifiers");
             Parallel.For(0, 24, i => store.Create("Concurrent artist " + i));
             check(store.Count() == 25, "concurrent account creation commits distinct identities without lost updates");
         }

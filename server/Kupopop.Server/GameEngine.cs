@@ -19,6 +19,7 @@ public sealed partial class GameEngine(AccountStore accounts, ILogger<GameEngine
     {
         public long MonitorId;
         public HashSet<Guid> StatsParticipants = [];
+        public HashSet<Guid> DrawingLikes = [];
         public bool StatsRecorded;
         public string Code = code;
         public Guid Host = host;
@@ -158,6 +159,16 @@ public sealed partial class GameEngine(AccountStore accounts, ILogger<GameEngine
                 switch (command.Type)
                 {
                     case "social": SendSocial(peer); break;
+                    case "leaderboard":
+                        peer.Send(new("leaderboard", Leaderboard: accounts.Leaderboard(peer.Id, command.Text ?? "best", command.Page)));
+                        break;
+                    case "leaderboard-name":
+                    case "leaderboard-hidden":
+                    case "leaderboard-portrait":
+                        accounts.SetLeaderboardPreference(peer.Id, command.Type[12..], command.Enabled);
+                        peer.Send(new("leaderboard", Leaderboard: accounts.Leaderboard(peer.Id, "best", 0)));
+                        break;
+                    case "like-drawing": LikeDrawing(peer, room, command.TurnId); break;
                     case "friend-request": ChangeFriend(peer, command.TargetId, "request"); break;
                     case "friend-accept": ChangeFriend(peer, command.TargetId, "accept"); break;
                     case "friend-remove": ChangeFriend(peer, command.TargetId, "remove"); break;
@@ -418,6 +429,7 @@ public sealed partial class GameEngine(AccountStore accounts, ILogger<GameEngine
         room.Phase = "choosing";
         room.Drawer = room.Deck[room.Position];
         room.TurnId = Guid.NewGuid();
+        room.DrawingLikes.Clear();
         room.Deadline = Now.AddSeconds(15);
         room.Revealed = 0;
         room.Word = "";
@@ -503,7 +515,8 @@ public sealed partial class GameEngine(AccountStore accounts, ILogger<GameEngine
             room.Options.VoteKickEnabled && room.Drawer != room.Host && (!room.VoteUsed || room.Vote is not null),
             room.Options.VoteSkipEnabled && (!room.SkipVoteUsed || room.SkipVote is not null),
             room.Phase == "choosing" && room.Drawer == peer.Id && room.CustomWordAvailable,
-            room.Phase == "results" ? room.Results : null)));
+            room.Phase == "results" ? room.Results : null,
+            room.DrawingLikes.Count, room.DrawingLikes.Contains(peer.Id))));
     }
 
     private void BroadcastState(Room room, bool reset = false, Guid? except = null)

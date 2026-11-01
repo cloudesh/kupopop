@@ -13,6 +13,11 @@ public static class SocialValidation
 {
     public static bool Valid(ServerEvent message)
     {
+        if (message.Leaderboard is { } board &&
+            (board.Page is < 0 or > 199 || board.Metric is not ("best" or "points" or "games" or "likes") ||
+            board.Entries is not { Length: <= 50 } || board.Entries.Any(e => e is null || !Protocol.ValidName(e.Name) ||
+                !Protocol.ValidAvatar(e.AvatarPixels) || e.AvatarPreset is not null && AvatarPresets.Find(e.AvatarPreset) is null ||
+                e.BestScore is < 0 or > 1_000_000 || e.Points < 0 || e.Games < 0 || e.Likes < 0))) return false;
         static bool Invite(GameInvitation i) => i is not null && i.Id != Guid.Empty && Protocol.ValidProfile(i.From)
             && Protocol.ValidName(i.RoomTitle);
         if (message.Invitation is { } invitation && !Invite(invitation)) return false;

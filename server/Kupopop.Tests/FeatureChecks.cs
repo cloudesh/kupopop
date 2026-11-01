@@ -37,14 +37,14 @@ static class FeatureChecks
         store.Update(account.AccountId, null, portrait.Pixels, false);
         var persisted = new AccountStore(storePath).Get(account.AccountId)!;
         check(persisted.AvatarPixels!.SequenceEqual(portrait.Pixels), "custom alpha pixels survive server persistence");
-        store.Update(account.AccountId, null, null, false, "job-paladin");
-        check(new AccountStore(storePath).Get(account.AccountId) is { AvatarPreset: "job-paladin", AvatarPixels: null },
-            "job preset persists by allow-listed ID without storing game artwork");
         bool rejected = false;
+        try { store.Update(account.AccountId, null, null, false, "job-paladin"); } catch (ArgumentException) { rejected = true; }
+        check(rejected, "removed job presets cannot be selected through a forged command");
+        rejected = false;
         try { store.Update(account.AccountId, null, null, false, "arbitrary-remote-image"); } catch (ArgumentException) { rejected = true; }
         check(rejected, "arbitrary portrait paths and non-catalog presets are rejected");
-        check(AvatarPresets.Items.Count(p => p.Icon == 0) == 7 && AvatarPresets.Items.Select(p => p.Id).Distinct().Count() == AvatarPresets.Items.Length,
-            "seven sketch presets and job presets have distinct validated identifiers");
+        check(AvatarPresets.Items.Length == 7 && AvatarPresets.Items.Select(p => p.Id).Distinct().Count() == AvatarPresets.Items.Length,
+            "only the seven native sketch presets remain available");
         store.Update(account.AccountId, null, new byte[4096], false);
         check(store.Get(account.AccountId) is { AvatarPreset: null } && store.Get(account.AccountId)!.AvatarPixels!.All(p => p == 0),
             "switching from a preset to a legacy white custom drawing preserves its pixels");

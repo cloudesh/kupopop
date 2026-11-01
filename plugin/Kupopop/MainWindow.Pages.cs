@@ -55,6 +55,7 @@ public sealed partial class MainWindow
                 else if (screen == "welcome") Welcome();
                 else if (screen == "profile") ProfileScreen();
                 else if (screen == "friends") FriendsScreen();
+                else if (screen == "leaderboards") LeaderboardsScreen();
                 else if (screen == "game" && room is not null) Game();
                 else if (screen == "public") PublicRooms();
                 else if (screen == "create") CreateRoomScreen();
@@ -115,10 +116,10 @@ public sealed partial class MainWindow
     {
         string play = room is null ? "Play" : "Your room";
         var start = ImGui.GetCursorScreenPos();
-        float width = ImGui.CalcTextSize(play).X + ImGui.CalcTextSize("ProfileFriends").X + UiTheme.S(86);
+        float width = ImGui.CalcTextSize(play).X + ImGui.CalcTextSize("ProfileFriendsLeaderboards").X + UiTheme.S(112);
         ImGui.GetWindowDrawList().AddRectFilled(start - UiTheme.V(3, 3), start + new Vector2(width, UiTheme.S(33)),
             UiTheme.C(UiPresentation.Alpha(UiTheme.Inset, 0.55f)), UiTheme.S(7));
-        if (UiTheme.Tab(play, !ShowDebug && screen is not ("profile" or "friends")))
+        if (UiTheme.Tab(play, !ShowDebug && screen is not ("profile" or "friends" or "leaderboards")))
         { ShowDebug = false; screen = room is null ? "menu" : "game"; }
         ImGui.SameLine(0, UiTheme.S(2));
         using (ImRaii.Disabled(profile is null))
@@ -126,6 +127,10 @@ public sealed partial class MainWindow
         ImGui.SameLine(0, UiTheme.S(2));
         using (ImRaii.Disabled(profile is null))
             if (UiTheme.Tab("Friends", !ShowDebug && screen == "friends")) OpenFriends();
+        ImGui.SameLine(0, UiTheme.S(2));
+        using (ImRaii.Disabled(profile is null))
+            if (UiTheme.Tab("Leaderboards", !ShowDebug && screen == "leaderboards"))
+            { ShowDebug = false; screen = "leaderboards"; RequestLeaderboard(); }
     }
 
     private void ConnectingScreen()
@@ -155,7 +160,7 @@ public sealed partial class MainWindow
         {
             UiTheme.Field("Display name", "##new-name", ref displayName, 40, "Your character or artist name");
 
-            UiTheme.Wrapped("Recommended: record lifetime stats, share your profile with room partners and friends, and check for invitations once a minute while closed. Sharing reveals plugin use. You can hide or disable each feature later.", UiTheme.Muted);
+            UiTheme.Wrapped("Recommended: record lifetime stats, share your profile with room partners and friends, and check for invitations once a minute while closed. Recorded stats appear anonymously with your portrait on leaderboards unless you opt out. Sharing or a recognisable portrait can reveal plugin use. You can hide or disable each feature later.", UiTheme.Muted);
             using (ImRaii.Disabled(!Protocol.ValidName(displayName)))
             {
                 if (UiTheme.Button(busy ? "Creating your profile..." : "Create & enable all three", ImGui.GetContentRegionAvail().X, primary: true)) CreateAccount(false, enableAll: true);
@@ -647,6 +652,7 @@ public sealed partial class MainWindow
         avatarHistory.Clear();
         profileSettingsPage = 0;
         screen = "profile";
+        RequestLeaderboard();
     }
 
     private void ProfileScreen()
@@ -663,19 +669,10 @@ public sealed partial class MainWindow
                 {
                     UiTheme.Caption("YOUR CANVAS");
                     AvatarChoices();
-                    bool emblem = AvatarPresets.Find(avatarPreset)?.Icon is > 0;
-                    if (emblem && profile is not null)
-                    {
-                        UiPortrait.Draw(avatars.Get(profile with { AvatarPixels = null, AvatarPreset = avatarPreset }).Handle, UiTheme.V(128, 128));
-                        UiTheme.Wrapped("Job emblem from your game client. Choose a moogle or custom drawing to paint.", UiTheme.Muted);
-                    }
-                    else
-                    {
-                        avatarEditor.Toolbar("avatar-tools", transparency: true, undo: () => { avatarHistory.Undo(avatar); avatarReset = false; avatarPreset = null; }, canUndo: avatarHistory.CanUndo);
-                        avatarEditor.Draw("avatar-canvas", avatar, new Vector2(ImGui.GetContentRegionAvail().X,
-                            Math.Max(UiTheme.S(100), ImGui.GetContentRegionAvail().Y - UiTheme.S(38))), true,
-                            operation => { avatarHistory.Capture(avatar, operation.StrokeId); avatar.Apply(operation); avatarReset = false; avatarPreset = null; });
-                    }
+                    avatarEditor.Toolbar("avatar-tools", transparency: true, undo: () => { avatarHistory.Undo(avatar); avatarReset = false; avatarPreset = null; }, canUndo: avatarHistory.CanUndo);
+                    avatarEditor.Draw("avatar-canvas", avatar, new Vector2(ImGui.GetContentRegionAvail().X,
+                        Math.Max(UiTheme.S(100), ImGui.GetContentRegionAvail().Y - UiTheme.S(38))), true,
+                        operation => { avatarHistory.Capture(avatar, operation.StrokeId); avatar.Apply(operation); avatarReset = false; avatarPreset = null; });
                     UiTheme.Gap(5);
                     if (UiTheme.Button("Use my default avatar", 0, quiet: true) && profile is not null)
                     { avatar.Load(AvatarGenerator.Generate(profile.AvatarSeed)); avatarReset = true; avatarPreset = null; avatarHistory.Clear(); }

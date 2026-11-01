@@ -14,7 +14,7 @@ public sealed partial class AccountStore
     private void InitializeSocial()
     {
         using var versionQuery = Command("PRAGMA user_version");
-        if (Convert.ToInt32(versionQuery.ExecuteScalar()) is 3 or SchemaVersion) return;
+        if (Convert.ToInt32(versionQuery.ExecuteScalar()) is >= 3 and <= SchemaVersion) return;
         using var transaction = database.BeginTransaction();
         Execute("""
             CREATE TABLE account_names (id TEXT PRIMARY KEY, name_key TEXT NOT NULL UNIQUE) STRICT;
@@ -55,7 +55,7 @@ public sealed partial class AccountStore
     private void InitializeInvitationPreferences()
     {
         using var version = Command("PRAGMA user_version");
-        if (Convert.ToInt32(version.ExecuteScalar()) == SchemaVersion) return;
+        if (Convert.ToInt32(version.ExecuteScalar()) >= 4) return;
         using var transaction = database.BeginTransaction();
         Execute("ALTER TABLE preferences ADD COLUMN invite_checks INTEGER NOT NULL DEFAULT 0; PRAGMA user_version=4;", transaction);
         transaction.Commit();
@@ -105,6 +105,8 @@ public sealed partial class AccountStore
             {
                 using var clear = Command("DELETE FROM lifetime WHERE id=$id", transaction);
                 clear.Parameters.AddWithValue("$id", id.ToString()); clear.ExecuteNonQuery();
+                using var likes = Command("DELETE FROM drawing_likes WHERE id=$id", transaction);
+                likes.Parameters.AddWithValue("$id", id.ToString()); likes.ExecuteNonQuery();
             }
             transaction.Commit();
         }

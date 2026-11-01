@@ -113,7 +113,7 @@ fonts/services and cannot verify the game's graphics backend.
 Verify dragging, pinning, Escape/close ordering, the resize corner, consistent
 headers, square canvas and aligned side panels. Word selection/recaps must be
 canvas-centered; toolbox/palette interaction must not paint underneath. Verify
-avatar transparency, legacy white pixels, undo, job icons, vote clicks, private
+avatar transparency, legacy white pixels, undo, moogle presets, vote clicks, private
 near misses, done chat, reconnect, final ties and update-notice dismissal.
 
 Keep diagnostics free of credentials, private chat, answers, unused choices and
@@ -158,3 +158,5 @@ monitoring uses a private local snapshot, with no public HTTP route or identity 
 0.9.2: the standard Dalamud frame is mandatory; obsolete paper drag handles and frame preferences are removed. Native title-bar movement and WindowSystem own position, pinning and closing. New room setup explicitly requests six word offers; the protocol fallback remains four for older clients and minimal starter banks. Leader immunity is enforced server-side, and promotion clears an existing kick ballot targeting the new leader. Out-of-turn cursor packets are silently discarded, while malformed active-drawer cursors remain rejected. New-account requests can atomically persist explicitly selected stats/sharing/invitation preferences; old privacy settings are never silently enabled.
 
 0.9.3: hide the native title bar/background outside ShowDebug, retaining native ImGui empty-space movement and WindowSystem focus/close handling. The debug view shows the standard frame. Paper-header pin/close controls are presentation/actions only; no custom drag input or position controller exists. Frameless snapshot fades are disabled and the main game viewport remains forced.
+
+Leaderboards: schema 5 adds separate named/hidden/portrait preferences and drawing-like totals. Stats consent remains required; anonymous display names and visible portraits are the default for tracked accounts. Named listing is explicitly enabled by its owner, independently of shared-profile visibility. Queries are authenticated, use allow-listed sort keys, and return at most 50 rows without account IDs. Opt-out filters every metric; disabling/resetting stats erases drawing likes too. Drawing likes are server-authoritative, drawer-excluding and turn-bound, and duplicate senders remain remembered through reconnect. No sender identity or drawing payload is persisted with likes. Existing job preset IDs are cleared transactionally during migration, leaving account seeds, custom pixels and credentials intact.

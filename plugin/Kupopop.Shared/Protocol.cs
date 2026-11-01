@@ -73,7 +73,7 @@ public static class Protocol
                 ValidProfile(p.Profile) && p.Score is >= 0 and <= 1_000_000) &&
             Board(room.Canvas) && Cursor(room.Cursor) && Text(room.Hint, 64) && (room.Word is null || Text(room.Word, 64)) &&
             (room.WordChoices is null || room.WordChoices is { Length: >= 1 and <= 8 } && room.WordChoices.All(w => Text(w, 64))) &&
-            Results(room.FirstGuessers) && Results(room.MatchResults);
+            Results(room.FirstGuessers) && Results(room.MatchResults) && room.DrawingLikes is >= 0 and < MaximumPlayers;
     }
 }
 
@@ -102,14 +102,17 @@ public sealed record RoomView(string Code, RoomOptions Options, string Phase, Gu
     bool CanUndo = false, KickVoteView? KickVote = null, string[]? WordChoices = null,
     SolveResult[]? FirstGuessers = null, KickVoteView? SkipVote = null, BrushCursor? Cursor = null,
     bool KickVoteAvailable = true, bool SkipVoteAvailable = true,
-    bool CustomWordAvailable = false, SolveResult[]? MatchResults = null);
+    bool CustomWordAvailable = false, SolveResult[]? MatchResults = null,
+    int DrawingLikes = 0, bool YouLikedDrawing = false);
 
 public sealed record DrawOperation(string Tool, int X1, int Y1, int X2, int Y2, byte Color = 1, int Size = 3, Guid StrokeId = default);
 public sealed record ClientCommand(string Type, string? Text = null, RoomOptions? Options = null,
     DrawOperation? Draw = null, Guid TurnId = default, byte[]? Avatar = null, bool ResetAvatar = false, string? AvatarPreset = null,
-    BrushCursor? Cursor = null, Guid TargetId = default, bool Enabled = false, bool Shared = false, bool? BackgroundInvitations = null);
+    BrushCursor? Cursor = null, Guid TargetId = default, bool Enabled = false, bool Shared = false, bool? BackgroundInvitations = null,
+    int Page = 0);
 public sealed record ServerEvent(string Type, RoomView? Room = null, RoomSummary[]? Rooms = null,
     ChatLine? Chat = null, DrawOperation? Draw = null, Guid? ActorId = null,
     string? Error = null, PlayerProfile? Profile = null, Guid TurnId = default, string? RejectedCommand = null,
     WordListInfo[]? WordLists = null, byte[]? Canvas = null, bool CanUndo = false, BrushCursor? Cursor = null,
-    SocialView? Social = null, SharedProfile? SharedProfile = null, GameInvitation? Invitation = null, bool Online = false);
+    SocialView? Social = null, SharedProfile? SharedProfile = null, GameInvitation? Invitation = null, bool Online = false,
+    LeaderboardView? Leaderboard = null);

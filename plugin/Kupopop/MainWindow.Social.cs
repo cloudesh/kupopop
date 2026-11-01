@@ -23,6 +23,10 @@ public sealed partial class MainWindow
                 if (social is not null && plugin.Config.BackgroundInvitations != social.Preferences.BackgroundInvitations)
                 { plugin.Config.BackgroundInvitations = social.Preferences.BackgroundInvitations; plugin.Save(); }
                 return true;
+            case "leaderboard":
+                leaderboard = message.Leaderboard;
+                if (leaderboard is not null) leaderboardMetric = leaderboard.Metric;
+                return true;
             case "friend-presence":
                 if (social is not null) social = social with
                 {
@@ -177,8 +181,13 @@ public sealed partial class MainWindow
         changed |= ImGui.Checkbox("Share my profile", ref share);
         changed |= ImGui.Checkbox("Invitations while my book is closed", ref background);
         UiTheme.Wrapped("Optional: checks for friend invitations once a minute over HTTPS, without staying in a game session. Shows a Dalamud notification; it never opens your book automatically.", UiTheme.Muted);
-        UiTheme.Wrapped("Sharing reveals plugin use to friends and room partners. There is no player directory. Turning off statistics deletes your totals; match scoring stays the same.", UiTheme.Muted);
+        UiTheme.Wrapped("Profile sharing reveals plugin use to friends and room partners. Recorded statistics appear anonymously with your portrait on leaderboards unless you opt out below. Turning off statistics deletes your totals and likes; match scoring stays the same.", UiTheme.Muted);
         if (changed) Send(new("profile-privacy", Enabled: track, Shared: share, BackgroundInvitations: background));
+        if (leaderboard is null)
+        {
+            if (UiTheme.Button("Leaderboard visibility", 0, quiet: true)) RequestLeaderboard();
+        }
+        else LeaderboardPrivacyControls();
         if (UiTheme.Button("View my profile", 0, quiet: true)) ViewArtistProfile(device!.AccountId);
         ImGui.SameLine();
         if (UiTheme.Button("Reset lifetime stats", 0, quiet: true)) ImGui.OpenPopup("reset-lifetime");

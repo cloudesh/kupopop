@@ -9,10 +9,10 @@ namespace Kupopop.Server;
 // Retained only for importing pre-SQLite installations.
 public sealed record StoredAccount(PlayerProfile Profile, string AccessHash, string RecoveryHash);
 
-/// <summary>Transactional account persistence. Game rooms and scores remain ephemeral.</summary>
+/// <summary>Transactional accounts and opted-in statistics. Live room state remains ephemeral.</summary>
 public sealed partial class AccountStore : IDisposable
 {
-    private const int SchemaVersion = 4;
+    private const int SchemaVersion = 5;
     private const int MaximumAccounts = 10_000;
     private const string ProfileColumns = "id, display_name, avatar_seed, avatar_pixels, avatar_preset";
     private readonly object gate = new();
@@ -38,6 +38,7 @@ public sealed partial class AccountStore : IDisposable
             Initialize(directory);
             InitializeSocial();
             InitializeInvitationPreferences();
+            InitializeLeaderboards();
             VerifyIntegrity();
         }
         catch { database.Dispose(); throw; }
@@ -190,7 +191,7 @@ public sealed partial class AccountStore : IDisposable
     {
         using var versionQuery = Command("PRAGMA user_version");
         int version = Convert.ToInt32(versionQuery.ExecuteScalar());
-        if (version is 2 or 3 or SchemaVersion) return;
+        if (version is 2 or 3 or 4 or SchemaVersion) return;
         if (version == 1)
         {
             // SQLite counts Unicode scalars; .NET string limits count UTF-16
@@ -243,12 +244,14 @@ public sealed partial class AccountStore : IDisposable
         if (source.Count > MaximumAccounts) throw new InvalidDataException("Legacy account capacity exceeded.");
         foreach (var (id, account) in source)
         {
-            if (account?.Profile is not { } profile || id == Guid.Empty || id != profile.Id ||
+            var imported = account?.Profile?.AvatarPreset?.StartsWith("job-", StringComparison.Ordinal) == true
+                ? account with { Profile = account.Profile with { AvatarPreset = null } } : account;
+            if (imported?.Profile is not { } profile || id == Guid.Empty || id != profile.Id ||
                 !Protocol.ValidName(profile.DisplayName) || !Protocol.ValidAvatar(profile.AvatarPixels) ||
                 (profile.AvatarPreset is not null && AvatarPresets.Find(profile.AvatarPreset) is null) ||
-                !ValidHash(account.AccessHash) || !ValidHash(account.RecoveryHash))
+                !ValidHash(imported.AccessHash) || !ValidHash(imported.RecoveryHash))
                 throw new InvalidDataException("Legacy account validation failed; import refused.");
-            Insert(account, transaction);
+            Insert(imported, transaction);
         }
         // The original file remains untouched as the rollback copy. Schema version
         // makes this a one-time import, even if that copy is present on every boot.

@@ -35,9 +35,11 @@ This is an experimental plugin distributed through a custom repository. It is no
 
 - Choose from FFXIV, everyday things, internet memes, and video games.
 - Set your room's timer, rounds, and word lists.
-- Draw your own profile picture or choose a moogle face or job emblem.
+- Draw your own profile picture or choose a moogle face.
 - Use pencils, shapes, fill, a colour palette, and undo to rescue your masterpiece.
 - Pick light or dark paper to suit your setup.
+- Give a good drawing a thumbs-up: one like per drawing, with no change to match points.
+- Compare best game scores, overall points, games played and drawing likes in Leaderboards.
 - Add artists as friends, accept requests, and invite online friends to your room.
 - Opt into lifetime game statistics and share your profile with friends and room partners.
 
@@ -47,9 +49,11 @@ Save your private recovery code when you create your profile. Keep it somewhere 
 
 Right-click an artist in a room to add them or view their profile. Manage friend requests, invitations, and recently played partners in **Friends**. Invitations appear inside Kupo Skribbl, and the Play screen lets you join an invited game directly.
 
-New-profile setup recommends sharing with friends and room partners, with a visible switch before you create the account. Existing privacy choices stay unchanged. Lifetime statistics start disabled; enable them separately in **Profile → Privacy & invitations**. Shared profiles show your avatar and recorded games, wins, total points, and best match. They are visible to friends and people you have played with, with no global player search. Game points are statistics, not a currency.
+New-profile setup offers an explained choice to enable lifetime stats, profile sharing and closed-window invitations together, or create a private profile. Existing privacy choices stay unchanged. You can change each setting in **Profile → Privacy & invitations**. Shared profiles show your avatar and recorded games, wins, total points, and best match. They are visible to friends and people you have played with, with no global player search. Game points are statistics, not a currency.
 
 The plugin starts closed. Closing it leaves your room and disconnects you; friends only see you online while your book is open. If you enable **Invitations while my book is closed**, a short authenticated check once a minute can notify you about friend invitations without keeping a game connection. Clicking the notification opens your book; it never opens itself. Recently played partners are private to the current session. You can remove friends and reset or disable your statistics at any time.
+
+Recorded lifetime statistics appear on leaderboards with anonymous names and your portrait by default. Use **Leaderboards** or **Profile → Privacy & invitations** to include your name, hide your portrait, or opt out entirely. A recognisable portrait can identify you; profile sharing is a separate setting.
 
 ## Quick questions
 

@@ -4,25 +4,13 @@ using Kupopop.Shared;
 
 namespace Kupopop;
 
-public sealed class AvatarTextures(DiagnosticLog? diagnostic = null) : IDisposable
+public sealed class AvatarTextures : IDisposable
 {
     private sealed record Entry(int Seed, string? Preset, byte[]? Source, IDalamudTextureWrap Texture);
     private readonly Dictionary<Guid, Entry> cache = [];
-    private readonly HashSet<uint> unavailableIcons = [];
 
     public IDalamudTextureWrap Get(PlayerProfile profile)
     {
-        var preset = AvatarPresets.Find(profile.AvatarPreset);
-        if (profile.AvatarPixels is null && preset?.Icon is > 0 && !unavailableIcons.Contains(preset.Icon))
-        {
-            try
-            {
-                var icon = Plugin.TextureProvider.GetFromGameIcon(new GameIconLookup(preset.Icon));
-                if (icon.TryGetWrap(out var wrap, out var error)) return wrap;
-                if (error is not null) { unavailableIcons.Add(preset.Icon); diagnostic?.Write("ui.job_icon_unavailable icon=" + preset.Icon, error); }
-            }
-            catch (Exception ex) { unavailableIcons.Add(preset.Icon); diagnostic?.Write("ui.job_icon_unavailable icon=" + preset.Icon, ex); }
-        }
         if (cache.TryGetValue(profile.Id, out var old) && old.Seed == profile.AvatarSeed &&
             old.Preset == profile.AvatarPreset &&
             ((old.Source is null && profile.AvatarPixels is null) ||

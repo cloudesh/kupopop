@@ -68,7 +68,7 @@ public sealed partial class MainWindow : Window, IDisposable
     {
         this.plugin = plugin;
         this.log = log;
-        avatars = new(log);
+        avatars = new();
         art = new(log);
         vault = new(directory);
         Size = UiWindowGeometry.DefaultSize;
@@ -92,6 +92,7 @@ public sealed partial class MainWindow : Window, IDisposable
         room = null; profile = null; device = null;
         chat.Clear(); publicRooms = [];
         social = null; sharedProfile = null; showSharedProfile = false;
+        leaderboard = null;
         serviceAvailable = sessionReady = busy = savingProfile = savingRoomSettings = false;
         painting.RemoteCursor = null;
         undoPending = canUndoDrawing = false;
