@@ -3,47 +3,82 @@ using Dalamud.Bindings.ImGui;
 
 namespace Kupopop;
 
-/// <summary>Small stationery illustrations, drawn directly at the current UI scale.</summary>
+/// <summary>Consistent fine-line stationery marks, rendered sharply at the current UI scale.</summary>
 internal static class UiToolArt
 {
     public static bool Button(string tool, bool selected)
     {
-        var min = ImGui.GetCursorScreenPos();
+        var origin = ImGui.GetCursorScreenPos();
         bool clicked = ImGui.InvisibleButton("tool-" + tool, UiTheme.V(28, 28));
         var draw = ImGui.GetWindowDrawList();
-        Vector2 P(float x, float y) => min + UiTheme.V(x, y);
-        uint ink = UiTheme.C(UiTheme.Ink), accent = UiTheme.C(UiTheme.Rose);
-        draw.AddRectFilled(min, P(28, 28), UiTheme.C(selected ? UiTheme.RoseTint : ImGui.IsItemHovered() ? UiTheme.Panel : UiTheme.Inset), UiTheme.S(3));
-        if (tool == "pencil")
+        var end = origin + UiTheme.V(28, 28);
+        var wash = selected ? UiPresentation.Alpha(UiTheme.RoseTint, 0.85f)
+            : ImGui.IsItemHovered() ? UiPresentation.Alpha(UiTheme.Inset, 0.65f)
+            : UiPresentation.Alpha(UiTheme.Ink, 0.035f);
+        draw.AddRectFilled(origin, end, UiTheme.C(wash), UiTheme.S(5));
+        if (selected)
+            draw.AddRect(origin + UiTheme.V(0.5f, 0.5f), end - UiTheme.V(0.5f, 0.5f),
+                UiTheme.C(UiPresentation.Alpha(UiTheme.Rose, 0.35f)), UiTheme.S(5), 0, UiTheme.S(1));
+
+        var mark = new Mark(draw, origin, selected);
+        switch (tool)
         {
-            draw.AddQuadFilled(P(8, 19), P(18, 5), P(23, 9), P(13, 23), UiTheme.C(UiTheme.Tape));
-            draw.AddLine(P(10, 20), P(20, 7), ink, UiTheme.S(1));
-            draw.AddTriangleFilled(P(8, 19), P(13, 23), P(5, 25), UiTheme.C(UiTheme.White));
-            draw.AddTriangleFilled(P(5, 25), P(7, 21), P(9, 24), ink);
-            draw.AddQuadFilled(P(18, 5), P(20, 3), P(25, 7), P(23, 9), accent);
-        }
-        else if (tool == "eraser")
-        {
-            draw.AddQuadFilled(P(5, 17), P(15, 6), P(24, 13), P(14, 24), accent);
-            draw.AddQuadFilled(P(5, 17), P(10, 12), P(19, 19), P(14, 24), UiTheme.C(UiTheme.White));
-            draw.AddLine(P(5, 25), P(24, 25), ink, UiTheme.S(1));
-        }
-        else if (tool == "fill")
-        {
-            draw.AddQuadFilled(P(5, 13), P(13, 5), P(22, 14), P(14, 22), UiTheme.C(UiTheme.Muted));
-            draw.AddQuadFilled(P(7, 13), P(13, 7), P(19, 13), P(13, 19), UiTheme.C(UiTheme.Panel));
-            draw.AddLine(P(8, 5), P(19, 16), ink, UiTheme.S(2));
-            draw.AddTriangleFilled(P(23, 16), P(20, 22), P(26, 22), accent);
-            draw.AddCircleFilled(P(23, 22), UiTheme.S(3), accent);
-        }
-        else
-        {
-            // Overlapping square/triangle/circle reads as a shape collection.
-            draw.AddRectFilled(P(5, 5), P(15, 15), UiTheme.C(UiTheme.Muted), UiTheme.S(1));
-            draw.AddTriangleFilled(P(17, 5), P(25, 17), P(10, 17), accent);
-            draw.AddCircleFilled(P(12, 20), UiTheme.S(6), UiTheme.C(UiTheme.Panel));
-            draw.AddCircle(P(12, 20), UiTheme.S(6), ink, 20, UiTheme.S(1));
+            case "pencil": mark.Pencil(); break;
+            case "fill": mark.Bucket(); break;
+            case "eraser": mark.Eraser(); break;
+            case "shapes": mark.Shapes(); break;
         }
         return clicked;
+    }
+
+    private readonly struct Mark(ImDrawListPtr draw, Vector2 origin, bool selected)
+    {
+        private Vector2 P(float x, float y) => origin + UiTheme.V(x, y);
+        private uint Ink => UiTheme.C(selected ? UiTheme.Rose : UiTheme.Ink);
+        private uint Wash => UiTheme.C(UiPresentation.Alpha(UiTheme.Rose, UiTheme.DarkMode ? 0.12f : 0.07f));
+        private float Stroke => UiTheme.S(1.35f);
+        private void Line(float ax, float ay, float bx, float by) => draw.AddLine(P(ax, ay), P(bx, by), Ink, Stroke);
+
+        public void Pencil()
+        {
+            // A long barrel, inset graphite seam, narrow ferrule and cut wood tip.
+            draw.AddQuadFilled(P(7, 17), P(17, 7), P(21, 11), P(11, 21), Wash);
+            draw.AddQuad(P(7, 17), P(17, 7), P(21, 11), P(11, 21), Ink, Stroke);
+            draw.AddTriangle(P(7, 17), P(11, 21), P(4.5f, 23.5f), Ink, Stroke);
+            draw.AddTriangleFilled(P(4.5f, 23.5f), P(5.5f, 20.5f), P(7.5f, 22.5f), Ink);
+            Line(10, 17, 18.5f, 8.5f);
+            draw.AddQuad(P(17, 7), P(19.5f, 4.5f), P(23.5f, 8.5f), P(21, 11), Ink, Stroke);
+            Line(16, 8, 20, 12);
+        }
+
+        public void Eraser()
+        {
+            // The sleeve is a light wash; the exposed rubber stays paper-coloured.
+            draw.AddQuadFilled(P(10, 11), P(15, 6), P(23, 13), P(18, 18), Wash);
+            draw.AddQuad(P(5, 16), P(15, 6), P(23, 13), P(13, 23), Ink, Stroke);
+            Line(10, 11, 18, 18);
+            Line(13, 23, 22, 23);
+            Line(17, 8.5f, 21, 12);
+        }
+
+        public void Bucket()
+        {
+            draw.AddQuadFilled(P(4.5f, 14), P(11, 7.5f), P(20, 16.5f), P(13.5f, 23), Wash);
+            draw.AddQuad(P(4.5f, 14), P(11, 7.5f), P(20, 16.5f), P(13.5f, 23), Ink, Stroke);
+            // Curved wire handle and a double lip distinguish a paint pail.
+            draw.AddBezierCubic(P(7, 11.5f), P(1, 1), P(15, 0.5f), P(15, 11.5f), Ink, Stroke);
+            Line(10, 6, 22, 18);
+            Line(12, 6, 22, 16);
+            draw.AddBezierCubic(P(23, 18.5f), P(20, 22), P(19.5f, 25), P(23, 25), Ink, Stroke);
+            draw.AddBezierCubic(P(23, 25), P(26.5f, 25), P(26, 22), P(23, 18.5f), Ink, Stroke);
+        }
+
+        public void Shapes()
+        {
+            draw.AddRect(P(4.5f, 5.5f), P(13.5f, 14.5f), Ink, UiTheme.S(1.2f), 0, Stroke);
+            draw.AddTriangle(P(20, 5.5f), P(25, 14.5f), P(15, 14.5f), Ink, Stroke);
+            draw.AddCircleFilled(P(13.5f, 21), UiTheme.S(5), Wash);
+            draw.AddCircle(P(13.5f, 21), UiTheme.S(5), Ink, 32, Stroke);
+        }
     }
 }

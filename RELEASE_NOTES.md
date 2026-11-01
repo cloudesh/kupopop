@@ -1,8 +1,7 @@
-Kupo Skribbl 0.11.1 makes suggestions easier to find and send.
+Kupo Skribbl 0.11.2 refines the drawing toolbar.
 
-- Suggestions on the home page uses the accent colour.
-- The suggestion form starts directly with its tabs. General feedback uses an in-box prompt that disappears on focus; word suggestions use placeholders without extra headings or labels.
-- Word suggestions can propose a new category for maintainer review. Category names remain bounded to 2–40 characters and never alter the catalog automatically.
-- Profile Back-button alignment now matches the button's actual width.
+- Pencil, paint pail, eraser and Shapes use a consistent fine-line stationery style with subtle shading.
+- Quiet backgrounds and a restrained rose selection highlight replace the solid colour blocks.
+- Tool targets remain the same compact size, and the Shapes button still shows a square, triangle and circle.
 
-Experimental custom-repository release. Layout checked outside FFXIV; in-game verification is still needed.
+Plugin-only visual update. Checked in light/dark native previews outside FFXIV; in-game verification is still needed.
