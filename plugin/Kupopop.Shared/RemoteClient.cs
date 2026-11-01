@@ -13,13 +13,17 @@ public sealed class RemoteClient : IDisposable
     private readonly Action<string, Exception?>? diagnostic;
     private readonly ConcurrentQueue<(ServerEvent Event, int Bytes)> events = new();
     private readonly CancellationTokenSource lifetime = new();
+    private readonly object connectionGate = new();
+    private readonly SemaphoreSlim sendGate = new(1, 1);
+    private readonly SemaphoreSlim disconnectGate = new(1, 1);
+    private int closing;
     private int queuedEventBytes;
     private int disposed;
     private ClientWebSocket? socket;
     private CancellationTokenSource? stop;
     private Channel<byte[]>? outgoing;
     private Task? connection;
-    public bool Connected => socket?.State == WebSocketState.Open;
+    public bool Connected => Volatile.Read(ref closing) == 0 && socket?.State == WebSocketState.Open;
     public bool TryRead(out ServerEvent? message)
     {
         message = null;
@@ -91,28 +95,40 @@ public sealed class RemoteClient : IDisposable
 
     public async Task ConnectAsync(string accessToken)
     {
+        ObjectDisposedException.ThrowIf(Volatile.Read(ref closing) != 0 || disposed != 0, this);
         await DisconnectAsync().ConfigureAwait(false);
         while (TryRead(out _)) { }
-        stop = new CancellationTokenSource();
-        socket = new ClientWebSocket();
-        socket.Options.SetRequestHeader("Authorization", "Bearer " + accessToken);
-        socket.Options.SetRequestHeader("X-Kupopop-Protocol", Protocol.Version.ToString());
-        socket.Options.KeepAliveInterval = TimeSpan.FromSeconds(20);
-        socket.Options.CollectHttpResponseDetails = true;
+        ClientWebSocket ws;
+        CancellationToken cancel;
+        lock (connectionGate)
+        {
+            ObjectDisposedException.ThrowIf(closing != 0 || disposed != 0, this);
+            stop = new CancellationTokenSource();
+            cancel = stop.Token;
+            socket = ws = new ClientWebSocket();
+        }
+        ws.Options.SetRequestHeader("Authorization", "Bearer " + accessToken);
+        ws.Options.SetRequestHeader("X-Kupopop-Protocol", Protocol.Version.ToString());
+        ws.Options.KeepAliveInterval = TimeSpan.FromSeconds(20);
+        ws.Options.CollectHttpResponseDetails = true;
         var uri = new UriBuilder(endpoint) { Scheme = endpoint.Scheme == "https" ? "wss" : "ws", Path = "/ws" }.Uri;
-        using var timeout = CancellationTokenSource.CreateLinkedTokenSource(stop.Token);
+        using var timeout = CancellationTokenSource.CreateLinkedTokenSource(cancel, lifetime.Token);
         timeout.CancelAfter(TimeSpan.FromSeconds(15));
-        try { await socket.ConnectAsync(uri, timeout.Token).ConfigureAwait(false); }
+        try { await ws.ConnectAsync(uri, timeout.Token).ConfigureAwait(false); }
         catch (Exception ex)
         {
-            diagnostic?.Invoke("websocket.connect_failed http_status=" + (int)socket.HttpStatusCode, ex);
-            if (socket.HttpStatusCode is System.Net.HttpStatusCode.Unauthorized or System.Net.HttpStatusCode.UpgradeRequired)
-                throw new HttpRequestException("Sign-in rejected.", ex, socket.HttpStatusCode);
+            diagnostic?.Invoke("websocket.connect_failed http_status=" + (int)ws.HttpStatusCode, ex);
+            if (ws.HttpStatusCode is System.Net.HttpStatusCode.Unauthorized or System.Net.HttpStatusCode.UpgradeRequired)
+                throw new HttpRequestException("Sign-in rejected.", ex, ws.HttpStatusCode);
             throw;
         }
-        outgoing = Channel.CreateBounded<byte[]>(128);
-        diagnostic?.Invoke("websocket.connected protocol=" + Protocol.Version, null);
-        connection = RunAsync(socket, outgoing, stop.Token);
+        lock (connectionGate)
+        {
+            ObjectDisposedException.ThrowIf(closing != 0 || disposed != 0, this);
+            outgoing = Channel.CreateBounded<byte[]>(128);
+            diagnostic?.Invoke("websocket.connected protocol=" + Protocol.Version, null);
+            connection = RunAsync(ws, outgoing, cancel);
+        }
     }
 
     public bool Send(ClientCommand command)
@@ -135,7 +151,9 @@ public sealed class RemoteClient : IDisposable
                 {
                     using var timeout = CancellationTokenSource.CreateLinkedTokenSource(linked.Token);
                     timeout.CancelAfter(TimeSpan.FromSeconds(10));
-                    await ws.SendAsync(bytes, WebSocketMessageType.Text, true, timeout.Token).ConfigureAwait(false);
+                    await sendGate.WaitAsync(timeout.Token).ConfigureAwait(false);
+                    try { await ws.SendAsync(bytes, WebSocketMessageType.Text, true, timeout.Token).ConfigureAwait(false); }
+                    finally { sendGate.Release(); }
                 }
             }
             finally { linked.Cancel(); ws.Abort(); }
@@ -173,19 +191,51 @@ public sealed class RemoteClient : IDisposable
 
     public async Task DisconnectAsync()
     {
-        stop?.Cancel();
-        socket?.Abort();
-        if (connection is not null)
-            try { await connection.ConfigureAwait(false); } catch (OperationCanceledException) { }
-        connection = null;
-        outgoing = null;
-        socket?.Dispose(); socket = null;
-        stop?.Dispose(); stop = null;
+        await disconnectGate.WaitAsync().ConfigureAwait(false);
+        try
+        {
+            stop?.Cancel();
+            socket?.Abort();
+            if (connection is not null)
+                try { await connection.ConfigureAwait(false); } catch (OperationCanceledException) { }
+            connection = null;
+            outgoing = null;
+            socket?.Dispose(); socket = null;
+            stop?.Dispose(); stop = null;
+        }
+        finally { disconnectGate.Release(); }
+    }
+
+    public async Task CloseAsync()
+    {
+        ClientWebSocket? ws;
+        lock (connectionGate)
+        {
+            if (closing != 0 || disposed != 0) return;
+            closing = 1;
+            lifetime.Cancel();
+            ws = socket;
+        }
+        try
+        {
+            if (ws?.State == WebSocketState.Open)
+            {
+                using var timeout = new CancellationTokenSource(TimeSpan.FromSeconds(2));
+                await sendGate.WaitAsync(timeout.Token).ConfigureAwait(false);
+                try { await ws.CloseOutputAsync(WebSocketCloseStatus.NormalClosure, "Window closed", timeout.Token).ConfigureAwait(false); }
+                finally { sendGate.Release(); }
+                if (connection is { } pending) await pending.WaitAsync(timeout.Token).ConfigureAwait(false);
+            }
+        }
+        catch (Exception ex) when (ex is OperationCanceledException or WebSocketException or ObjectDisposedException or InvalidOperationException)
+        { diagnostic?.Invoke("websocket.close_interrupted", null); }
+        finally { await DisconnectAsync().ConfigureAwait(false); Dispose(); }
     }
 
     public void Dispose()
     {
         if (Interlocked.Exchange(ref disposed, 1) != 0) return;
+        Interlocked.Exchange(ref closing, 1);
         lifetime.Cancel();
         stop?.Cancel();
         socket?.Abort();

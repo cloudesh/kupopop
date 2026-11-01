@@ -13,6 +13,12 @@ string root = Environment.GetEnvironmentVariable("KUPOPOP_ROOT") ?? AppContext.B
 string data = Path.Combine(root, "data");
 string logs = Path.Combine(root, "logs");
 Directory.CreateDirectory(root);
+string monitorPath = Path.Combine(logs, "status.json");
+if (args.Contains("--monitor") || args.Contains("--status"))
+{
+    await ServerMonitor.WatchAsync(monitorPath, once: args.Contains("--status"));
+    return;
+}
 if (args.Contains("--database-check") || args.Contains("--backup-database"))
 {
     using var store = new AccountStore(data);
@@ -74,6 +80,7 @@ app.MapGameEndpoints();
 
 var game = app.Services.GetRequiredService<GameEngine>();
 var tickStop = new CancellationTokenSource();
+var monitoring = ServerMonitor.PublishAsync(game, monitorPath, app.Logger, tickStop.Token);
 var ticking = Task.Run(async () =>
 {
     using var timer = new PeriodicTimer(TimeSpan.FromMilliseconds(250));
@@ -89,5 +96,6 @@ finally
 {
     tickStop.Cancel();
     await ticking;
+    await monitoring;
     tickStop.Dispose();
 }

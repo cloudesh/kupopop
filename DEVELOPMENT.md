@@ -122,3 +122,33 @@ Public lobby listing remains opt-in and excludes player profiles. The published
 plugin uses a single maintained service; user-defined backends require a source
 build. Review current [Dalamud publishing requirements](https://dalamud.dev/plugin-publishing/approval-process/)
 before an official submission; no official approval is claimed.
+
+## Social features and visibility
+
+Protocol 5 adds account-scoped friend requests, accepted friendships, invitations,
+and shared profiles. AccountStore.Social.cs owns normalized unique names, private
+preferences, relationships and optional totals. GameEngine.Social.cs authorizes
+social commands against accepted relationships or bounded session partners.
+MainWindow.Social.cs owns the scoped UI. No global account search exists.
+
+Name keys use compatibility normalization, collapsed whitespace and invariant
+case. SQLite enforces uniqueness transactionally. Schema 3 preserves identities,
+credential verifiers and pixels; duplicate legacy names get deterministic suffixes.
+
+Friendship acceptance grants mutual presence. Invitations require an accepted
+online friend outside a room, expire after five minutes, and validate recipient,
+room phase and capacity again when accepted. All notices stay inside the plugin.
+Recent partners are limited to 30 per session and clear on intentional close.
+
+Statistics and profile sharing default off. Completed matches record only players
+who opted in before the match and stayed opted in. Changing privacy or resetting
+stats during a match excludes that match. Only authoritative totals are retained;
+no chat, answers, drawings or game-world information is stored with them. Turning
+statistics off deletes totals. They are not a spendable currency. Shared profiles
+require a prior room encounter or relationship; public directories are absent.
+
+Window startup is closed. MainWindow starts network work only while open, scopes
+async completions to their owning client and cancels the retired client on close.
+Normal WebSocket closure removes membership immediately; unexpected disconnects
+retain the bounded grace. Reopening waits for the old close handshake. Operational
+monitoring uses a private local snapshot, with no public HTTP route or identity data.

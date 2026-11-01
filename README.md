@@ -2,7 +2,7 @@
   <img src="plugin/images/icon.png" alt="Kupo Skribbl moogle" width="112" />
 </p>
 
-<h1 align="center">Kupo Skribbl</h1>
+<h1 align="center">Kupo Skribbl — FFXIV Drawing &amp; Guessing Plugin</h1>
 
 <p align="center">A little drawing. A little guessing. A lot of questionable art.<br />A multiplayer drawing and guessing game, right inside Final Fantasy XIV.</p>
 
@@ -38,8 +38,26 @@ This is an experimental plugin distributed through a custom repository. It is no
 - Draw your own profile picture or choose a moogle face or job emblem.
 - Use pencils, shapes, fill, a colour palette, and undo to rescue your masterpiece.
 - Pick light or dark paper to suit your setup.
+- Add artists as friends, accept requests, and invite online friends to your room.
+- Opt into lifetime game statistics and share your profile with friends and room partners.
 
 Save your private recovery code when you create your profile. Keep it somewhere safe and don't share it.
+
+## Friends & privacy
+
+Right-click an artist in a room to add them or view their profile. Manage friend requests, invitations, and recently played partners in **Friends**. Invitations appear inside Kupo Skribbl, and the Play screen lets you join an invited game directly.
+
+Your profile starts private and lifetime statistics start disabled. Enable either in **Profile** if you want them. Shared profiles show your avatar and recorded games, wins, total points, and best match. They are visible to friends and people you have played with, with no global player search. Game points are statistics, not a currency.
+
+The plugin starts closed. Closing it leaves your room and disconnects you; friends only see you online while your book is open. Recently played partners are private to the current session. You can remove friends and reset or disable your statistics at any time.
+
+## Quick questions
+
+**Is Kupo Skribbl a browser game?** No—drawing, guessing, chat, and profiles run inside FFXIV through Dalamud.
+
+**Do my friends need the plugin?** Yes. Everyone installs Kupo Skribbl, then joins by code or an in-plugin friend invitation.
+
+**Is it on the official Dalamud repository?** Not yet. Use the experimental repository link above.
 
 ## Something gone wonky?
 

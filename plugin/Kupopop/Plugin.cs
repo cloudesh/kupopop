@@ -43,7 +43,13 @@ public sealed class Plugin : IDalamudPlugin
     internal void Save() => PluginInterface.SavePluginConfig(Config);
     private void Draw()
     {
-        try { main.PollNetwork(); using var style = UiTheme.Apply(main.IsDrawingRoom, Config.DarkMode); windows.Draw(); }
+        try
+        {
+            main.PollNetwork();
+            using var style = UiTheme.Apply(main.IsDrawingRoom, Config.DarkMode);
+            windows.Draw();
+            main.SynchronizeVisibility();
+        }
         catch (Exception ex)
         {
             if (Environment.TickCount64 - lastFrameFailure > 5000)

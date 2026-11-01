@@ -11,6 +11,7 @@ public static class GameEndpoints
         app.MapPost("/api/accounts", (AccountRequest request, AccountStore accounts) =>
         {
             try { return Results.Json(accounts.Create(request.DisplayName), Protocol.Json, statusCode: 201); }
+            catch (DisplayNameTakenException) { return Results.Conflict(new { error = "That display name is unavailable. Please choose another." }); }
             catch (ArgumentException) { return Results.BadRequest(new { error = "Use a display name of 2–40 characters." }); }
             catch (InvalidOperationException) { return Results.StatusCode(503); }
         }).RequireRateLimiting("accounts");
@@ -64,7 +65,7 @@ public static class GameEndpoints
             catch (Exception ex) { log.LogError("Connection handler failed. Category={Category} Stack={Stack}", ex.GetType().Name, ex.StackTrace); }
             finally
             {
-                engine.Detach(peer);
+                engine.Detach(peer, intentional: socket.CloseStatus == WebSocketCloseStatus.NormalClosure);
                 peer.Complete();
                 stop.Cancel();
                 socket.Abort();

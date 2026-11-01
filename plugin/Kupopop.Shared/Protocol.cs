@@ -5,7 +5,7 @@ namespace Kupopop.Shared;
 
 public static class Protocol
 {
-    public const int Version = 4;
+    public const int Version = 5;
     public const int CanvasWidth = 384;
     public const int CanvasHeight = 384;
     public const int AvatarSize = 64;
@@ -65,6 +65,7 @@ public static class Protocol
         if (message.Rooms is { } rooms && (rooms.Length > 100 || rooms.Any(r => r is null || !ValidName(r.Title) || !Text(r.Code, 8)))) return false;
         if (message.WordLists is { } lists && (lists.Length > 64 || lists.Any(l => l is null ||
             !Text(l.Id, 40) || !ValidName(l.Name) || !ValidName(l.Category) || l.Count is < 2 or > 2000))) return false;
+        if (!SocialValidation.Valid(message)) return false;
         if (message.Room is not { } room) return true;
         return room.Options is not null && ValidName(room.Options.Title) && Text(room.Code, 8) &&
             room.Phase is "waiting" or "choosing" or "drawing" or "intermission" or "results" &&
@@ -106,8 +107,9 @@ public sealed record RoomView(string Code, RoomOptions Options, string Phase, Gu
 public sealed record DrawOperation(string Tool, int X1, int Y1, int X2, int Y2, byte Color = 1, int Size = 3, Guid StrokeId = default);
 public sealed record ClientCommand(string Type, string? Text = null, RoomOptions? Options = null,
     DrawOperation? Draw = null, Guid TurnId = default, byte[]? Avatar = null, bool ResetAvatar = false, string? AvatarPreset = null,
-    BrushCursor? Cursor = null);
+    BrushCursor? Cursor = null, Guid TargetId = default, bool Enabled = false, bool Shared = false);
 public sealed record ServerEvent(string Type, RoomView? Room = null, RoomSummary[]? Rooms = null,
     ChatLine? Chat = null, DrawOperation? Draw = null, Guid? ActorId = null,
     string? Error = null, PlayerProfile? Profile = null, Guid TurnId = default, string? RejectedCommand = null,
-    WordListInfo[]? WordLists = null, byte[]? Canvas = null, bool CanUndo = false, BrushCursor? Cursor = null);
+    WordListInfo[]? WordLists = null, byte[]? Canvas = null, bool CanUndo = false, BrushCursor? Cursor = null,
+    SocialView? Social = null, SharedProfile? SharedProfile = null, GameInvitation? Invitation = null, bool Online = false);

@@ -10,9 +10,9 @@ namespace Kupopop.Server;
 public sealed record StoredAccount(PlayerProfile Profile, string AccessHash, string RecoveryHash);
 
 /// <summary>Transactional account persistence. Game rooms and scores remain ephemeral.</summary>
-public sealed class AccountStore : IDisposable
+public sealed partial class AccountStore : IDisposable
 {
-    private const int SchemaVersion = 2;
+    private const int SchemaVersion = 3;
     private const int MaximumAccounts = 10_000;
     private const string ProfileColumns = "id, display_name, avatar_seed, avatar_pixels, avatar_preset";
     private readonly object gate = new();
@@ -36,6 +36,7 @@ public sealed class AccountStore : IDisposable
             Restrict(path);
             Execute("PRAGMA journal_mode=WAL; PRAGMA synchronous=FULL; PRAGMA trusted_schema=OFF;");
             Initialize(directory);
+            InitializeSocial();
             VerifyIntegrity();
         }
         catch { database.Dispose(); throw; }
@@ -50,7 +51,9 @@ public sealed class AccountStore : IDisposable
             if (Count(transaction) >= MaximumAccounts) throw new InvalidOperationException("Account capacity reached.");
             string access = Secret(), recovery = Secret();
             var profile = new PlayerProfile(Guid.NewGuid(), displayName.Trim(), RandomNumberGenerator.GetInt32(int.MaxValue));
+            EnsureNameAvailable(profile.DisplayName, profile.Id, transaction);
             Insert(new(profile, Hash(access), Hash(recovery)), transaction);
+            SetNameKey(profile, transaction);
             transaction.Commit();
             return new(profile.Id, access, recovery, profile);
         }
@@ -128,6 +131,8 @@ public sealed class AccountStore : IDisposable
                 AvatarPixels = reset || preset is not null ? null : avatar ?? current.AvatarPixels,
                 AvatarPreset = reset || avatar is not null ? null : preset ?? current.AvatarPreset,
             };
+            EnsureNameAvailable(profile.DisplayName, id, transaction);
+            SetNameKey(profile, transaction);
             using var command = Command("UPDATE accounts SET display_name=$name, avatar_pixels=$pixels, avatar_preset=$preset WHERE id=$id", transaction);
             command.Parameters.AddWithValue("$id", id.ToString());
             command.Parameters.AddWithValue("$name", profile.DisplayName);
@@ -179,7 +184,7 @@ public sealed class AccountStore : IDisposable
     {
         using var versionQuery = Command("PRAGMA user_version");
         int version = Convert.ToInt32(versionQuery.ExecuteScalar());
-        if (version == SchemaVersion) return;
+        if (version is 2 or SchemaVersion) return;
         if (version == 1)
         {
             // SQLite counts Unicode scalars; .NET string limits count UTF-16
@@ -187,7 +192,7 @@ public sealed class AccountStore : IDisposable
             using var upgrade = database.BeginTransaction();
             CreateTable("accounts_upgrade", upgrade);
             Execute("INSERT INTO accounts_upgrade SELECT * FROM accounts; DROP TABLE accounts; ALTER TABLE accounts_upgrade RENAME TO accounts;", upgrade);
-            Execute($"PRAGMA user_version={SchemaVersion}", upgrade);
+            Execute($"PRAGMA user_version=2", upgrade);
             upgrade.Commit();
             return;
         }
@@ -197,7 +202,7 @@ public sealed class AccountStore : IDisposable
         CreateTable("accounts", transaction, ifMissing: true);
         if (Count(transaction) != 0) throw new InvalidDataException("Unversioned account database contains data; automatic import refused.");
         ImportLegacy(Path.Combine(directory, "accounts.json"), transaction);
-        Execute($"PRAGMA user_version={SchemaVersion}", transaction);
+        Execute($"PRAGMA user_version=2", transaction);
         transaction.Commit();
     }
 

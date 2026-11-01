@@ -104,6 +104,7 @@ RoomRulesChecks.Run(working, Check);
 PolishChecks.Run(working, Check);
 RateLimitChecks.Run(Check);
 StorageChecks.Run(working, Check);
+SocialChecks.Run(working, Check);
 var credentials = Enumerable.Range(0, 18).Select(i => accounts.Create("Artist " + i)).ToArray();
 string accountFile = ReadShared(Path.Combine(working, "accounts", "accounts.db")) +
     ReadShared(Path.Combine(working, "accounts", "accounts.db-wal"));
@@ -306,6 +307,24 @@ try
         "server file diagnostics exclude credentials, private chat, and answers");
     Check((await http.PostAsJsonAsync("/api/accounts", new AccountRequest("Cache Test"))).Headers.CacheControl?.NoStore == true,
         "account credential responses cannot be cached");
+    await second.ConnectAsync(two.AccessToken);
+    await third.ConnectAsync(three.AccessToken);
+    await WaitEvent(third, e => e.Room?.Players.Length == 2);
+    await second.CloseAsync();
+    await WaitEvent(third, e => e.Room?.Players.Length == 1);
+    Check(!second.Connected, "normal client window closure disconnects and removes membership over a real WebSocket");
+    using var reopened = new RemoteClient(http.BaseAddress!, allowTestHttp: true);
+    await reopened.ConnectAsync(two.AccessToken);
+    await WaitEvent(reopened, e => e.Type == "profile");
+    reopened.Send(new("create", Options: new("Reopened room")));
+    Check((await WaitEvent(reopened, e => e.Room is not null)).Room!.Options.Title == "Reopened room",
+        "a reopened client can create a fresh room instead of silently rejoining its old one");
+    bool cannotReconnect = false;
+    try { await second.ConnectAsync(two.AccessToken); } catch (ObjectDisposedException) { cannotReconnect = true; }
+    Check(cannotReconnect, "a closed client cannot reconnect from stale asynchronous work");
+    await reopened.CloseAsync();
+    Check((await http.GetAsync("/status")).StatusCode == HttpStatusCode.NotFound,
+        "operational monitoring has no public HTTP endpoint");
 }
 finally
 {

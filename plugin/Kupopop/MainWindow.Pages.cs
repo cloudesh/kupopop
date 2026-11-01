@@ -60,6 +60,7 @@ public sealed partial class MainWindow
                 else if (ShowDebug) Preferences();
                 else if (screen == "welcome") Welcome();
                 else if (screen == "profile") ProfileScreen();
+                else if (screen == "friends") FriendsScreen();
                 else if (screen == "game" && room is not null) Game();
                 else if (screen == "public") PublicRooms();
                 else if (screen == "create") CreateRoomScreen();
@@ -68,6 +69,7 @@ public sealed partial class MainWindow
         }
         UiChrome.Footer(position, position + ImGui.GetWindowSize(), "v" + UiVersion, IsPinned);
         DrawToasts();
+        SharedProfilePopup();
     }
 
     private void DrawHeader()
@@ -110,7 +112,7 @@ public sealed partial class MainWindow
                 if (ToolAction(FontAwesomeIcon.Thumbtack, IsPinned ? "Unpin book" : "Pin book", IsPinned))
                 { IsPinned = !IsPinned; plugin.Config.PaperPinned = IsPinned; plugin.Save(); }
                 ImGui.SameLine();
-                if (ToolAction(FontAwesomeIcon.Times, "Close book")) IsOpen = false;
+                if (ToolAction(FontAwesomeIcon.Times, "Close book")) { IsOpen = false; SynchronizeVisibility(); }
             }
         }
         finally { ImGui.EndTable(); }
@@ -120,14 +122,17 @@ public sealed partial class MainWindow
     {
         string play = room is null ? "Play" : "Your room";
         var start = ImGui.GetCursorScreenPos();
-        float width = ImGui.CalcTextSize(play).X + ImGui.CalcTextSize("Profile").X + UiTheme.S(58);
+        float width = ImGui.CalcTextSize(play).X + ImGui.CalcTextSize("ProfileFriends").X + UiTheme.S(86);
         ImGui.GetWindowDrawList().AddRectFilled(start - UiTheme.V(3, 3), start + new Vector2(width, UiTheme.S(33)),
             UiTheme.C(UiPresentation.Alpha(UiTheme.Inset, 0.55f)), UiTheme.S(7));
-        if (UiTheme.Tab(play, !ShowDebug && screen != "profile"))
+        if (UiTheme.Tab(play, !ShowDebug && screen is not ("profile" or "friends")))
         { ShowDebug = false; screen = room is null ? "menu" : "game"; }
         ImGui.SameLine(0, UiTheme.S(2));
         using (ImRaii.Disabled(profile is null))
             if (UiTheme.Tab("Profile", !ShowDebug && screen == "profile")) { ShowDebug = false; OpenProfile(); }
+        ImGui.SameLine(0, UiTheme.S(2));
+        using (ImRaii.Disabled(profile is null))
+            if (UiTheme.Tab("Friends", !ShowDebug && screen == "friends")) OpenFriends();
     }
 
     private void ConnectingScreen()
@@ -213,13 +218,16 @@ public sealed partial class MainWindow
             {
                 if (card.Success)
                 {
-                    art.Heading("Join via code");
-                    UiTheme.Wrapped("Enter a code from your friend below to play.", UiTheme.Muted);
+                    var invitation = ActiveInvitations().FirstOrDefault();
+                    art.Heading(invitation is null ? "Join via code" : "You're invited!");
+                    UiTheme.Wrapped(invitation is null ? "Enter a code from your friend below to play." : invitation.From.DisplayName + " invited you to " + invitation.RoomTitle, UiTheme.Muted);
                     UiTheme.Gap(10);
-                    UiTheme.Field("Room code", "##room-code", ref joinCode, 12, "Enter your room code");
+                    if (invitation is null) UiTheme.Field("Room code", "##room-code", ref joinCode, 12, "Enter your room code");
+                    else if (UiTheme.Button("Dismiss invitation", 0, quiet: true)) Send(new("dismiss-invite", TargetId: invitation.Id));
                     CardActionPosition();
-                    using (ImRaii.Disabled(client?.Connected != true || string.IsNullOrWhiteSpace(joinCode)))
-                        if (UiTheme.NoteButton("Join room", ImGui.GetContentRegionAvail().X, UiTheme.StickyYellow, primary: true)) Send(new("join", Text: joinCode));
+                    using (ImRaii.Disabled(client?.Connected != true || invitation is null && string.IsNullOrWhiteSpace(joinCode)))
+                        if (UiTheme.NoteButton(invitation is null ? "Join room" : "Join invited game", ImGui.GetContentRegionAvail().X, UiTheme.StickyYellow, primary: true))
+                            Send(invitation is null ? new("join", Text: joinCode) : new("accept-invite", TargetId: invitation.Id));
                 }
             }
             ImGui.TableNextColumn();
@@ -296,6 +304,7 @@ public sealed partial class MainWindow
                     UiRoomSettings.Basic(ref seconds, ref rounds, ref capacity);
                     UiTheme.Gap(12);
                     ImGui.Checkbox("Public lobby", ref publicRoom);
+                    if (!editing) ImGui.Checkbox("Invite friends after creating", ref inviteAfterCreate);
                     UiTheme.Wrapped(publicRoom
                         ? "Anyone can see the room name and player count. Your profile is visible after they join."
                         : "Private room. Only people with your code can join.", UiTheme.Muted);
@@ -425,11 +434,10 @@ public sealed partial class MainWindow
         {
             string invitation = "No rooms available, would you like to make your own?";
             float width = Math.Min(UiTheme.S(430), ImGui.GetContentRegionAvail().X);
-            var text = ImGui.CalcTextSize(invitation, false, width);
-            var origin = ImGui.GetCursorScreenPos() + new Vector2(Math.Max(0, (ImGui.GetContentRegionAvail().X - width) / 2), Math.Max(0, (ImGui.GetContentRegionAvail().Y - text.Y - UiTheme.S(52)) / 2));
-            ImGui.SetCursorScreenPos(origin);
-            ImGui.PushTextWrapPos(ImGui.GetCursorPosX() + width); ImGui.TextUnformatted(invitation); ImGui.PopTextWrapPos();
-            ImGui.SetCursorScreenPos(origin + new Vector2(Math.Max(0, (width - UiTheme.S(160)) / 2), text.Y + UiTheme.S(14)));
+            float textHeight = ImGui.CalcTextSize(invitation, false, width).Y;
+            var origin = ImGui.GetCursorScreenPos() + new Vector2(Math.Max(0, (ImGui.GetContentRegionAvail().X - width) / 2), Math.Max(0, (ImGui.GetContentRegionAvail().Y - textHeight - UiTheme.S(52)) / 2));
+            UiPresentation.DrawCenteredText(invitation, origin, new Vector2(width, textHeight));
+            ImGui.SetCursorScreenPos(origin + new Vector2(Math.Max(0, (width - UiTheme.S(160)) / 2), textHeight + UiTheme.S(14)));
             if (UiTheme.Button("Host Room", UiTheme.S(160), primary: true)) OpenRoomSetup(publicByDefault: true);
             return;
         }
@@ -498,6 +506,7 @@ public sealed partial class MainWindow
                 using (ImRaii.Disabled(online < 2 || client?.Connected != true))
                     if (UiTheme.Button(state.Phase == "results" ? "Play again" : "Start drawing", 0, primary: true)) Send(new("start"));
                 ImGui.SameLine(); if (UiTheme.Button("Room settings", 0, quiet: true)) { EditRoomSettings(); return; }
+                ImGui.SameLine(); if (UiTheme.Button("Invite friends", 0, quiet: true)) { OpenFriends(); return; }
                 if (online < 2) { ImGui.SameLine(); ImGui.AlignTextToFramePadding(); UiTheme.Caption("Invite another artist to begin."); }
             }
             else UiTheme.Caption("Waiting for the host to start.");
@@ -548,9 +557,10 @@ public sealed partial class MainWindow
             ImGui.TextColored(player.Solved ? UiTheme.Green : UiTheme.Muted, $"{player.Score:N0} pts");
             ImGui.EndGroup();
             ImGui.EndGroup();
-            if (state.HostId == device?.AccountId && player.Profile.Id != device?.AccountId && ImGui.BeginPopupContextItem("artist-actions"))
+            if (player.Profile.Id != device?.AccountId && ImGui.BeginPopupContextItem("artist-actions"))
             {
-                if (ImGui.MenuItem("Kick from room")) Send(new("kick", Text: player.Profile.Id.ToString()));
+                SocialActions(player.Profile.Id);
+                if (state.HostId == device?.AccountId && ImGui.MenuItem("Kick from room")) Send(new("kick", Text: player.Profile.Id.ToString()));
                 ImGui.EndPopup();
             }
             UiTheme.Rule();
@@ -680,6 +690,7 @@ public sealed partial class MainWindow
             UiTheme.Gap(4);
             UiTheme.Field("Display name", "##profile-name", ref displayName, 40, "Your artist name");
             UiTheme.Wrapped("Character unverified. Your name and avatar are shared with the people in your room.", UiTheme.Muted);
+            ProfilePrivacyControls();
             UiTheme.Gap(6);
             using (ImRaii.Disabled(savingProfile || client?.Connected != true || !Protocol.ValidName(displayName)))
                 if (UiTheme.NoteButton(savingProfile ? "Saving..." : "Save my profile", ImGui.GetContentRegionAvail().X, UiTheme.StickyRose, primary: true))
@@ -692,8 +703,8 @@ public sealed partial class MainWindow
             using (ImRaii.Disabled(busy || device is null || client?.Connected != true))
                 if (UiTheme.NoteButton("Replace recovery code", ImGui.GetContentRegionAvail().X, UiTheme.StickyRose))
                 {
-                    var activeClient = client!; string token = device!.AccessToken;
-                    Work(async () => await AcceptCredentials(await activeClient.RotateRecoveryAsync(token)), "Replacing recovery code");
+                    string token = device!.AccessToken;
+                    Work(async (active, complete) => await AcceptCredentials(active, complete, await active.RotateRecoveryAsync(token)), "Replacing recovery code");
                 }
         }
         finally { ImGui.EndTable(); }

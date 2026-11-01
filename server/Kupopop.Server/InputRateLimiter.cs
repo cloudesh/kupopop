@@ -25,6 +25,8 @@ public sealed class InputRateLimiter(TimeProvider? provider = null)
             "shape" => ("shape", 16d, 4d),
             "fill" => ("fill", 16d, 4d),
             "cursor" => ("cursor", 50d, 25d),
+            "friend-request" => ("friend-requests", 3d, 0.05d),
+            "invite" => ("invitations", 5d, 0.2d),
             _ => ("commands", 8d, 8d),
         };
         if (!buckets.TryGetValue(key, out var bucket)) buckets[key] = bucket = new(capacity, now);

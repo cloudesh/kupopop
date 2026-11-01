@@ -3,7 +3,7 @@ using Kupopop.Shared;
 
 namespace Kupopop.Server;
 
-public sealed class GameEngine(AccountStore accounts, ILogger<GameEngine> log, TimeProvider clock, WordBank? wordBank = null,
+public sealed partial class GameEngine(AccountStore accounts, ILogger<GameEngine> log, TimeProvider clock, WordBank? wordBank = null,
     Func<int>? customWordRoll = null)
 {
     private sealed class Member(Guid id)
@@ -17,6 +17,9 @@ public sealed class GameEngine(AccountStore accounts, ILogger<GameEngine> log, T
 
     private sealed class Room(string code, Guid host, RoomOptions options)
     {
+        public long MonitorId;
+        public HashSet<Guid> StatsParticipants = [];
+        public bool StatsRecorded;
         public string Code = code;
         public Guid Host = host;
         public RoomOptions Options = options;
@@ -52,6 +55,7 @@ public sealed class GameEngine(AccountStore accounts, ILogger<GameEngine> log, T
     private readonly object gate = new();
     private readonly Dictionary<Guid, IGamePeer> peers = [];
     private readonly Dictionary<string, Room> rooms = new(StringComparer.OrdinalIgnoreCase);
+    private long nextMonitorId;
     private readonly WordBank words = wordBank ?? WordBank.Starter();
     private sealed class KickBallot(Guid target, Guid[] eligible, int required, DateTimeOffset expires)
     {
@@ -62,6 +66,16 @@ public sealed class GameEngine(AccountStore accounts, ILogger<GameEngine> log, T
         public DateTimeOffset Expires = expires;
     }
     private DateTimeOffset Now => clock.GetUtcNow();
+
+    public ServerStatus GetStatus(TimeSpan uptime, bool running = true)
+    {
+        lock (gate)
+            return new(Now, running, (long)uptime.TotalSeconds, peers.Count,
+                peers.Values.Count(p => p.RoomCode is null), rooms.Values.Select(r => new RoomStatus(
+                    r.MonitorId, r.Options.IsPublic, r.Phase, r.Members.Values.Count(m => m.Connected),
+                    r.Members.Count, r.Options.MaxPlayers, r.RotationSize > 0 ? Math.Min(r.Options.Rounds, r.Position / r.RotationSize + 1) : 0,
+                    r.Options.Rounds)).ToArray());
+    }
 
     public bool TryAttach(IGamePeer peer, string accessToken)
     {
@@ -92,15 +106,28 @@ public sealed class GameEngine(AccountStore accounts, ILogger<GameEngine> log, T
                 BroadcastState(room, except: peer.Id);
             }
             log.LogInformation("Connection attached. Online={Online} Rooms={Rooms}", peers.Count, rooms.Count);
+            SendSocial(peer);
+            RefreshFriends(peer.Id, presenceOnly: true);
         }
     }
 
-    public void Detach(IGamePeer peer)
+    public void Detach(IGamePeer peer, bool intentional = false)
     {
         lock (gate)
         {
             if (!peers.TryGetValue(peer.Id, out var active) || !ReferenceEquals(active, peer)) return;
             peers.Remove(peer.Id);
+            invitations.Remove(peer.Id);
+            nextInvitation.Remove(peer.Id);
+            if (intentional) recentPlayers.Remove(peer.Id);
+            RefreshFriends(peer.Id, presenceOnly: true);
+            if (intentional && FindRoom(peer) is { } leaving)
+            {
+                Remove(leaving, peer.Id);
+                peer.RoomCode = null;
+                log.LogInformation("Window closed. Online={Online} Rooms={Rooms}", peers.Count, rooms.Count);
+                return;
+            }
             if (FindRoom(peer) is { } room && room.Members.TryGetValue(peer.Id, out var member))
             {
                 member.Connected = false;
@@ -130,6 +157,21 @@ public sealed class GameEngine(AccountStore accounts, ILogger<GameEngine> log, T
             {
                 switch (command.Type)
                 {
+                    case "social": SendSocial(peer); break;
+                    case "friend-request": ChangeFriend(peer, command.TargetId, "request"); break;
+                    case "friend-accept": ChangeFriend(peer, command.TargetId, "accept"); break;
+                    case "friend-remove": ChangeFriend(peer, command.TargetId, "remove"); break;
+                    case "view-profile": ViewProfile(peer, command.TargetId); break;
+                    case "profile-privacy":
+                        accounts.SetPreferences(peer.Id, command.Enabled, command.Shared, command.ResetAvatar);
+                        foreach (var activeRoom in rooms.Values) activeRoom.StatsParticipants.Remove(peer.Id);
+                        SendSocial(peer); ViewProfile(peer, peer.Id);
+                        break;
+                    case "invite": Invite(peer, room, command.TargetId); break;
+                    case "accept-invite": AcceptInvitation(peer, room, command.TargetId); break;
+                    case "dismiss-invite":
+                        if (invitations.TryGetValue(peer.Id, out var inbox)) inbox.RemoveAll(i => i.View.Id == command.TargetId);
+                        SendSocial(peer); break;
                     case "list":
                         peer.Send(new("rooms", Rooms: rooms.Values.Where(r => r.Options.IsPublic)
                             .Select(r => new RoomSummary(r.Code, r.Options.Title,
@@ -142,6 +184,7 @@ public sealed class GameEngine(AccountStore accounts, ILogger<GameEngine> log, T
                         string code;
                         do code = Convert.ToHexString(RandomNumberGenerator.GetBytes(4)); while (rooms.ContainsKey(code));
                         room = new(code, peer.Id, options);
+                        room.MonitorId = ++nextMonitorId;
                         room.Members[peer.Id] = new(peer.Id);
                         rooms[code] = room;
                         peer.RoomCode = code;
@@ -156,6 +199,7 @@ public sealed class GameEngine(AccountStore accounts, ILogger<GameEngine> log, T
                         if (room.Members.Count >= room.Options.MaxPlayers) throw new ArgumentException("Room is full.");
                         room.Members[peer.Id] = new(peer.Id);
                         peer.RoomCode = room.Code;
+                        RememberRoom(room);
                         State(room, peer, snapshot: true);
                         SystemMessage(room, "A player joined the room.");
                         BroadcastState(room, except: peer.Id);
@@ -172,6 +216,8 @@ public sealed class GameEngine(AccountStore accounts, ILogger<GameEngine> log, T
                         if (participants.Length < 2) throw new ArgumentException("At least two connected players are needed.");
                         foreach (var member in room.Members.Values) { member.Score = 0; member.Solved = false; }
                         room.MatchScores = participants.ToDictionary(id => id, id => new SolveResult(id, accounts.Get(id)!.DisplayName, 0));
+                        room.StatsParticipants = participants.Where(id => accounts.Preferences(id).TrackStats).ToHashSet();
+                        room.StatsRecorded = false;
                         room.Results = [];
                         room.Deck = [];
                         for (int i = 0; i < room.Options.Rounds; i++) room.Deck.AddRange(participants);
@@ -241,6 +287,7 @@ public sealed class GameEngine(AccountStore accounts, ILogger<GameEngine> log, T
                         var profile = accounts.Update(peer.Id, command.Text, command.Avatar, command.ResetAvatar, command.AvatarPreset);
                         peer.Send(new("profile", Profile: profile));
                         if (room is not null) BroadcastState(room);
+                        RefreshFriends(peer.Id);
                         break;
                     case "kick":
                         RequireHost(peer, room);
@@ -268,7 +315,10 @@ public sealed class GameEngine(AccountStore accounts, ILogger<GameEngine> log, T
             foreach (var room in rooms.Values.ToArray())
             {
                 foreach (var member in room.Members.Values.Where(m => !m.Connected && Now - m.DisconnectedAt > TimeSpan.FromSeconds(30)).ToArray())
+                {
                     Remove(room, member.Id);
+                    recentPlayers.Remove(member.Id);
+                }
                 if (!rooms.ContainsKey(room.Code)) continue;
                 if (room.Members.Values.All(m => !m.Connected))
                 {
@@ -352,6 +402,11 @@ public sealed class GameEngine(AccountStore accounts, ILogger<GameEngine> log, T
             room.Deadline = default;
             room.CustomWordAvailable = false;
             room.Results = room.MatchScores.Values.OrderByDescending(s => s.Points).ThenBy(s => s.Name, StringComparer.Ordinal).ToArray();
+            if (!room.StatsRecorded && room.Position >= room.Deck.Count && room.Results.Length >= 2)
+            {
+                accounts.RecordMatch(room.Results, room.StatsParticipants);
+                room.StatsRecorded = true;
+            }
             SystemMessage(room, "Match finished! The host can start another match.");
             BroadcastState(room);
             log.LogInformation("Match finished. Players={Players}", room.Members.Count);

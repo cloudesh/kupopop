@@ -12,7 +12,8 @@ public sealed partial class MainWindow : Window, IDisposable
     private readonly Plugin plugin;
     private readonly DiagnosticLog log;
     private readonly CredentialVault vault;
-    private readonly ConcurrentQueue<Action> actions = new();
+    private readonly ConcurrentQueue<(RemoteClient Owner, Action Apply)> actions = new();
+    private readonly ConcurrentQueue<(RemoteClient Owner, AccountCredentials Credentials)> pendingCredentials = new();
     private readonly CanvasWidget painting = new();
     private readonly CanvasWidget avatarEditor = new();
     private readonly PixelCanvas canvas = new();
@@ -30,6 +31,7 @@ public sealed partial class MainWindow : Window, IDisposable
     private readonly UiAssets art;
     private readonly List<ChatLine> chat = [];
     private RemoteClient? client;
+    private Task sessionClosing = Task.CompletedTask;
     private DeviceAccount? device;
     private PlayerProfile? profile;
     private RoomView? room;
@@ -70,7 +72,36 @@ public sealed partial class MainWindow : Window, IDisposable
         vault = new(directory);
         Size = UiWindowGeometry.DefaultSize;
         SizeCondition = ImGuiCond.FirstUseEver;
-        ConfigureClient();
+        IsOpen = false;
+    }
+
+    public override void OnOpen() => SynchronizeVisibility();
+    public override void OnClose() => CloseSession();
+
+    public void SynchronizeVisibility()
+    {
+        if (disposed || !IsOpen) { CloseSession(); return; }
+        if (client is null && sessionClosing.IsCompleted) ConfigureClient();
+    }
+
+    private void CloseSession()
+    {
+        var closing = client;
+        client = null;
+        room = null; profile = null; device = null;
+        chat.Clear(); publicRooms = [];
+        social = null; sharedProfile = null; showSharedProfile = false;
+        serviceAvailable = sessionReady = busy = savingProfile = savingRoomSettings = false;
+        painting.RemoteCursor = null;
+        undoPending = canUndoDrawing = false;
+        updateCheckPending = false;
+        if (closing is not null)
+        {
+            // CloseAsync stops HTTP work immediately and sends a normal WebSocket
+            // close so the server removes membership without reconnect grace.
+            sessionClosing = closing.CloseAsync();
+            log.Write("client.window_closed");
+        }
     }
 
     private void ConfigureClient()
@@ -78,7 +109,9 @@ public sealed partial class MainWindow : Window, IDisposable
         client?.Dispose();
         client = null; device = null; profile = null; room = null;
         serviceAvailable = sessionReady = false;
-        newRecovery = "";
+        busy = false;
+        connectionRetry.Connected();
+        heartbeatAt = 0;
         chat.Clear();
         try
         {
@@ -104,8 +137,21 @@ public sealed partial class MainWindow : Window, IDisposable
 
     public void PollNetwork()
     {
-        if (!IsOpen) return;
-        while (actions.TryDequeue(out var action)) if (!disposed) action();
+        SynchronizeVisibility();
+        if (disposed || !IsOpen) return;
+        while (pendingCredentials.TryDequeue(out var pending))
+        {
+            // A completed recovery must not lose its new code when the user
+            // closes the window while the HTTP response is arriving.
+            if (!ReferenceEquals(pending.Owner, client)) ConfigureClient();
+            var result = pending.Credentials;
+            device = new(result.AccountId, result.AccessToken);
+            profile = result.Profile; displayName = result.Profile.DisplayName;
+            newRecovery = result.RecoveryCode; recoveryInput = ""; savedRecovery = revealRecovery = false;
+            sessionDeadline = Environment.TickCount64 + 15000;
+        }
+        while (actions.TryDequeue(out var action))
+            if (ReferenceEquals(action.Owner, client)) action.Apply();
         int budget = 256;
         while (budget-- > 0 && client?.TryRead(out var message) == true)
         {
@@ -116,20 +162,22 @@ public sealed partial class MainWindow : Window, IDisposable
         if (now - remoteCursorAt > 2000) painting.RemoteCursor = null;
         if (!updateCheckPending && now >= nextUpdateCheck)
         {
+            var owner = client!;
             updateCheckPending = true; nextUpdateCheck = now + 600000;
             _ = Task.Run(async () =>
             {
                 try
                 {
                     var newer = await updates.CheckAsync(typeof(Plugin).Assembly.GetName().Version ?? new Version(0, 0));
-                    if (newer is not null) actions.Enqueue(() =>
+                    if (newer is not null) actions.Enqueue((owner, () =>
                     {
                         if (plugin.Config.DismissedUpdate != newer.ToString())
                             toasts.Show("update:" + newer, "An update is available", $"Kupo Skribbl {(newer.Build >= 0 ? newer.ToString(3) : newer.ToString())} is ready. Update through the Dalamud plugin installer.");
-                    });
+                    }
+                        ));
                 }
                 catch (Exception ex) { if (!disposed) log.Write("update.check_failed", ex); }
-                finally { actions.Enqueue(() => updateCheckPending = false); }
+                finally { actions.Enqueue((owner, () => updateCheckPending = false)); }
             });
         }
         if (client?.Connected == true)
@@ -137,7 +185,7 @@ public sealed partial class MainWindow : Window, IDisposable
             if (!sessionReady && !busy && now >= sessionDeadline)
             {
                 connectionStatus = "The server took too long to load your profile. Trying again...";
-                Work(async () => await client.DisconnectAsync(), "Reconnecting");
+                Work(async (active, _) => await active.DisconnectAsync(), "Reconnecting");
             }
             if (now - heartbeatAt > 15000) { Send(new("ping")); heartbeatAt = now; }
         }
@@ -154,6 +202,7 @@ public sealed partial class MainWindow : Window, IDisposable
     private void HandleEvent(ServerEvent message)
     {
         received++;
+        if (HandleSocialEvent(message)) return;
         switch (message.Type)
         {
             case "profile":
@@ -175,8 +224,11 @@ public sealed partial class MainWindow : Window, IDisposable
                 if (state.Cursor is { } brush && state.DrawerId != device?.AccountId)
                 { painting.RemoteCursor = brush; remoteCursorAt = Environment.TickCount64; }
                 room = state;
+                if (differentRoom) Send(new("social"));
                 serverOffset = state.ServerTime - DateTimeOffset.UtcNow;
-                if (screen != "profile" && !(screen == "create" && !differentRoom && state.Phase is "waiting" or "results")) screen = "game";
+                if (screen is not ("profile" or "friends") && !(screen == "create" && !differentRoom && state.Phase is "waiting" or "results")) screen = "game";
+                if (differentRoom && inviteAfterCreate && state.HostId == device?.AccountId)
+                { inviteAfterCreate = false; OpenFriends(); }
                 log.Write($"room.state phase={state.Phase} round={state.Round} players={state.Players.Length} canvas_reset={state.ResetCanvas}");
                 break;
             case "draw" when message.Draw is { } op:
@@ -228,29 +280,21 @@ public sealed partial class MainWindow : Window, IDisposable
     private void CreateAccount(bool recovering)
     {
         if (client is null) return;
-        var activeClient = client;
         string name = displayName, code = recoveryInput;
-        Work(async () =>
+        Work(async (activeClient, complete) =>
         {
             var result = recovering ? await activeClient.RecoverAsync(code) : await activeClient.CreateAsync(name);
-            await AcceptCredentials(result);
+            await AcceptCredentials(activeClient, complete, result);
         }, recovering ? "Recovering account" : "Creating account");
     }
 
-    private async Task AcceptCredentials(AccountCredentials result)
+    private async Task AcceptCredentials(RemoteClient activeClient, Action<Action> complete, AccountCredentials result)
     {
         var saved = new DeviceAccount(result.AccountId, result.AccessToken);
         vault.Save(endpoint!, saved);
-        actions.Enqueue(() =>
-        {
-            device = saved; profile = result.Profile; displayName = result.Profile.DisplayName;
-            newRecovery = result.RecoveryCode; recoveryInput = ""; savedRecovery = false; revealRecovery = false;
-            sessionReady = false;
-            sessionDeadline = Environment.TickCount64 + 15000;
-            connectionRetry.Connected();
-        });
-        await client!.ConnectAsync(result.AccessToken);
-        actions.Enqueue(() => NotifyStatus("Account ready. Save the recovery code below."));
+        pendingCredentials.Enqueue((activeClient, result));
+        await activeClient.ConnectAsync(result.AccessToken);
+        complete(() => NotifyStatus("Account ready. Save the recovery code below."));
     }
 
     private void Connect()
@@ -261,13 +305,12 @@ public sealed partial class MainWindow : Window, IDisposable
         if (device is not null) { room = null; chat.Clear(); if (screen == "game") screen = "menu"; }
         sessionReady = false;
         connectionStatus = device is null ? "Checking the game service..." : "Signing in to your Kupopop profile...";
-        var activeClient = client;
         string? token = device?.AccessToken;
-        Work(async () =>
+        Work(async (activeClient, complete) =>
         {
             await activeClient.CheckHealthAsync();
             if (token is not null) await activeClient.ConnectAsync(token);
-            actions.Enqueue(() =>
+            complete(() =>
             {
                 serviceAvailable = true;
                 sessionDeadline = Environment.TickCount64 + 15000;
@@ -297,20 +340,25 @@ public sealed partial class MainWindow : Window, IDisposable
         return sent;
     }
 
-    private void Work(Func<Task> operation, string label)
+    private void Work(Func<RemoteClient, Action<Action>, Task> operation, string label)
     {
-        if (busy) return;
+        if (busy || !IsOpen || client is null) return;
+        var owner = client;
+        void Complete(Action apply) => actions.Enqueue((owner, apply));
         busy = true;
         if (label != "Connecting") NotifyStatus(label + "...");
         _ = Task.Run(async () =>
         {
-            try { await operation().ConfigureAwait(false); }
+            try { await operation(owner, Complete).ConfigureAwait(false); }
             catch (Exception ex)
             {
+                if (!ReferenceEquals(owner, client)) return;
                 log.Write("client.operation_failed category=" + label, ex);
-                actions.Enqueue(() =>
+                Complete(() =>
                 {
-                    if (label != "Connecting") NotifyStatus($"{label} failed. Please try again. Details were saved to the diagnostic log.", error: true);
+                    if (label != "Connecting") NotifyStatus(ex is HttpRequestException { StatusCode: System.Net.HttpStatusCode.Conflict }
+                        ? "That display name is unavailable. Please choose another."
+                        : $"{label} failed. Please try again. Details were saved to the diagnostic log.", error: true);
                     if (label == "Connecting" || ex is HttpRequestException { StatusCode: null } or OperationCanceledException)
                     {
                         sessionReady = serviceAvailable = false;
@@ -327,14 +375,14 @@ public sealed partial class MainWindow : Window, IDisposable
                     }
                 });
             }
-            finally { actions.Enqueue(() => busy = false); }
+            finally { Complete(() => busy = false); }
         });
     }
 
     public void Dispose()
     {
+        CloseSession();
         disposed = true;
-        client?.Dispose();
         updates.Dispose();
         painting.Dispose(); avatarEditor.Dispose(); avatars.Dispose(); art.Dispose();
         newRecovery = ""; recoveryInput = "";

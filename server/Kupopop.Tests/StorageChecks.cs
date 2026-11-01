@@ -96,7 +96,9 @@ static class StorageChecks
         }
         using (var previousSchema = Open(Path.Combine(unicodeRoot, "accounts.db")))
         {
-            using var schema = previousSchema.CreateCommand(); schema.CommandText = "PRAGMA user_version=1"; schema.ExecuteNonQuery();
+            using var schema = previousSchema.CreateCommand();
+            schema.CommandText = "DROP TABLE account_names; DROP TABLE preferences; DROP TABLE lifetime; DROP TABLE relationships; PRAGMA user_version=1";
+            schema.ExecuteNonQuery();
         }
         using (var upgraded = new AccountStore(unicodeRoot))
             check(upgraded.Count() == 1 && upgraded.Create("🎭").Profile.DisplayName == "🎭", "schema upgrade preserves existing rows and Unicode-compatible name constraints");
