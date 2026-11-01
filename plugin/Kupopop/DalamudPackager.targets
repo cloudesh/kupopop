@@ -1,0 +1,15 @@
+<Project>
+  <!-- Keep the local/dev icon in the ZIP, rather than moving it beside the archive. -->
+  <Target Name="PackageKupoSkribbl" AfterTargets="Build">
+    <PropertyGroup>
+      <KupoMakeZip>false</KupoMakeZip>
+      <KupoMakeZip Condition="'$(Configuration)' == 'Release'">true</KupoMakeZip>
+    </PropertyGroup>
+    <DalamudPackager ProjectDir="$(ProjectDir)" OutputPath="$(OutputPath)"
+      AssemblyName="$(AssemblyName)" MakeZip="$(KupoMakeZip)" HandleImages="false"
+      Include="$(AssemblyName).dll;$(AssemblyName).deps.json;$(AssemblyName).json;Kupopop.Shared.dll;images/icon.png"
+      Author="$(Author)" Name="$(Name)" Punchline="$(Punchline)" Description="$(Description)"
+      ApplicableVersion="$(ApplicableVersion)" RepoUrl="$(RepoUrl)" Tags="$(Tags)"
+      DalamudApiLevel="$(DalamudApiLevel)" IconUrl="$(IconUrl)" />
+  </Target>
+</Project>

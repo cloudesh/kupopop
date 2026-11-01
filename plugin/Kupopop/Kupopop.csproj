@@ -6,7 +6,7 @@
     <Description>Kupo Skribbl is a drawing and guessing pictionary game. Each player takes turns to draw their chosen word and others have to guess it to gain points! The person with the most points is the winner!
 
 Open with /kupopop or /kuposkribbl.</Description>
-    <IconUrl>https://raw.githubusercontent.com/cloudesh/kupopop/main/plugin/images/icon.png</IconUrl>
+    <IconUrl>https://raw.githubusercontent.com/cloudesh/kupopop/main/plugin/images/icon.png?v=$(Version)</IconUrl>
     <RepoUrl>https://github.com/cloudesh/kupopop</RepoUrl>
     <Tags>drawing;game;multiplayer;social</Tags>
     <Use_Dalamud_FFXIVClientStructs>false</Use_Dalamud_FFXIVClientStructs>
@@ -18,4 +18,5 @@ Open with /kupopop or /kuposkribbl.</Description>
   </PropertyGroup>
   <ItemGroup><ProjectReference Include="../Kupopop.Shared/Kupopop.Shared.csproj" /></ItemGroup>
   <ItemGroup><EmbeddedResource Include="Audio/*.wav" /></ItemGroup>
+  <ItemGroup><Content Include="../images/icon.png" Link="images/icon.png" CopyToOutputDirectory="PreserveNewest" /></ItemGroup>
 </Project>

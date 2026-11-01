@@ -61,7 +61,7 @@ public static class GameEndpoints
             {
                 while (socket.State == WebSocketState.Open)
                 {
-                    var bytes = await Protocol.ReceiveAsync(socket, 12000, stop.Token);
+                    var bytes = await peer.ReceiveAsync(stop.Token);
                     if (bytes is null) break;
                     var command = JsonSerializer.Deserialize<ClientCommand>(bytes, Protocol.Json)
                         ?? throw new InvalidDataException("Empty command.");

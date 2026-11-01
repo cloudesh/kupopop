@@ -1,10 +1,9 @@
-Kupo Skribbl 0.12.2 adds game sounds and subtle notebook polish.
+Kupo Skribbl 0.13.0 polishes the drawing book and hardens server connections.
 
-- Suggestions now aligns with the home cards, alongside your profile.
-- Faint paper fibres, pencil edges and a folded corner add a little handmade character in both themes.
-- New sounds celebrate correct guesses, the next drawing turn and top-three finishes. A separate cue marks a missed guessing timer.
-- Everyone in the room hears a correct guess, including the drawer and players who already solved the word.
-- A clock ticks once per second for the final ten seconds of drawing, stopping at zero. Missed ticks are skipped rather than replayed.
-- Sounds can be disabled in appearance settings. Reconnecting and repeated snapshots do not replay them, and closing the book stops playback.
+- Original hand-lettered title on the home page and header, with a fuller marker outline and warm rose/gold/teal accents.
+- A smiling moogle artist with a pencil, faint sketch marks on sticky notes and a small paperclip.
+- Updated transparent installer icon, a versioned icon URL and a packaged local icon. Release verification now checks the icon is included.
+- Excessive WebSocket traffic is rejected before JSON dispatch. Idle/partial messages have a finite receive deadline, and account budgets remain consistent during reconnects.
+- Existing game rules, scores, account data, privacy preferences and protocol remain unchanged.
 
-Plugin-only update; the server and protocol are unchanged. In-game verification is still needed.
+API 15 build and automated/native preview checks passed. This remains an experimental release; in-game verification is still needed.

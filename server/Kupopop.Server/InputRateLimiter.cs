@@ -12,15 +12,23 @@ public sealed class AccountInputLimits
 public sealed class InputRateLimiter(TimeProvider? provider = null)
 {
     private readonly TimeProvider clock = provider ?? TimeProvider.System;
+    private readonly object gate = new();
     private readonly Dictionary<string, Bucket> buckets = [];
     private long? profileAt;
 
     public bool Allow(string type)
     {
+        // The receive loop and engine can access the same account during a reconnect.
+        lock (gate) return AllowLocked(type);
+    }
+
+    private bool AllowLocked(string type)
+    {
         long now = clock.GetTimestamp();
         if (type == "profile" && profileAt is { } previous && clock.GetElapsedTime(previous, now).TotalSeconds < 5) return false;
         var (key, capacity, refill) = type switch
         {
+            "transport" => ("transport", 384d, 160d),
             "draw" => ("draw", 180d, 90d),
             "shape" => ("shape", 16d, 4d),
             "fill" => ("fill", 16d, 4d),

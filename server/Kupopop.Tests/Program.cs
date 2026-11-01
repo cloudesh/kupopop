@@ -104,6 +104,7 @@ RoundFlowChecks.Run(working, Check);
 RoomRulesChecks.Run(working, Check);
 PolishChecks.Run(working, Check);
 RateLimitChecks.Run(Check);
+TransportChecks.Run(Check);
 StorageChecks.Run(working, Check);
 SocialChecks.Run(working, Check);
 LeaderboardChecks.Run(working, Check);

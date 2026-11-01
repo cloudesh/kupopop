@@ -81,11 +81,8 @@ public sealed partial class MainWindow
             var face = ImGui.GetCursorScreenPos();
             ImGui.Dummy(UiTheme.V(211, 34));
             var afterBrand = ImGui.GetCursorScreenPos();
-            UiStationery.Moogle(face + UiTheme.V(20, 23), UiTheme.S(14), pom.Angle);
-            ImGui.SetCursorScreenPos(face + UiTheme.V(49, 0));
-            ImGui.BeginGroup();
-            art.Heading("Kupo Skribbl");
-            ImGui.EndGroup();
+            UiStationery.Logo(face + UiTheme.V(20, 23), UiTheme.S(14), pom.Angle);
+            UiBrand.Wordmark(face + UiTheme.V(46, 2), UiTheme.V(161, 30));
             ImGui.SetCursorScreenPos(afterBrand);
             ImGui.TableNextColumn();
             UiTheme.Gap(1);
@@ -214,7 +211,10 @@ public sealed partial class MainWindow
     {
         var available = ImGui.GetContentRegionAvail();
         float width = Math.Min(available.X, UiTheme.S(900));
-        var origin = ImGui.GetCursorScreenPos() + new Vector2(Math.Max(0, (available.X - width) / 2), Math.Max(0, (available.Y - UiTheme.S(310)) / 2));
+        var cover = ImGui.GetCursorScreenPos() + new Vector2(Math.Max(0, (available.X - width) / 2), Math.Max(0, (available.Y - UiTheme.S(402)) / 2));
+        UiStationery.Logo(cover + UiTheme.V(35, 44), UiTheme.S(23));
+        UiBrand.Wordmark(cover + UiTheme.V(80, 5), new Vector2(Math.Min(width - UiTheme.S(90), UiTheme.S(440)), UiTheme.S(74)), cover: true);
+        var origin = cover + UiTheme.V(0, 92);
         ImGui.SetCursorScreenPos(origin);
         if (!ImGui.BeginTable("play-actions", 3, ImGuiTableFlags.SizingStretchSame | ImGuiTableFlags.NoPadOuterX, new Vector2(width, 0))) return;
         try

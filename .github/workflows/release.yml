@@ -66,6 +66,7 @@ jobs:
           try {
             $entry = $archive.GetEntry('Kupopop.json')
             if (-not $entry) { throw 'Published ZIP has no plugin manifest.' }
+            if (-not $archive.GetEntry('images/icon.png')) { throw 'Published ZIP has no installer icon.' }
             $reader = [IO.StreamReader]::new($entry.Open())
             try { $published = $reader.ReadToEnd() | ConvertFrom-Json } finally { $reader.Dispose() }
             if ($published.AssemblyVersion -ne $manifest.AssemblyVersion -or $published.DalamudApiLevel -ne $manifest.DalamudApiLevel -or $published.Name -ne $manifest.Name -or $published.InternalName -ne $manifest.InternalName) { throw 'Published ZIP does not match the feed.' }

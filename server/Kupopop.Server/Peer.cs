@@ -31,6 +31,18 @@ public sealed class Peer(Guid id, WebSocket socket, InputRateLimiter? limiter = 
 
     public bool Allow(string type) => limits.Allow(type);
 
+    public async Task<byte[]?> ReceiveAsync(CancellationToken cancel, TimeSpan? timeout = null)
+    {
+        // Normal clients heartbeat every 15 seconds. A finite whole-message deadline
+        // also prevents a sender holding a slot open by trickling fragments.
+        using var deadline = CancellationTokenSource.CreateLinkedTokenSource(cancel);
+        deadline.CancelAfter(timeout ?? TimeSpan.FromSeconds(45));
+        var bytes = await Protocol.ReceiveAsync(Socket, 12000, deadline.Token);
+        if (bytes is not null && !Allow("transport"))
+            throw new InvalidDataException("Connection traffic budget exceeded.");
+        return bytes;
+    }
+
     public async Task PumpAsync(CancellationToken cancel)
     {
         try

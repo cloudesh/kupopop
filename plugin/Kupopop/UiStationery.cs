@@ -106,33 +106,97 @@ public static class UiStationery
         UiTheme.Gap(3);
     }
 
+    public static void SketchNote(Vector2 min, Vector2 max)
+    {
+        var draw = ImGui.GetWindowDrawList();
+        var ink = UiTheme.Ink; ink.W = UiTheme.DarkMode ? 0.12f : 0.17f;
+        uint color = UiTheme.C(ink);
+        // Short, imperfect graphite strokes stay at the edges, clear of text.
+        for (int side = 0; side < 2; side++)
+        {
+            float y = side == 0 ? min.Y + UiTheme.S(2) : max.Y - UiTheme.S(2);
+            for (int i = 0; i < 3; i++)
+            {
+                float x = min.X + UiTheme.S(6 + i * 9);
+                draw.AddBezierCubic(new(x, y), new(x + UiTheme.S(5), y - UiTheme.S(0.8f)),
+                    new(x + UiTheme.S(11), y + UiTheme.S(0.8f)), new(x + UiTheme.S(15), y), color, UiTheme.S(0.8f));
+            }
+        }
+        draw.AddLine(new(max.X - UiTheme.S(2), min.Y + UiTheme.S(21)),
+            new(max.X - UiTheme.S(1.5f), min.Y + UiTheme.S(48)), color, UiTheme.S(0.7f));
+    }
+
+    public static void Paperclip(Vector2 origin)
+    {
+        var draw = ImGui.GetWindowDrawList();
+        Vector2 P(float x, float y) => origin + UiTheme.V(x + y * 0.15f, y);
+        uint shadow = UiTheme.C(UiPresentation.Alpha(UiTheme.CanvasInk, 0.18f));
+        uint metal = UiTheme.C(UiTheme.DarkMode ? UiTheme.Line : UiTheme.Brass);
+        for (int pass = 0; pass < 2; pass++)
+        {
+            var offset = pass == 0 ? UiTheme.V(1, 1) : Vector2.Zero;
+            uint color = pass == 0 ? shadow : metal;
+            float width = UiTheme.S(pass == 0 ? 3 : 1.5f);
+            draw.AddBezierCubic(P(0, 16) + offset, P(0, 26) + offset, P(11, 26) + offset, P(11, 16) + offset, color, width);
+            draw.AddBezierCubic(P(11, 16) + offset, P(11, -9) + offset, P(-4, -9) + offset, P(-4, 4) + offset, color, width);
+            draw.AddLine(P(-4, 4) + offset, P(-4, 17) + offset, color, width);
+            draw.AddBezierCubic(P(-4, 17) + offset, P(-4, 32) + offset, P(17, 32) + offset, P(17, 17) + offset, color, width);
+            draw.AddLine(P(17, 17) + offset, P(17, 1) + offset, color, width);
+        }
+    }
+
+    /// <summary>The moogle artist mark; also exported unchanged for the installer.</summary>
+    public static void Logo(Vector2 center, float radius, float angle = 0)
+    {
+        Moogle(center, radius, angle);
+        var draw = ImGui.GetWindowDrawList();
+        Vector2 P(float x, float y) => center + new Vector2(x, y) * radius;
+        float stroke = Math.Max(UiTheme.S(1), radius * 0.06f);
+        uint ink = UiTheme.C(UiTheme.CanvasInk);
+        var blush = UiTheme.RoseHover; blush.W = 0.45f;
+        draw.AddCircleFilled(P(-0.58f, 0.23f), radius * 0.13f, UiTheme.C(blush), 16);
+        draw.AddCircleFilled(P(0.58f, 0.23f), radius * 0.13f, UiTheme.C(blush), 16);
+        // A little pencil tucked under one paw makes the drawing-game purpose clear.
+        uint yellow = UiTheme.C(new Vector4(0xF5 / 255f, 0xBD / 255f, 0x54 / 255f, 1));
+        draw.AddQuadFilled(P(0.65f, 0.55f), P(1.13f, -0.55f), P(1.44f, -0.41f), P(0.96f, 0.69f), yellow);
+        draw.AddQuad(P(0.65f, 0.55f), P(1.13f, -0.55f), P(1.44f, -0.41f), P(0.96f, 0.69f), ink, stroke);
+        draw.AddLine(P(0.80f, 0.54f), P(1.24f, -0.4f), ink, stroke * 0.6f);
+        draw.AddTriangleFilled(P(0.65f, 0.55f), P(0.96f, 0.69f), P(0.61f, 0.94f), UiTheme.C(UiTheme.White));
+        draw.AddTriangle(P(0.65f, 0.55f), P(0.96f, 0.69f), P(0.61f, 0.94f), ink, stroke);
+        draw.AddLine(P(0.61f, 0.94f), P(0.68f, 0.79f), ink, stroke * 1.4f);
+        draw.AddCircleFilled(P(0.69f, 0.38f), radius * 0.21f, UiTheme.C(UiTheme.White), 20);
+        draw.AddCircle(P(0.69f, 0.38f), radius * 0.21f, ink, 20, stroke);
+        draw.AddLine(P(-1.28f, -0.53f), P(-1.39f, -0.72f), UiTheme.C(UiTheme.Rose), stroke);
+        draw.AddLine(P(-1.43f, -0.4f), P(-1.62f, -0.47f), UiTheme.C(UiTheme.Rose), stroke);
+    }
+
     public static void Moogle(Vector2 center, float radius, float angle = 0)
     {
         var draw = ImGui.GetWindowDrawList();
         Vector2 P(float x, float y) => center + new Vector2(x, y) * radius;
         uint ink = UiTheme.C(UiTheme.CanvasInk), cream = UiTheme.C(UiTheme.White), pink = UiTheme.C(UiTheme.RoseTint);
+        float stroke = Math.Max(UiTheme.S(1), radius * 0.04f);
         draw.AddTriangleFilled(P(-0.85f, -0.2f), P(-0.85f, -1.05f), P(-0.2f, -0.65f), cream);
         draw.AddTriangleFilled(P(0.85f, -0.2f), P(0.85f, -1.05f), P(0.2f, -0.65f), cream);
-        draw.AddTriangle(P(-0.85f, -0.2f), P(-0.85f, -1.05f), P(-0.2f, -0.65f), ink, UiTheme.S(1));
-        draw.AddTriangle(P(0.85f, -0.2f), P(0.85f, -1.05f), P(0.2f, -0.65f), ink, UiTheme.S(1));
+        draw.AddTriangle(P(-0.85f, -0.2f), P(-0.85f, -1.05f), P(-0.2f, -0.65f), ink, stroke);
+        draw.AddTriangle(P(0.85f, -0.2f), P(0.85f, -1.05f), P(0.2f, -0.65f), ink, stroke);
         draw.AddTriangleFilled(P(-0.71f, -0.44f), P(-0.73f, -0.8f), P(-0.4f, -0.59f), pink);
         draw.AddTriangleFilled(P(0.71f, -0.44f), P(0.73f, -0.8f), P(0.4f, -0.59f), pink);
         Ellipse(draw, center, new Vector2(radius, radius * 0.8f), cream, true);
         Ellipse(draw, center, new Vector2(radius, radius * 0.8f), ink, false);
         // Happy closed eyes and a rose button nose.
-        draw.AddLine(P(-0.55f, -0.1f), P(-0.36f, -0.22f), ink, UiTheme.S(1.4f));
-        draw.AddLine(P(-0.36f, -0.22f), P(-0.17f, -0.08f), ink, UiTheme.S(1.4f));
-        draw.AddLine(P(0.17f, -0.08f), P(0.36f, -0.22f), ink, UiTheme.S(1.4f));
-        draw.AddLine(P(0.36f, -0.22f), P(0.55f, -0.1f), ink, UiTheme.S(1.4f));
+        draw.AddLine(P(-0.55f, -0.1f), P(-0.36f, -0.22f), ink, Math.Max(UiTheme.S(1.4f), stroke));
+        draw.AddLine(P(-0.36f, -0.22f), P(-0.17f, -0.08f), ink, Math.Max(UiTheme.S(1.4f), stroke));
+        draw.AddLine(P(0.17f, -0.08f), P(0.36f, -0.22f), ink, Math.Max(UiTheme.S(1.4f), stroke));
+        draw.AddLine(P(0.36f, -0.22f), P(0.55f, -0.1f), ink, Math.Max(UiTheme.S(1.4f), stroke));
         Ellipse(draw, P(0, 0.18f), new Vector2(radius * 0.18f, radius * 0.13f), UiTheme.C(UiTheme.Rose), true);
-        draw.AddLine(P(0, 0.32f), P(-0.15f, 0.43f), ink, UiTheme.S(1));
-        draw.AddLine(P(0, 0.32f), P(0.15f, 0.43f), ink, UiTheme.S(1));
+        draw.AddBezierCubic(P(-0.16f, 0.36f), P(-0.1f, 0.53f), P(0.1f, 0.53f), P(0.16f, 0.36f), ink, stroke);
         var root = P(0, -0.7f);
         var pom = root + new Vector2(MathF.Sin(angle) * radius * 0.85f, -MathF.Cos(angle) * radius * 0.85f);
-        draw.AddBezierCubic(root, root + new Vector2(radius * 0.15f, -radius * 0.45f), pom + new Vector2(-radius * 0.2f, radius * 0.3f), pom, ink, UiTheme.S(1.2f));
+        draw.AddBezierCubic(root, root + new Vector2(radius * 0.15f, -radius * 0.45f), pom + new Vector2(-radius * 0.2f, radius * 0.3f), pom, ink, Math.Max(UiTheme.S(1.2f), stroke));
         draw.AddCircleFilled(pom + UiTheme.V(1, 1), radius * 0.35f, UiTheme.C(UiTheme.Line));
         draw.AddCircleFilled(pom, radius * 0.35f, UiTheme.C(UiTheme.RoseHover));
-        draw.AddCircle(pom, radius * 0.35f, UiTheme.C(UiTheme.Rose), 0, UiTheme.S(1));
+        draw.AddCircle(pom, radius * 0.35f, UiTheme.C(UiTheme.Rose), 0, stroke);
         draw.AddCircleFilled(pom + new Vector2(-radius * 0.1f, -radius * 0.1f), radius * 0.09f, UiTheme.C(UiTheme.RoseTint));
     }
 
@@ -145,6 +209,6 @@ public static class UiStationery
             draw.PathLineTo(center + new Vector2(MathF.Cos(angle), MathF.Sin(angle)) * radii);
         }
         if (fill) draw.PathFillConvex(color);
-        else draw.PathStroke(color, ImDrawFlags.Closed, UiTheme.S(1.1f));
+        else draw.PathStroke(color, ImDrawFlags.Closed, Math.Max(UiTheme.S(1.1f), radii.X * 0.04f));
     }
 }

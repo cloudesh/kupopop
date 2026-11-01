@@ -322,6 +322,7 @@ public static class UiTheme
                 }
                 else draw.AddRect(min, max, C(outline), S(1));
                 if (!attachedTabs) PaperGrain(min, max, note);
+                if (note.HasValue) UiStationery.SketchNote(min, max);
                 if (note.HasValue && !plainTop)
                 {
                     var glue = Ink; glue.W = 0.035f;
@@ -330,6 +331,7 @@ public static class UiTheme
                     draw.AddLine(min + V(1, 13), new Vector2(max.X - S(1), min.Y + S(13)), C(edge));
                 }
                 if (taped) UiStationery.Tape(new Vector2(min.X + (max.X - min.X) * 0.5f - S(25), min.Y + S(2)), S(50));
+                if (id == "make-card") UiStationery.Paperclip(new Vector2(max.X - S(22), min.Y + S(2)));
                 if (!attachedTabs)
                 {
                     var curl = note.HasValue ? Vector4.Lerp(surface, Inset, 0.4f) : Inset;

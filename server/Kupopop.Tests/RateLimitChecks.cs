@@ -21,6 +21,16 @@ static class RateLimitChecks
         clock.Advance(5);
         check(limits.Allow("profile"), "profile cooldown recovers after five seconds");
         check(Enumerable.Range(0, 50).All(_ => limits.Allow("cursor")) && !limits.Allow("cursor"), "cursor delivery bursts are bounded independently from drawing and chat");
+        var transport = new InputRateLimiter(clock);
+        check(Enumerable.Range(0, 384).All(_ => transport.Allow("transport")) && !transport.Allow("transport"),
+            "transport budget stops excess messages before JSON parsing without consuming command buckets");
+        clock.Advance(1);
+        check(Enumerable.Range(0, 160).All(_ => transport.Allow("transport")) && !transport.Allow("transport"),
+            "transport permits normal sustained drawing plus cursor and control traffic");
+        var concurrent = new InputRateLimiter(clock);
+        int accepted = 0;
+        Parallel.For(0, 1000, _ => { if (concurrent.Allow("transport")) Interlocked.Increment(ref accepted); });
+        check(accepted == 384, "concurrent receive loops cannot overspend the shared account transport budget");
     }
 
     private sealed class Clock : TimeProvider
