@@ -467,10 +467,13 @@ public sealed partial class MainWindow
             ImGui.TableSetupColumn("Word", ImGuiTableColumnFlags.WidthStretch);
             ImGui.TableSetupColumn("Time", ImGuiTableColumnFlags.WidthFixed, UiTheme.S(114));
             ImGui.TableNextColumn(); UiTheme.Caption($"ROUND {state.Round} / {state.Options.Rounds}");
-            art.Heading(state.Phase == "choosing" ? "Choosing a word..." : state.Word ?? state.Hint);
-            if (ImGui.IsItemHovered()) ImGui.SetTooltip(state.Phase == "intermission" ? "The word was" : state.DrawerId == device?.AccountId ? "Your word to draw" : "Guess the word");
+            if (state.Phase == "choosing") art.Heading("Choosing a word...");
+            else if (state.Word is { } word) art.Heading(word);
+            else art.Hint(state.Hint);
+            if (state.Word is not null && ImGui.IsItemHovered()) ImGui.SetTooltip(state.Phase == "intermission" ? "The word was" : "Your word to draw");
             ImGui.TableNextColumn();
-            UiAssets.Glyph(FontAwesomeIcon.Clock, UiTheme.Brass); ImGui.SameLine();
+            float timerWidth = ImGui.GetContentRegionAvail().X;
+            ImGui.SetCursorPosX(ImGui.GetCursorPosX() + Math.Max(0, timerWidth - art.MeasureLarge(left + "s", timerWidth).X));
             using (ImRaii.PushColor(ImGuiCol.Text, left <= 15 && state.Phase == "drawing" ? UiTheme.Rose : UiTheme.Ink)) art.LargeText(left + "s");
         }
         finally { ImGui.EndTable(); }
@@ -485,8 +488,17 @@ public sealed partial class MainWindow
         {
             var texture = avatars.Get(player.Profile);
             using var id = ImRaii.PushId(player.Profile.Id.ToString());
+            bool drawing = player.IsDrawer && state.Phase is "drawing" or "choosing";
+            if (drawing)
+            {
+                var row = ImGui.GetCursorScreenPos();
+                var draw = ImGui.GetWindowDrawList();
+                draw.AddRectFilled(row - UiTheme.V(3, 2), row + new Vector2(ImGui.GetContentRegionAvail().X, UiTheme.S(42)), UiTheme.C(UiPresentation.Alpha(UiTheme.Rose, 0.12f)), UiTheme.S(3));
+                draw.AddRectFilled(row - UiTheme.V(3, 2), row + UiTheme.V(0, 42), UiTheme.C(UiTheme.Rose), UiTheme.S(2));
+            }
             ImGui.BeginGroup();
             ImGui.Image(texture.Handle, UiTheme.V(40, 40));
+            if (drawing && ImGui.IsItemHovered()) ImGui.SetTooltip("Current drawer");
             ImGui.SameLine(); ImGui.BeginGroup();
             UiTheme.Ellipsis(player.Profile.DisplayName, Math.Max(UiTheme.S(35), ImGui.GetContentRegionAvail().X));
             ImGui.TextColored(player.Solved ? UiTheme.Green : UiTheme.Muted, $"{player.Score:N0} pts");
@@ -529,6 +541,11 @@ public sealed partial class MainWindow
         ImGui.TextUnformatted(state.YouAreDone ? "Done mode" : "Room chat");
         if (ImGui.IsItemHovered()) ImGui.SetTooltip(state.YouAreDone ? "Only the drawer and correct guessers see your messages." : "Talk and guess in the same chat.");
         UiTheme.Rule();
+        using var messageBackground = ImRaii.PushColor(ImGuiCol.ChildBg, Vector4.Zero);
+        using var messageBorder = ImRaii.PushColor(ImGuiCol.Border, Vector4.Zero);
+        using var messageBorderSize = ImRaii.PushStyle(ImGuiStyleVar.ChildBorderSize, 0);
+        using var messagePadding = ImRaii.PushStyle(ImGuiStyleVar.WindowPadding, Vector2.Zero);
+        using var scrollbar = ImRaii.PushColor(ImGuiCol.ScrollbarBg, Vector4.Zero);
         using (var messages = ImRaii.Child("messages", new Vector2(0, -UiTheme.S(34)), false))
         {
             if (messages.Success)

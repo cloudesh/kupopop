@@ -36,6 +36,9 @@ public sealed class UiAssets : IDisposable
         using var font = large.Push();
         return ImGui.CalcTextSize(text, false, width);
     }
+    public void Hint(string hint) { using var font = title.Push(); UiPresentation.Hint(hint); }
+    public void CenteredHeading(string text, float width)
+    { using var font = title.Push(); UiPresentation.CenteredLabel(text, width, UiTheme.Ink); }
 
     public void Mascot(float size)
     {

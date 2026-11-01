@@ -88,6 +88,8 @@ static class RoundFlowChecks
 
         var skip = Room(3); Choose(skip.game, skip.peers[0]); var turn = skip.peers[0].State.TurnId;
         skip.game.Handle(skip.peers[1], new("vote-skip", TurnId: turn));
+        check(skip.peers[0].Events.Any(e => e.Chat is { System: true, Text: "Vote to skip: 1/2. 1 more vote needed." }),
+            "skip votes announce the correct singular remaining-vote count to the room");
         check(skip.peers[1].State.SkipVote is { Votes: 1, Required: 2 } && skip.peers[1].State.KickVote is null, "skip ballot is separate from removal voting");
         skip.game.Handle(skip.peers[1], new("vote-skip", TurnId: turn));
         check(skip.peers[1].Events.Last().Type == "error", "duplicate skip votes cannot inflate agreement");

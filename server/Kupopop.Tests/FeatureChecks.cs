@@ -112,7 +112,12 @@ static class FeatureChecks
         }
         var expiry = Room(4); Guid expiryTurn = expiry.peers[0].State.TurnId;
         expiry.engine.Handle(expiry.peers[1], new("vote-kick", TurnId: expiryTurn));
+        check(expiry.peers[2].Events.Any(e => e.Chat is { System: true, Text: "Vote to kick: 1/3. 2 more votes needed." }),
+            "accepted kick votes announce the server-owned tally and remaining agreement in room chat");
+        int voteMessages = expiry.peers[2].Events.Count(e => e.Chat?.Text.StartsWith("Vote to kick:") == true);
         expiry.engine.Handle(expiry.peers[1], new("vote-kick", TurnId: expiryTurn));
+        check(expiry.peers[2].Events.Count(e => e.Chat?.Text.StartsWith("Vote to kick:") == true) == voteMessages,
+            "rejected duplicate votes do not spam room vote announcements");
         check(expiry.peers[1].Events.Last().Type == "error" && expiry.peers[2].State.KickVote?.Votes == 1, "duplicate votes cannot inflate the tally");
         expiry.engine.Detach(expiry.peers[3]);
         expiry.engine.Handle(expiry.peers[2], new("vote-kick", TurnId: expiryTurn));

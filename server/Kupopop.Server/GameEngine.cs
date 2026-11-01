@@ -437,6 +437,8 @@ public sealed class GameEngine(AccountStore accounts, ILogger<GameEngine> log, T
         var ballot = activeVote;
         if (Now >= ballot.Expires || !ballot.Eligible.Contains(peer.Id) || !ballot.Votes.Add(peer.Id))
             throw new ArgumentException("This vote has ended or your vote was already counted.");
+        int remaining = Math.Max(0, ballot.Required - ballot.Votes.Count);
+        SystemMessage(room, $"Vote to {(skip ? "skip" : "kick")}: {ballot.Votes.Count}/{ballot.Required}. {remaining} more {(remaining == 1 ? "vote" : "votes")} needed.");
         if (ballot.Votes.Count >= ballot.Required)
         {
             if (skip)

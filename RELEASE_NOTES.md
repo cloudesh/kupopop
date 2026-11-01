@@ -1,14 +1,11 @@
-Kupo Skribbl 0.5.0 adds word choice, clearer turn presentation and a larger drawing toolkit.
+Kupo Skribbl 0.5.1 polishes the game UI following in-game feedback.
 
-- Drawers privately choose from four words within 15 seconds. The server auto-picks on timeout; the full configured drawing timer starts after selection. Unused choices never go to other players.
-- Larger clock/timer at the canvas top right. Hints reveal randomized positions, retaining previously revealed letters.
-- Six-second turn recaps dim the plugin and show the answer plus up to three earliest guessers and their awarded points. Solve order stays correct if a solver leaves.
-- Artists show only portrait, name and points. Room leaders right-click a row to kick; this includes the current drawer. Vote Kick and Vote Skip are small controls in the lower-right canvas area. Skip uses the same frozen eligibility/threshold rules, ending the turn without removing its drawer.
-- Compact, individually boxed chat messages. Game/server cards have an information icon.
-- Shared drawer cursor shows canvas position, selected tool, brush size and color. Cursor data is ephemeral, canvas-bounded, drawer-authorized and rate-limited; it is not persisted or logged.
-- Line, rectangle, square, ellipse and circle tools preview locally and commit on release as one undo action.
-- A Color button opens 32 colors, with transparency additionally available in the portrait editor. Existing palette indexes and saved avatar colors are preserved.
-- Reusable notifications appear inside the plugin's bottom-right corner. Update checks read bounded public feed metadata on startup and every ten minutes. New-version notices are dismissible per version; updates remain manual through Dalamud.
+- Timer stays large and right-aligned without a clock icon. Hints have distinct letter slots and word spacing rather than a continuous underline; hover shows the letter count.
+- Chat history has no extra cream child background or borders. Individual cards are translucent over the blue note. Done-mode names/messages are gray with a status icon; server cards retain their information icon.
+- A circle-icon button opens Line, Rectangle and Ellipse. Redundant Square/Circle choices are removed from the menu; protocol 3 compatibility is preserved.
+- The turn recap uses a themed 2-1-3 podium, with first place raised in the center. The current drawer is highlighted in the artists list without an extra text row.
+- Canvas vote buttons are translucent and borderless. Every accepted kick/skip vote announces its tally and how many more votes are required. Duplicate/rejected votes do not generate announcements.
+- Word selection uses a centered translucent panel, softer cards and centered options.
 
-Protocol 3 requires updating both plugin and server. Deployment restarts active rooms while preserving profiles, credentials, certificates and private word banks. Stock three-word starter banks upgrade to four; custom selections need at least four distinct words.
+Protocol 3 remains compatible with 0.5.0 clients. Profiles, credentials and private word banks are preserved; deploying the server restarts active rooms. File diagnostics still exclude words, credentials, chat and drawing/cursor contents.
 

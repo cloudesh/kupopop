@@ -11,17 +11,23 @@ public sealed partial class MainWindow
     private void DrawWordChoices(RoomView state)
     {
         var saved = ImGui.GetCursorScreenPos();
-        var origin = painting.RenderOrigin + UiTheme.V(12, 18);
+        var panelSize = new Vector2(Math.Max(60, painting.RenderSize.X - UiTheme.S(28)),
+            Math.Max(60, Math.Min(painting.RenderSize.Y - UiTheme.S(28), UiTheme.S(state.WordChoices is null ? 145 : 250))));
+        var origin = painting.RenderOrigin + (painting.RenderSize - panelSize) / 2;
         ImGui.SetCursorScreenPos(origin);
-        using (ImRaii.PushColor(ImGuiCol.ChildBg, UiTheme.Panel))
-        using (var panel = ImRaii.Child("word-choices", new Vector2(Math.Max(60, painting.RenderSize.X - UiTheme.S(24)), Math.Max(60, painting.RenderSize.Y - UiTheme.S(36))), false))
+        using (ImRaii.PushColor(ImGuiCol.ChildBg, UiPresentation.Alpha(UiTheme.Panel, 0.78f)))
+        using (ImRaii.PushColor(ImGuiCol.Border, Vector4.Zero))
+        using (ImRaii.PushStyle(ImGuiStyleVar.ChildBorderSize, 0))
+        using (ImRaii.PushStyle(ImGuiStyleVar.ChildRounding, UiTheme.S(8)))
+        using (ImRaii.PushStyle(ImGuiStyleVar.WindowPadding, UiTheme.V(12, 12)))
+        using (var panel = ImRaii.Child("word-choices", panelSize, true))
         {
             if (panel.Success)
             {
-                art.Heading(state.DrawerId == device?.AccountId ? "Choose your word" : "A little inspiration...");
+                art.CenteredHeading(state.DrawerId == device?.AccountId ? "Choose your word" : "A little inspiration...", ImGui.GetContentRegionAvail().X);
                 if (state.WordChoices is { Length: > 0 } choices)
                 {
-                    UiTheme.Wrapped("Choose one. Your drawing timer starts afterwards.", UiTheme.Muted);
+                    UiPresentation.CenteredLabel("Your drawing timer starts after you choose.", ImGui.GetContentRegionAvail().X, UiTheme.Muted);
                     if (ImGui.BeginTable("four-words", 2, ImGuiTableFlags.SizingStretchSame))
                     {
                         for (int i = 0; i < choices.Length; i++)
@@ -49,9 +55,9 @@ public sealed partial class MainWindow
         var end = ImGui.GetCursorScreenPos();
         var color = new[] { UiTheme.StickyYellow, UiTheme.StickyRose, UiTheme.StickySage, UiTheme.StickyBlue }[index % 4];
         var draw = ImGui.GetWindowDrawList();
-        draw.AddRectFilled(start, start + size, UiTheme.C(color), UiTheme.S(2));
-        draw.AddRect(start, start + size, UiTheme.C(hovered ? UiTheme.Rose : UiTheme.Line), UiTheme.S(2));
-        ImGui.SetCursorScreenPos(start + UiTheme.V(7, 8));
+        draw.AddRectFilled(start, start + size, UiTheme.C(UiPresentation.Alpha(color, hovered ? 0.94f : 0.74f)), UiTheme.S(4));
+        var textSize = ImGui.CalcTextSize(word, false, Math.Max(20, size.X - UiTheme.S(14)));
+        ImGui.SetCursorScreenPos(start + new Vector2(Math.Max(UiTheme.S(7), (size.X - textSize.X) / 2), (size.Y - textSize.Y) / 2));
         ImGui.PushTextWrapPos(ImGui.GetCursorPosX() + size.X - UiTheme.S(14));
         ImGui.TextUnformatted(word); ImGui.PopTextWrapPos();
         ImGui.SetCursorScreenPos(end);
@@ -66,44 +72,16 @@ public sealed partial class MainWindow
         float width = ImGui.CalcTextSize(kick).X + ImGui.CalcTextSize(skip).X + UiTheme.S(36);
         ImGui.SetCursorScreenPos(painting.RenderOrigin + new Vector2(Math.Max(UiTheme.S(4), painting.RenderSize.X - width - UiTheme.S(4)), painting.RenderSize.Y - UiTheme.S(32)));
         using (ImRaii.Disabled(!state.KickVoteAvailable || state.KickVote?.YouVoted == true))
-            if (UiTheme.Button(kick, 0, quiet: false)) Send(new("vote-kick", TurnId: state.TurnId));
+            if (UiPresentation.SoftButton(kick)) Send(new("vote-kick", TurnId: state.TurnId));
         if (ImGui.IsItemHovered()) ImGui.SetTooltip("Vote to remove the drawer. Under 5: all other players; 5+: 70%, rounded up. Ballot lasts 30s.");
         ImGui.SameLine();
         using (ImRaii.Disabled(!state.SkipVoteAvailable || state.SkipVote?.YouVoted == true))
-            if (UiTheme.Button(skip, 0, quiet: false)) Send(new("vote-skip", TurnId: state.TurnId));
+            if (UiPresentation.SoftButton(skip)) Send(new("vote-skip", TurnId: state.TurnId));
         if (ImGui.IsItemHovered()) ImGui.SetTooltip("Vote to skip this turn without removing its drawer. Same threshold as a kick vote.");
         ImGui.SetCursorScreenPos(saved);
     }
 
-    private static void DrawChatCard(ChatLine line)
-    {
-        float width = ImGui.GetContentRegionAvail().X, pad = UiTheme.S(5);
-        var start = ImGui.GetCursorScreenPos();
-        float indent = line.System ? UiTheme.S(19) : 0;
-        float textHeight = ImGui.CalcTextSize(line.Text, false, Math.Max(20, width - pad * 2 - indent)).Y;
-        float height = textHeight + pad * 2 + (line.System ? 0 : ImGui.GetTextLineHeight() + UiTheme.S(2));
-        var draw = ImGui.GetWindowDrawList();
-        draw.AddRectFilled(start, start + new Vector2(width, height), UiTheme.C(line.System ? UiTheme.StickySage : UiTheme.Panel), UiTheme.S(2));
-        draw.AddRect(start, start + new Vector2(width, height), UiTheme.C(UiTheme.Line), UiTheme.S(2));
-        ImGui.SetCursorScreenPos(start + new Vector2(pad, pad));
-        ImGui.BeginGroup();
-        if (line.System)
-        {
-            UiAssets.Glyph(FontAwesomeIcon.InfoCircle, UiTheme.Green);
-            if (ImGui.IsItemHovered()) ImGui.SetTooltip("Game / server message");
-            ImGui.SameLine(0, UiTheme.S(4));
-        }
-        else
-        {
-            using var color = ImRaii.PushColor(ImGuiCol.Text, line.Done ? UiTheme.Rose : UiTheme.Brass);
-            UiTheme.Ellipsis(line.Name, width - pad * 2);
-        }
-        ImGui.PushTextWrapPos(ImGui.GetCursorPosX() + width - pad * 2 - indent);
-        ImGui.TextUnformatted(line.Text); ImGui.PopTextWrapPos();
-        ImGui.EndGroup();
-        ImGui.SetCursorScreenPos(start + new Vector2(0, height));
-        ImGui.Dummy(new Vector2(width, 0));
-    }
+    private static void DrawChatCard(ChatLine line) => UiPresentation.ChatCard(line);
 
     private void DrawTurnReveal(RoomView state)
     {
@@ -120,7 +98,7 @@ public sealed partial class MainWindow
                 draw.AddRectFilled(origin, origin + size, ImGui.GetColorU32(new Vector4(0.18f, 0.18f, 0.22f, 0.28f)));
                 float cardWidth = Math.Min(UiTheme.S(520), size.X - UiTheme.S(36));
                 float contentHeight = art.MeasureLarge(state.Word ?? "", cardWidth - UiTheme.S(36)).Y + UiTheme.S(84) +
-                    (state.FirstGuessers?.Length ?? 1) * ImGui.GetTextLineHeightWithSpacing();
+                    (state.FirstGuessers is { Length: > 0 } ? UiTheme.S(122) : ImGui.GetTextLineHeightWithSpacing());
                 var card = new Vector2(cardWidth, Math.Min(Math.Max(UiTheme.S(180), contentHeight), size.Y - UiTheme.S(40)));
                 var position = origin + (size - card) / 2;
                 draw.AddRectFilled(position, position + card, UiTheme.C(UiTheme.Panel), UiTheme.S(3));
@@ -132,7 +110,7 @@ public sealed partial class MainWindow
                 art.LargeText(state.Word ?? "", wrap: true);
                 ImGui.PopTextWrapPos(); UiTheme.Gap(10);
                 if (state.FirstGuessers is { Length: > 0 } winners)
-                    for (int i = 0; i < winners.Length; i++) ImGui.TextUnformatted($"{i + 1}. {winners[i].Name}   +{winners[i].Points}");
+                    UiPresentation.Podium(winners, card.X - UiTheme.S(36));
                 else UiTheme.Caption("A fresh page is coming up.");
                 ImGui.EndGroup();
             }

@@ -45,12 +45,16 @@ public sealed class CanvasWidget : IDisposable
                 if (ImGui.IsItemHovered() || ImGui.IsItemFocused())
                     ImGui.SetTooltip(tool == "pencil" ? "Pencil" : tool == "fill" ? "Fill bucket" : transparency ? "Erase to transparent" : "Eraser");
             }
-            ImGui.SameLine(); ImGui.SetNextItemWidth(UiTheme.S(70));
-            if (ImGui.BeginCombo("##shapes", DrawingTools.Shape(Tool) ? char.ToUpperInvariant(Tool[0]) + Tool[1..] : "Shapes"))
+            ImGui.SameLine();
+            using (Plugin.PluginInterface.UiBuilder.IconFontFixedWidthHandle.Push())
+            using (ImRaii.PushColor(ImGuiCol.Button, DrawingTools.Shape(Tool) ? UiTheme.RoseTint : UiTheme.Inset))
+                if (ImGui.Button(FontAwesomeIcon.Circle.ToIconString() + "##shapes", UiTheme.V(28, 28))) ImGui.OpenPopup("shape-menu");
+            if (ImGui.IsItemHovered()) ImGui.SetTooltip("Shapes");
+            if (ImGui.BeginPopup("shape-menu"))
             {
-                foreach (string shape in new[] { "line", "rectangle", "square", "ellipse", "circle" })
+                foreach (string shape in new[] { "line", "rectangle", "ellipse" })
                     if (ImGui.Selectable(char.ToUpperInvariant(shape[0]) + shape[1..], Tool == shape)) Tool = shape;
-                ImGui.EndCombo();
+                ImGui.EndPopup();
             }
             if (available >= UiTheme.S(300)) ImGui.SameLine();
             ImGui.SetNextItemWidth(brushWidth);
