@@ -38,6 +38,7 @@ public sealed partial class MainWindow : Window, IDisposable
     private RoomSummary[] publicRooms = [];
     private Uri? endpoint;
     private string displayName = "";
+    private bool shareNewProfile = true;
     private string recoveryInput = "";
     private string newRecovery = "";
     private string joinCode = "";
@@ -228,7 +229,7 @@ public sealed partial class MainWindow : Window, IDisposable
                 serverOffset = state.ServerTime - DateTimeOffset.UtcNow;
                 if (screen is not ("profile" or "friends") && !(screen == "create" && !differentRoom && state.Phase is "waiting" or "results")) screen = "game";
                 if (differentRoom && inviteAfterCreate && state.HostId == device?.AccountId)
-                { inviteAfterCreate = false; OpenFriends(); }
+                { inviteAfterCreate = false; OpenFriends(inviting: true); }
                 log.Write($"room.state phase={state.Phase} round={state.Round} players={state.Players.Length} canvas_reset={state.ResetCanvas}");
                 break;
             case "draw" when message.Draw is { } op:
@@ -281,9 +282,10 @@ public sealed partial class MainWindow : Window, IDisposable
     {
         if (client is null) return;
         string name = displayName, code = recoveryInput;
+        bool share = shareNewProfile;
         Work(async (activeClient, complete) =>
         {
-            var result = recovering ? await activeClient.RecoverAsync(code) : await activeClient.CreateAsync(name);
+            var result = recovering ? await activeClient.RecoverAsync(code) : await activeClient.CreateAsync(name, share);
             await AcceptCredentials(activeClient, complete, result);
         }, recovering ? "Recovering account" : "Creating account");
     }

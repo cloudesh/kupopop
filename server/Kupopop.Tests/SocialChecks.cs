@@ -4,6 +4,7 @@ using System.Text;
 using Kupopop.Server;
 using Kupopop.Shared;
 using Microsoft.Extensions.Logging.Abstractions;
+using Microsoft.Data.Sqlite;
 
 static class SocialChecks
 {
@@ -123,5 +124,51 @@ static class SocialChecks
         migrated.RecordMatch([new(winnerId, "Duplicate Mog", 1200), new(source.Keys.Last(), "Duplicate Mog ~2", 100)], [winnerId]);
         check(migrated.Statistics(winnerId) == new LifetimeStats(1, 1, 1200, 1200),
             "opted-in lifetime stats retain authoritative points, wins and best match");
+
+        var shared = accounts.Create("Explicit shared setup", shareProfile: true);
+        check(accounts.Preferences(shared.AccountId) == new ProfilePreferences(false, true, false),
+            "explicit setup sharing never implicitly enables statistics or background checks");
+        accounts.SetPreferences(b.AccountId, false, false, false, backgroundInvitations: true);
+        check(accounts.Preferences(b.AccountId).BackgroundInvitations && !accounts.Preferences(a.AccountId).BackgroundInvitations,
+            "closed-window invitation checks require an account's own explicit opt-in");
+        // Re-establish a mutual friendship after the earlier removal test.
+        game.Handle(pa, new("friend-request", TargetId: b.AccountId));
+        game.Handle(resumed, new("friend-accept", TargetId: a.AccountId));
+        game.Detach(resumed, intentional: true);
+        game.Handle(pa, new("invite", TargetId: b.AccountId));
+        check(pa.Events[^1].Type == "notice", "an opted-in offline friend can receive a bounded queued invitation");
+        var backgroundInbox = game.InvitationInbox(b.AccessToken)!;
+        check(backgroundInbox.Enabled && backgroundInbox.Invitations.Length == 1 &&
+            backgroundInbox.Invitations[0].From.AvatarPixels is null && game.GetStatus(TimeSpan.Zero).ConnectedUsers == 2,
+            "authenticated inbox polling returns compact metadata without attaching a game connection");
+        rejected = false;
+        try { game.InvitationInbox(b.AccessToken); } catch (InboxRateLimitException) { rejected = true; }
+        check(rejected && game.InvitationInbox("invalid-token") is null,
+            "inbox polling rejects invalid credentials and enforces per-account rate limits");
+        clock.Advance(21);
+        accounts.SetPreferences(b.AccountId, false, false, false, backgroundInvitations: false);
+        check(game.InvitationInbox(b.AccessToken) is { Enabled: false, Invitations.Length: 0 },
+            "opting out disables invitation polling without exposing queued invitations");
+        clock.Advance(301); game.Tick();
+        var returnPeer = new TestPeer(b.AccountId); game.Attach(returnPeer);
+        check(Social(returnPeer).Invitations.Length == 0, "expired offline invitations are pruned before reconnect");
+
+        string oldPreferences = Path.Combine(working, "schema-three-privacy");
+        Guid privateId;
+        using (var original = new AccountStore(oldPreferences))
+        {
+            privateId = original.Create("Private before upgrade").AccountId;
+            original.SetPreferences(privateId, true, false, false);
+        }
+        using (var oldDatabase = new SqliteConnection("Data Source=" + Path.Combine(oldPreferences, "accounts.db")))
+        {
+            oldDatabase.Open();
+            using var downgrade = oldDatabase.CreateCommand();
+            downgrade.CommandText = "ALTER TABLE preferences DROP COLUMN invite_checks; PRAGMA user_version=3";
+            downgrade.ExecuteNonQuery();
+        }
+        using var upgradedPreferences = new AccountStore(oldPreferences);
+        check(upgradedPreferences.Preferences(privateId) == new ProfilePreferences(true, false, false),
+            "schema upgrade preserves private profiles and prior stats consent while defaulting background checks off");
     }
 }

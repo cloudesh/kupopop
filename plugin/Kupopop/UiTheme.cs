@@ -10,23 +10,24 @@ namespace Kupopop;
 public static class UiTheme
 {
     public static bool DarkMode { get; private set; }
-    public static Vector4 Paper => Hex(DarkMode ? 0x252329 : 0xF1E8D3);
-    public static Vector4 Panel => Hex(DarkMode ? 0x312D34 : 0xFBF6E8);
-    public static Vector4 Inset => Hex(DarkMode ? 0x423A43 : 0xDED0B4);
-    public static Vector4 Cover => Hex(DarkMode ? 0x51414C : 0xB89A91);
+    public static Vector4 Paper => Hex(DarkMode ? 0x22252D : 0xF1E8D3);
+    public static Vector4 Panel => Hex(DarkMode ? 0x2B303B : 0xFBF6E8);
+    public static Vector4 Inset => Hex(DarkMode ? 0x39414F : 0xDED0B4);
+    public static Vector4 Cover => Hex(DarkMode ? 0x414858 : 0xB89A91);
     public static Vector4 Tape => Hex(DarkMode ? 0x8E744B : 0xE3C990);
-    public static Vector4 StickyYellow => Hex(DarkMode ? 0x494335 : 0xF5E7AD);
-    public static Vector4 StickyRose => Hex(DarkMode ? 0x493641 : 0xEECFD3);
-    public static Vector4 StickySage => Hex(DarkMode ? 0x34443B : 0xDCE7C9);
-    public static Vector4 StickyBlue => Hex(DarkMode ? 0x2F414B : 0xD7E6EC);
-    public static Vector4 Ink => Hex(DarkMode ? 0xE8E0D3 : 0x372E39);
-    public static Vector4 Muted => Hex(DarkMode ? 0xB8AAAD : 0x70626B);
-    public static Vector4 Line => Hex(DarkMode ? 0x61535C : 0xCFBEA1);
-    public static Vector4 Brass => Hex(DarkMode ? 0xD0B17F : 0x876339);
-    public static Vector4 Rose => Hex(DarkMode ? 0xD58BA3 : 0x824459);
-    public static Vector4 RoseHover => Hex(DarkMode ? 0xE5A1B6 : 0x9B536B);
-    public static Vector4 RoseTint => Hex(DarkMode ? 0x593D4B : 0xEAD6D8);
-    public static Vector4 Green => Hex(DarkMode ? 0x88BFA8 : 0x3C6D61);
+    public static Vector4 StickyYellow => Hex(DarkMode ? 0x414032 : 0xF5E7AD);
+    public static Vector4 StickyRose => Hex(DarkMode ? 0x453441 : 0xEECFD3);
+    public static Vector4 StickySage => Hex(DarkMode ? 0x30423B : 0xDCE7C9);
+    public static Vector4 StickyBlue => Hex(DarkMode ? 0x2F4050 : 0xD7E6EC);
+    public static Vector4 InvitationPaper => Hex(DarkMode ? 0x513949 : 0xF3CCD9);
+    public static Vector4 Ink => Hex(DarkMode ? 0xF2EEE7 : 0x372E39);
+    public static Vector4 Muted => Hex(DarkMode ? 0xB9C1CF : 0x70626B);
+    public static Vector4 Line => Hex(DarkMode ? 0x556171 : 0xCFBEA1);
+    public static Vector4 Brass => Hex(DarkMode ? 0xDFC794 : 0x876339);
+    public static Vector4 Rose => Hex(DarkMode ? 0xEDADC4 : 0x824459);
+    public static Vector4 RoseHover => Hex(DarkMode ? 0xF5C5D7 : 0x9B536B);
+    public static Vector4 RoseTint => Hex(DarkMode ? 0x503A4B : 0xEAD6D8);
+    public static Vector4 Green => Hex(DarkMode ? 0x9BD9C3 : 0x3C6D61);
     public static Vector4 GreenTint => Hex(DarkMode ? 0x2E483C : 0xDDE8DE);
     public static readonly Vector4 White = Hex(0xFFF9F1);
     public static readonly Vector4 CanvasInk = Hex(0x372E39);
@@ -53,12 +54,12 @@ public static class UiTheme
             Color(ImGuiCol.WindowBg, Cover); Color(ImGuiCol.ChildBg, Panel); Color(ImGuiCol.PopupBg, Panel);
             Color(ImGuiCol.Border, Line); Color(ImGuiCol.BorderShadow, Vector4.Zero);
             Color(ImGuiCol.TitleBg, Inset); Color(ImGuiCol.TitleBgActive, Inset); Color(ImGuiCol.TitleBgCollapsed, Inset);
-            Color(ImGuiCol.FrameBg, Hex(DarkMode ? 0x39333C : 0xE9DFC7)); Color(ImGuiCol.FrameBgHovered, Hex(DarkMode ? 0x473F49 : 0xE0D2B3)); Color(ImGuiCol.FrameBgActive, DarkMode ? Inset : White);
+            Color(ImGuiCol.FrameBg, Hex(DarkMode ? 0x333B48 : 0xE9DFC7)); Color(ImGuiCol.FrameBgHovered, Hex(DarkMode ? 0x414C5C : 0xE0D2B3)); Color(ImGuiCol.FrameBgActive, DarkMode ? Inset : White);
             Color(ImGuiCol.Button, Inset); Color(ImGuiCol.ButtonHovered, Vector4.Lerp(Inset, Ink, 0.08f)); Color(ImGuiCol.ButtonActive, Vector4.Lerp(Inset, Ink, 0.16f));
             Color(ImGuiCol.Header, RoseTint); Color(ImGuiCol.HeaderHovered, Vector4.Lerp(RoseTint, Rose, 0.15f)); Color(ImGuiCol.HeaderActive, RoseTint);
             Color(ImGuiCol.CheckMark, Rose); Color(ImGuiCol.SliderGrab, Rose); Color(ImGuiCol.SliderGrabActive, RoseHover);
             Color(ImGuiCol.Separator, Line); Color(ImGuiCol.SeparatorHovered, Brass); Color(ImGuiCol.SeparatorActive, Rose);
-            Color(ImGuiCol.ScrollbarBg, Paper); Color(ImGuiCol.ScrollbarGrab, Hex(DarkMode ? 0x786873 : 0xC3B399));
+            Color(ImGuiCol.ScrollbarBg, Paper); Color(ImGuiCol.ScrollbarGrab, Hex(DarkMode ? 0x65748B : 0xC3B399));
             Color(ImGuiCol.ScrollbarGrabHovered, Brass); Color(ImGuiCol.ScrollbarGrabActive, Rose);
             Color(ImGuiCol.TextSelectedBg, RoseTint); Color(ImGuiCol.TableHeaderBg, Inset);
             Color(ImGuiCol.TableBorderLight, Line); Color(ImGuiCol.TableBorderStrong, Line);
@@ -87,6 +88,14 @@ public static class UiTheme
         ImGui.PopTextWrapPos();
     }
     public static void Gap(float size = 4) => ImGui.Dummy(V(0, size));
+    public static void InvitationGlow(Vector2 min, Vector2 max)
+    {
+        var draw = ImGui.GetWindowDrawList();
+        var top = UiPresentation.Alpha(Rose, DarkMode ? 0.16f : 0.14f);
+        var bottom = UiPresentation.Alpha(Rose, 0);
+        draw.AddRectFilledMultiColor(min + V(7, 7), max - V(7, 7), C(top), C(top), C(bottom), C(bottom));
+        draw.AddRectFilled(min + V(7, 7), new Vector2(min.X + S(10), max.Y - S(7)), C(Rose));
+    }
     public static void Rule() => ImGui.Separator();
 
     public static void Tooltip(string text)

@@ -310,6 +310,14 @@ try
     await second.ConnectAsync(two.AccessToken);
     await third.ConnectAsync(three.AccessToken);
     await WaitEvent(third, e => e.Room?.Players.Length == 2);
+    second.Send(new("profile-privacy", BackgroundInvitations: true));
+    await WaitEvent(second, e => e.Social?.Preferences.BackgroundInvitations == true);
+    var invitationInbox = await second.CheckInvitationsAsync(two.AccessToken);
+    Check(invitationInbox.Enabled && invitationInbox.Invitations.Length == 0,
+        "real authenticated invitation checks return a compact inbox without requiring an additional WebSocket");
+    using var unauthenticatedInbox = await http.GetAsync("/api/invitations");
+    Check(unauthenticatedInbox.StatusCode == HttpStatusCode.Unauthorized && unauthenticatedInbox.Headers.CacheControl?.NoStore == true,
+        "inbox HTTP endpoint is authenticated and never cacheable");
     await second.CloseAsync();
     await WaitEvent(third, e => e.Room?.Players.Length == 1);
     Check(!second.Connected, "normal client window closure disconnects and removes membership over a real WebSocket");

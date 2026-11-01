@@ -2,6 +2,8 @@ using Kupopop.Shared;
 
 namespace Kupopop.Server;
 
+public sealed class InboxRateLimitException : Exception;
+
 public sealed partial class GameEngine
 {
     private sealed record Invitation(GameInvitation View, string RoomCode);
@@ -9,6 +11,28 @@ public sealed partial class GameEngine
     private readonly Dictionary<Guid, List<Guid>> recentPlayers = [];
     private readonly Dictionary<Guid, List<Invitation>> invitations = [];
     private readonly Dictionary<Guid, DateTimeOffset> nextInvitation = [];
+    private readonly Dictionary<Guid, DateTimeOffset> nextInboxCheck = [];
+    private DateTimeOffset nextInboxCleanup;
+
+    public InvitationInbox? InvitationInbox(string? accessToken)
+    {
+        lock (gate)
+        {
+            if (accounts.Authenticate(accessToken) is not { } profile) return null;
+            if (nextInboxCheck.GetValueOrDefault(profile.Id) > Now) throw new InboxRateLimitException();
+            nextInboxCheck[profile.Id] = Now.AddSeconds(20);
+            if (!accounts.Preferences(profile.Id).BackgroundInvitations) return new(false, []);
+            return new(true, LiveInvitations(profile.Id).Select(i => i with { From = i.From with { AvatarPixels = null } }).ToArray());
+        }
+    }
+
+    private void CleanInvitationInboxes()
+    {
+        if (Now < nextInboxCleanup) return;
+        nextInboxCleanup = Now.AddSeconds(30);
+        foreach (var id in invitations.Keys.ToArray())
+            if (LiveInvitations(id).Length == 0) invitations.Remove(id);
+    }
 
     private void RememberRoom(Room room)
     {
@@ -30,7 +54,8 @@ public sealed partial class GameEngine
     {
         var relationships = accounts.Relationships(peer.Id);
         var people = relationships.Select(r => new SocialPerson(accounts.Get(r.Id)!, r.Relationship,
-            r.Relationship == "friend" && peers.ContainsKey(r.Id))).ToList();
+            r.Relationship == "friend" && peers.ContainsKey(r.Id),
+            r.Relationship == "friend" && accounts.Preferences(r.Id).BackgroundInvitations)).ToList();
         foreach (var id in recentPlayers.GetValueOrDefault(peer.Id) ?? [])
             if (people.All(p => p.Profile.Id != id) && accounts.Get(id) is { } profile)
                 people.Add(new(profile, "recent"));
@@ -78,10 +103,13 @@ public sealed partial class GameEngine
     private void Invite(IGamePeer peer, Room? room, Guid target)
     {
         RequireHost(peer, room);
+        CleanInvitationInboxes();
+        peers.TryGetValue(target, out var receiver);
         if (room!.Phase is not ("waiting" or "results") || !accounts.Friends(peer.Id, target) ||
-            !peers.TryGetValue(target, out var receiver) || receiver.RoomCode is not null)
-            throw new ArgumentException("Invite an online friend who is not already in a room.");
+            (receiver is null && !accounts.Preferences(target).BackgroundInvitations) || receiver?.RoomCode is not null)
+            throw new ArgumentException("Invite a friend who is outside a room and accepts invitations.");
         if (nextInvitation.GetValueOrDefault(peer.Id) > Now) throw new ArgumentException("Wait a moment before sending another invitation.");
+        if (invitations.Sum(pair => pair.Value.Count) >= 1024) throw new ArgumentException("The invitation service is busy. Try again shortly.");
         if (!invitations.TryGetValue(target, out var inbox)) invitations[target] = inbox = [];
         LiveInvitations(target);
         if (inbox.Any(i => i.View.From.Id == peer.Id && i.RoomCode == room.Code)) throw new ArgumentException("Your friend already has this invitation.");
@@ -89,8 +117,8 @@ public sealed partial class GameEngine
         var invite = new GameInvitation(Guid.NewGuid(), accounts.Get(peer.Id)!, room.Options.Title, Now.AddMinutes(5));
         inbox.Add(new(invite, room.Code));
         nextInvitation[peer.Id] = Now.AddSeconds(3);
-        receiver.Send(new("invitation", Invitation: invite));
-        SendSocial(receiver);
+        receiver?.Send(new("invitation", Invitation: invite));
+        if (receiver is not null) SendSocial(receiver);
         peer.Send(new("notice", Error: "Invitation sent."));
     }
 

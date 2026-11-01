@@ -47,9 +47,9 @@ Save your private recovery code when you create your profile. Keep it somewhere 
 
 Right-click an artist in a room to add them or view their profile. Manage friend requests, invitations, and recently played partners in **Friends**. Invitations appear inside Kupo Skribbl, and the Play screen lets you join an invited game directly.
 
-Your profile starts private and lifetime statistics start disabled. Enable either in **Profile** if you want them. Shared profiles show your avatar and recorded games, wins, total points, and best match. They are visible to friends and people you have played with, with no global player search. Game points are statistics, not a currency.
+New-profile setup recommends sharing with friends and room partners, with a visible switch before you create the account. Existing privacy choices stay unchanged. Lifetime statistics start disabled; enable them separately in **Profile → Privacy & invitations**. Shared profiles show your avatar and recorded games, wins, total points, and best match. They are visible to friends and people you have played with, with no global player search. Game points are statistics, not a currency.
 
-The plugin starts closed. Closing it leaves your room and disconnects you; friends only see you online while your book is open. Recently played partners are private to the current session. You can remove friends and reset or disable your statistics at any time.
+The plugin starts closed. Closing it leaves your room and disconnects you; friends only see you online while your book is open. If you enable **Invitations while my book is closed**, a short authenticated check once a minute can notify you about friend invitations without keeping a game connection. Clicking the notification opens your book; it never opens itself. Recently played partners are private to the current session. You can remove friends and reset or disable your statistics at any time.
 
 ## Quick questions
 

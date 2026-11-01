@@ -14,7 +14,7 @@ public sealed partial class AccountStore
     private void InitializeSocial()
     {
         using var versionQuery = Command("PRAGMA user_version");
-        if (Convert.ToInt32(versionQuery.ExecuteScalar()) == SchemaVersion) return;
+        if (Convert.ToInt32(versionQuery.ExecuteScalar()) is 3 or SchemaVersion) return;
         using var transaction = database.BeginTransaction();
         Execute("""
             CREATE TABLE account_names (id TEXT PRIMARY KEY, name_key TEXT NOT NULL UNIQUE) STRICT;
@@ -48,7 +48,16 @@ public sealed partial class AccountStore
             update.Parameters.AddWithValue("$name", name); update.Parameters.AddWithValue("$id", id.ToString());
             update.ExecuteNonQuery();
         }
-        Execute($"PRAGMA user_version={SchemaVersion}", transaction);
+        Execute("PRAGMA user_version=3", transaction);
+        transaction.Commit();
+    }
+
+    private void InitializeInvitationPreferences()
+    {
+        using var version = Command("PRAGMA user_version");
+        if (Convert.ToInt32(version.ExecuteScalar()) == SchemaVersion) return;
+        using var transaction = database.BeginTransaction();
+        Execute("ALTER TABLE preferences ADD COLUMN invite_checks INTEGER NOT NULL DEFAULT 0; PRAGMA user_version=4;", transaction);
         transaction.Commit();
     }
 
@@ -75,20 +84,22 @@ public sealed partial class AccountStore
     {
         lock (gate)
         {
-            using var command = Command("SELECT track,share FROM preferences WHERE id=$id", transaction);
+            using var command = Command("SELECT track,share,invite_checks FROM preferences WHERE id=$id", transaction);
             command.Parameters.AddWithValue("$id", id.ToString());
             using var reader = command.ExecuteReader();
-            return reader.Read() ? new(reader.GetBoolean(0), reader.GetBoolean(1)) : new(false, false);
+            return reader.Read() ? new(reader.GetBoolean(0), reader.GetBoolean(1), reader.GetBoolean(2)) : new(false, false);
         }
     }
 
-    public void SetPreferences(Guid id, bool track, bool share, bool reset)
+    public void SetPreferences(Guid id, bool track, bool share, bool reset, bool? backgroundInvitations = null)
     {
         lock (gate)
         {
             using var transaction = database.BeginTransaction();
-            using var command = Command("INSERT INTO preferences VALUES($id,$track,$share) ON CONFLICT(id) DO UPDATE SET track=$track,share=$share", transaction);
+            bool invitations = backgroundInvitations ?? Preferences(id, transaction).BackgroundInvitations;
+            using var command = Command("INSERT INTO preferences VALUES($id,$track,$share,$invites) ON CONFLICT(id) DO UPDATE SET track=$track,share=$share,invite_checks=$invites", transaction);
             command.Parameters.AddWithValue("$id", id.ToString()); command.Parameters.AddWithValue("$track", track); command.Parameters.AddWithValue("$share", share);
+            command.Parameters.AddWithValue("$invites", invitations);
             command.ExecuteNonQuery();
             if (reset || !track)
             {

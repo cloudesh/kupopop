@@ -9,7 +9,8 @@ public sealed partial class MainWindow
 {
     private SocialView? social;
     private SharedProfile? sharedProfile;
-    private bool showSharedProfile, openSharedProfile, inviteAfterCreate;
+    private bool showSharedProfile, openSharedProfile, inviteAfterCreate, profileRequested;
+    private int profileSettingsPage;
 
     private GameInvitation[] ActiveInvitations() => social?.Invitations.Where(i => i.ExpiresAt > DateTimeOffset.UtcNow).ToArray() ?? [];
 
@@ -17,7 +18,11 @@ public sealed partial class MainWindow
     {
         switch (message.Type)
         {
-            case "social": social = message.Social; return true;
+            case "social":
+                social = message.Social;
+                if (social is not null && plugin.Config.BackgroundInvitations != social.Preferences.BackgroundInvitations)
+                { plugin.Config.BackgroundInvitations = social.Preferences.BackgroundInvitations; plugin.Save(); }
+                return true;
             case "friend-presence":
                 if (social is not null) social = social with
                 {
@@ -25,7 +30,7 @@ public sealed partial class MainWindow
                     p.Relationship == "friend" && p.Profile.Id == message.ActorId ? p with { Online = message.Online } : p).ToArray()
                 };
                 return true;
-            case "shared-profile": sharedProfile = message.SharedProfile; openSharedProfile = true; return true;
+            case "shared-profile": sharedProfile = message.SharedProfile; openSharedProfile = profileRequested; profileRequested = false; return true;
             case "invitation" when message.Invitation is { } invitation:
                 toasts.Show("invite:" + invitation.Id, "A game invitation", invitation.From.DisplayName + " invited you to " + invitation.RoomTitle + ". Open Friends or Play to join.");
                 return true;
@@ -34,14 +39,15 @@ public sealed partial class MainWindow
         }
     }
 
-    private void OpenFriends()
+    private void OpenFriends(bool inviting = false)
     {
+        if (inviting) friendsTab = "friend";
         ShowDebug = false; screen = "friends"; Send(new("social"));
     }
 
     private void SocialActions(Guid id)
     {
-        if (ImGui.MenuItem("View profile")) Send(new("view-profile", TargetId: id));
+        if (ImGui.MenuItem("View profile")) ViewArtistProfile(id);
         string? relationship = social?.People.FirstOrDefault(p => p.Profile.Id == id)?.Relationship;
         if (relationship is null or "recent")
         {
@@ -55,71 +61,124 @@ public sealed partial class MainWindow
         else if (ImGui.MenuItem(relationship == "friend" ? "Remove friend" : "Cancel friend request")) Send(new("friend-remove", TargetId: id));
     }
 
+    private string friendsTab = "friend";
+
     private void FriendsScreen()
     {
-        if (PageHeading("Friends", refresh: false)) return;
-        if (UiTheme.Button("Refresh", 0, quiet: true)) Send(new("social"));
-        UiTheme.Wrapped("Friend requests require acceptance. Accepted friends can see when your book is open and send in-plugin invitations. Recent players are private to this session and clear when you close the book.", UiTheme.Muted);
-        using var panel = new UiTheme.PaperPanel("friends-list", Vector2.Zero);
+        if (PageHeading("Friends")) return;
+        var tabs = ImGui.GetCursorScreenPos();
+        foreach (var tab in new[] { ("incoming", "Requests"), ("friend", "Friends"), ("outgoing", "Sent"), ("recent", "Recently played") })
+        {
+            if (tab.Item1 != "incoming") ImGui.SameLine(0, UiTheme.S(3));
+            int count = social?.People.Count(p => p.Relationship == tab.Item1) ?? 0;
+            if (UiTheme.PanelTab(tab.Item2 + "  " + count, friendsTab == tab.Item1)) friendsTab = tab.Item1;
+        }
+        ImGui.SetCursorScreenPos(tabs + UiTheme.V(0, 34));
+        using var panel = new UiTheme.PaperPanel("friends-list", Vector2.Zero, attachedTabs: true);
         if (!panel.Success) return;
-        foreach (var invite in ActiveInvitations())
+        foreach (var invite in ActiveInvitations()) InvitationCard(invite);
+        if (ImGui.BeginTable("friends-tools", 2, ImGuiTableFlags.NoPadOuterX))
         {
-            using var id = ImRaii.PushId(invite.Id.ToString());
-            UiTheme.Wrapped(invite.From.DisplayName + " invited you to " + invite.RoomTitle);
-            using (ImRaii.Disabled(room is not null))
-                if (UiTheme.Button("Join game", 0, primary: true)) Send(new("accept-invite", TargetId: invite.Id));
-            ImGui.SameLine(); if (UiTheme.Button("Dismiss", 0, quiet: true)) Send(new("dismiss-invite", TargetId: invite.Id));
-            if (room is not null) UiTheme.Caption("Leave your current room to accept this invitation.");
-            UiTheme.Rule();
-        }
-        foreach (var group in new[] { ("incoming", "FRIEND REQUESTS"), ("friend", "FRIENDS"), ("outgoing", "SENT REQUESTS"), ("recent", "RECENTLY PLAYED WITH") })
-        {
-            UiTheme.Caption(group.Item2);
-            var people = social?.People.Where(p => p.Relationship == group.Item1).ToArray() ?? [];
-            if (people.Length == 0) UiTheme.Caption(group.Item1 == "friend" ? "Right-click an artist in your room to add them." : "None yet.");
-            foreach (var person in people)
+            ImGui.TableSetupColumn("Explanation", ImGuiTableColumnFlags.WidthStretch);
+            ImGui.TableSetupColumn("Refresh", ImGuiTableColumnFlags.WidthFixed, UiTheme.S(80));
+            ImGui.TableNextColumn();
+            UiTheme.Wrapped(friendsTab switch
             {
-                using var id = ImRaii.PushId(person.Profile.Id.ToString());
-                ImGui.Image(avatars.Get(person.Profile).Handle, UiTheme.V(36, 36));
-                ImGui.SameLine(); ImGui.BeginGroup();
-                ImGui.TextUnformatted(person.Profile.DisplayName);
-                if (person.Relationship == "friend") UiTheme.Caption(person.Online ? "Book open" : "Offline");
-                ImGui.EndGroup();
-                ImGui.SameLine();
-                if (UiTheme.Button("Profile", 0, quiet: true)) Send(new("view-profile", TargetId: person.Profile.Id));
-                ImGui.SameLine();
-                if (person.Relationship == "incoming")
-                {
-                    if (UiTheme.Button("Accept")) Send(new("friend-accept", TargetId: person.Profile.Id));
-                    ImGui.SameLine(); if (UiTheme.Button("Decline", 0, quiet: true)) Send(new("friend-remove", TargetId: person.Profile.Id));
-                }
-                else if (person.Relationship == "recent")
-                {
-                    if (UiTheme.Button("Add friend")) Send(new("friend-request", TargetId: person.Profile.Id));
-                }
-                else if (person.Relationship == "friend")
-                {
-                    using (ImRaii.Disabled(!person.Online || room is null || room.HostId != device?.AccountId || room.Phase is not ("waiting" or "results")))
-                        if (UiTheme.Button("Invite")) Send(new("invite", TargetId: person.Profile.Id));
-                    ImGui.SameLine(); if (UiTheme.Button("Remove", 0, quiet: true)) Send(new("friend-remove", TargetId: person.Profile.Id));
-                }
-                else if (UiTheme.Button("Cancel request", 0, quiet: true)) Send(new("friend-remove", TargetId: person.Profile.Id));
-                UiTheme.Gap(4);
-            }
-            UiTheme.Rule();
+                "incoming" => "A new face for your sketchbook. Accept to become friends.",
+                "outgoing" => "Your invitations to become friends, waiting for a reply.",
+                "recent" => "Artists from this session. This list clears when you close the book.",
+                _ => "A little company makes every drawing better.",
+            }, UiTheme.Muted);
+            ImGui.TableNextColumn();
+            if (UiTheme.Button("Refresh", 0, quiet: true)) Send(new("social"));
+            ImGui.EndTable();
         }
+        UiTheme.Gap(8);
+        var people = social?.People.Where(p => p.Relationship == friendsTab).OrderByDescending(p => p.Online)
+            .ThenBy(p => p.Profile.DisplayName, StringComparer.OrdinalIgnoreCase).ToArray() ?? [];
+        if (people.Length == 0)
+        {
+            UiTheme.Gap(28);
+            UiTheme.Wrapped(friendsTab == "friend" ? "Your next drawing partner is a right-click away." : "Nothing on this page yet.");
+            UiTheme.Wrapped(friendsTab == "friend" ? "Right-click an artist in a room and choose Add friend." : "Come back after your next game.", UiTheme.Muted);
+        }
+        foreach (var person in people) FriendCard(person);
+    }
+
+    private void FriendCard(SocialPerson person)
+    {
+        using var id = ImRaii.PushId(person.Profile.Id.ToString());
+        using var padding = ImRaii.PushStyle(ImGuiStyleVar.WindowPadding, UiTheme.V(12, 10));
+        using var background = ImRaii.PushColor(ImGuiCol.ChildBg, UiPresentation.Alpha(UiTheme.Inset, UiTheme.DarkMode ? 0.48f : 0.30f));
+        using var rounding = ImRaii.PushStyle(ImGuiStyleVar.ChildRounding, UiTheme.S(7));
+        using var card = ImRaii.Child("friend-card", new Vector2(0, UiTheme.S(80)), false,
+            ImGuiWindowFlags.NoScrollbar | ImGuiWindowFlags.NoScrollWithMouse);
+        if (!card.Success) return;
+        ImGui.SetCursorPos(UiTheme.V(12, 10));
+        if (!ImGui.BeginTable("friend-row", 3, ImGuiTableFlags.NoPadOuterX, new Vector2(ImGui.GetContentRegionAvail().X - UiTheme.S(12), 0))) return;
+        try
+        {
+            ImGui.TableSetupColumn("Portrait", ImGuiTableColumnFlags.WidthFixed, UiTheme.S(64));
+            ImGui.TableSetupColumn("Artist", ImGuiTableColumnFlags.WidthStretch);
+            ImGui.TableSetupColumn("Actions", ImGuiTableColumnFlags.WidthFixed, UiTheme.S(170));
+            ImGui.TableNextColumn();
+            UiPortrait.Draw(avatars.Get(person.Profile).Handle, UiTheme.V(52, 52));
+            ImGui.TableNextColumn();
+            UiTheme.Gap(3);
+            UiTheme.Ellipsis(person.Profile.DisplayName, ImGui.GetContentRegionAvail().X);
+            string status = person.Relationship switch
+            {
+                "incoming" => "Would like to be your friend",
+                "outgoing" => "Waiting for their reply",
+                "recent" => "Shared a drawing room",
+                _ => person.Online ? "Book open" : person.AcceptsOfflineInvites ? "Offline · accepts invitations" : "Offline",
+            };
+            ImGui.TextColored(person.Online ? UiTheme.Green : UiTheme.Muted, status);
+            ImGui.TableNextColumn();
+            UiTheme.Gap(8);
+            if (UiTheme.Button("Profile", UiTheme.S(66), quiet: true)) ViewArtistProfile(person.Profile.Id);
+            ImGui.SameLine(0, UiTheme.S(4));
+            string action = person.Relationship switch { "incoming" => "Accept", "friend" => "Invite", "recent" => "Add", _ => "Cancel" };
+            bool invite = person.Relationship == "friend";
+            using (ImRaii.Disabled(invite && ((!person.Online && !person.AcceptsOfflineInvites) || room is null || room.HostId != device?.AccountId || room.Phase is not ("waiting" or "results"))))
+                if (UiTheme.Button(action, UiTheme.S(62), primary: person.Relationship is "incoming" or "recent"))
+                    Send(new(person.Relationship switch { "incoming" => "friend-accept", "friend" => "invite", "recent" => "friend-request", _ => "friend-remove" }, TargetId: person.Profile.Id));
+            ImGui.SameLine(0, UiTheme.S(2));
+            if (UiTheme.GlyphButton("Friend actions", "...", UiTheme.V(24, 28))) ImGui.OpenPopup("friend-options");
+            if (ImGui.BeginPopup("friend-options")) { SocialActions(person.Profile.Id); ImGui.EndPopup(); }
+        }
+        finally { ImGui.EndTable(); }
+    }
+
+    private void InvitationCard(GameInvitation invitation)
+    {
+        using var id = ImRaii.PushId(invitation.Id.ToString());
+        using var tint = ImRaii.PushColor(ImGuiCol.ChildBg, UiTheme.RoseTint);
+        using var padding = ImRaii.PushStyle(ImGuiStyleVar.WindowPadding, UiTheme.V(12, 10));
+        using var card = ImRaii.Child("invitation-card", new Vector2(0, UiTheme.S(94)), false,
+            ImGuiWindowFlags.NoScrollbar | ImGuiWindowFlags.NoScrollWithMouse);
+        if (!card.Success) return;
+        ImGui.SetCursorPos(UiTheme.V(12, 10));
+        ImGui.TextColored(UiTheme.Rose, "YOU'RE INVITED");
+        UiTheme.Ellipsis(invitation.From.DisplayName + " · " + invitation.RoomTitle, ImGui.GetContentRegionAvail().X);
+        using (ImRaii.Disabled(room is not null))
+            if (UiTheme.Button("Join game", UiTheme.S(110), primary: true)) Send(new("accept-invite", TargetId: invitation.Id));
+        ImGui.SameLine(); if (UiTheme.Button("Dismiss", 0, quiet: true)) Send(new("dismiss-invite", TargetId: invitation.Id));
     }
 
     private void ProfilePrivacyControls()
     {
         if (social is null) return;
         bool track = social.Preferences.TrackStats, share = social.Preferences.ShareProfile;
-        UiTheme.Rule();
+        bool background = social.Preferences.BackgroundInvitations;
+        UiTheme.Caption("YOUR PRIVACY");
         bool changed = ImGui.Checkbox("Record my lifetime game stats", ref track);
         changed |= ImGui.Checkbox("Share my profile", ref share);
-        UiTheme.Wrapped("Sharing lets room partners and friends view your avatar and opted-in game totals. It reveals that you use this plugin. There is no global player directory. Turning off stats deletes your totals; it never changes match scores or awards currency.", UiTheme.Muted);
-        if (changed) Send(new("profile-privacy", Enabled: track, Shared: share));
-        if (UiTheme.Button("View my profile", 0, quiet: true)) Send(new("view-profile", TargetId: device!.AccountId));
+        changed |= ImGui.Checkbox("Invitations while my book is closed", ref background);
+        UiTheme.Wrapped("Optional: checks for friend invitations once a minute over HTTPS, without staying in a game session. Shows a Dalamud notification; it never opens your book automatically.", UiTheme.Muted);
+        UiTheme.Wrapped("Sharing reveals plugin use to friends and room partners. There is no player directory. Turning off statistics deletes your totals; match scoring stays the same.", UiTheme.Muted);
+        if (changed) Send(new("profile-privacy", Enabled: track, Shared: share, BackgroundInvitations: background));
+        if (UiTheme.Button("View my profile", 0, quiet: true)) ViewArtistProfile(device!.AccountId);
         ImGui.SameLine();
         if (UiTheme.Button("Reset lifetime stats", 0, quiet: true)) ImGui.OpenPopup("reset-lifetime");
         if (ImGui.BeginPopup("reset-lifetime"))
@@ -131,25 +190,62 @@ public sealed partial class MainWindow
         }
     }
 
+    private void ViewArtistProfile(Guid id)
+    {
+        profileRequested = true;
+        if (!Send(new("view-profile", TargetId: id))) profileRequested = false;
+    }
+
     private void SharedProfilePopup()
     {
         if (openSharedProfile) { ImGui.OpenPopup("Artist profile"); showSharedProfile = true; openSharedProfile = false; }
-        ImGui.SetNextWindowSize(UiTheme.V(390, 300), ImGuiCond.Appearing);
+        ImGui.SetNextWindowSize(UiTheme.V(470, 450), ImGuiCond.Appearing);
+        ImGui.SetNextWindowPos(ImGui.GetWindowPos() + ImGui.GetWindowSize() / 2, ImGuiCond.Appearing, new Vector2(0.5f));
+        using var surface = ImRaii.PushColor(ImGuiCol.PopupBg, UiTheme.Panel);
+        using var padding = ImRaii.PushStyle(ImGuiStyleVar.WindowPadding, UiTheme.V(22, 18));
         if (!ImGui.BeginPopupModal("Artist profile", ref showSharedProfile, ImGuiWindowFlags.NoResize)) return;
         try
         {
             if (sharedProfile is not { } view) return;
-            ImGui.Image(avatars.Get(view.Profile).Handle, UiTheme.V(64, 64));
-            ImGui.SameLine(); ImGui.TextUnformatted(view.Profile.DisplayName);
-            UiTheme.Rule();
-            if (!view.Visible) UiTheme.Wrapped("This artist keeps their profile private.");
+            UiPortrait.Draw(avatars.Get(view.Profile).Handle, UiTheme.V(76, 76));
+            ImGui.SameLine(0, UiTheme.S(16)); ImGui.BeginGroup();
+            UiTheme.Gap(5);
+            UiTheme.Ellipsis(view.Profile.DisplayName, Math.Max(UiTheme.S(100), ImGui.GetContentRegionAvail().X));
+            ImGui.TextColored(view.Visible ? UiTheme.Green : UiTheme.Muted, view.Visible ? "A SHARED SKETCHBOOK" : "A PRIVATE SKETCHBOOK");
+            UiTheme.Caption("Kupo Skribbl artist");
+            ImGui.EndGroup();
+            UiTheme.Gap(14);
+            if (!view.Visible)
+            {
+                UiTheme.Wrapped("This artist is keeping their sketchbook to themselves.");
+                UiTheme.Wrapped("Their lifetime statistics are private.", UiTheme.Muted);
+            }
             else if (view.Stats is { } stats)
             {
-                ImGui.TextUnformatted($"Games completed: {stats.Games:N0}\nWins (including ties): {stats.Wins:N0}\nLifetime points: {stats.Points:N0}\nBest match: {stats.BestScore:N0}");
-                UiTheme.Wrapped("Totals cover completed matches since opting in. These are game statistics, not spendable Kupo-Points.", UiTheme.Muted);
+                if (ImGui.BeginTable("lifetime-cards", 2, ImGuiTableFlags.SizingStretchSame))
+                {
+                    foreach (var metric in new[] { ("GAMES PLAYED", stats.Games.ToString("N0")), ("VICTORIES", stats.Wins.ToString("N0")), ("LIFETIME POINTS", stats.Points.ToString("N0")), ("BEST MATCH", stats.BestScore.ToString("N0")) })
+                    {
+                        ImGui.TableNextColumn();
+                        var at = ImGui.GetCursorScreenPos();
+                        var size = new Vector2(ImGui.GetContentRegionAvail().X, UiTheme.S(78));
+                        ImGui.GetWindowDrawList().AddRectFilled(at, at + size, UiTheme.C(UiPresentation.Alpha(UiTheme.Inset, 0.55f)), UiTheme.S(6));
+                        ImGui.SetCursorScreenPos(at + UiTheme.V(12, 9)); UiTheme.Caption(metric.Item1);
+                        ImGui.SetCursorScreenPos(at + UiTheme.V(12, 30)); art.Heading(metric.Item2);
+                        ImGui.SetCursorScreenPos(at); ImGui.Dummy(size);
+                    }
+                    ImGui.EndTable();
+                }
+                UiTheme.Gap(8);
+                UiTheme.Wrapped("Completed matches since opting in. Victories include ties. Points are a personal record, not currency.", UiTheme.Muted);
             }
-            else UiTheme.Wrapped("Lifetime statistics are not enabled for this artist.", UiTheme.Muted);
-            if (UiTheme.Button("Close", 0, primary: true)) { showSharedProfile = false; ImGui.CloseCurrentPopup(); }
+            else
+            {
+                UiTheme.Wrapped("A fresh page, with stories still to draw.");
+                UiTheme.Wrapped("This artist hasn't enabled lifetime statistics.", UiTheme.Muted);
+            }
+            UiTheme.Gap(10);
+            if (UiTheme.Button("Close sketchbook", ImGui.GetContentRegionAvail().X, primary: true)) { showSharedProfile = false; ImGui.CloseCurrentPopup(); }
         }
         finally { ImGui.EndPopup(); }
     }

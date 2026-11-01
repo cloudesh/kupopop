@@ -12,7 +12,7 @@ public sealed record StoredAccount(PlayerProfile Profile, string AccessHash, str
 /// <summary>Transactional account persistence. Game rooms and scores remain ephemeral.</summary>
 public sealed partial class AccountStore : IDisposable
 {
-    private const int SchemaVersion = 3;
+    private const int SchemaVersion = 4;
     private const int MaximumAccounts = 10_000;
     private const string ProfileColumns = "id, display_name, avatar_seed, avatar_pixels, avatar_preset";
     private readonly object gate = new();
@@ -37,12 +37,13 @@ public sealed partial class AccountStore : IDisposable
             Execute("PRAGMA journal_mode=WAL; PRAGMA synchronous=FULL; PRAGMA trusted_schema=OFF;");
             Initialize(directory);
             InitializeSocial();
+            InitializeInvitationPreferences();
             VerifyIntegrity();
         }
         catch { database.Dispose(); throw; }
     }
 
-    public AccountCredentials Create(string displayName)
+    public AccountCredentials Create(string displayName, bool shareProfile = false)
     {
         ValidateName(displayName);
         lock (gate)
@@ -54,6 +55,11 @@ public sealed partial class AccountStore : IDisposable
             EnsureNameAvailable(profile.DisplayName, profile.Id, transaction);
             Insert(new(profile, Hash(access), Hash(recovery)), transaction);
             SetNameKey(profile, transaction);
+            using (var preferences = Command("INSERT INTO preferences(id,track,share,invite_checks) VALUES($id,0,$share,0)", transaction))
+            {
+                preferences.Parameters.AddWithValue("$id", profile.Id.ToString()); preferences.Parameters.AddWithValue("$share", shareProfile);
+                preferences.ExecuteNonQuery();
+            }
             transaction.Commit();
             return new(profile.Id, access, recovery, profile);
         }
@@ -184,7 +190,7 @@ public sealed partial class AccountStore : IDisposable
     {
         using var versionQuery = Command("PRAGMA user_version");
         int version = Convert.ToInt32(versionQuery.ExecuteScalar());
-        if (version is 2 or SchemaVersion) return;
+        if (version is 2 or 3 or SchemaVersion) return;
         if (version == 1)
         {
             // SQLite counts Unicode scalars; .NET string limits count UTF-16

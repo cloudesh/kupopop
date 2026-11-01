@@ -152,7 +152,7 @@ public sealed partial class MainWindow
     private void Welcome()
     {
         var available = ImGui.GetContentRegionAvail();
-        var size = new Vector2(Math.Min(available.X, UiTheme.S(480)), Math.Min(available.Y, UiTheme.S(returningArtist ? 420 : 280)));
+        var size = new Vector2(Math.Min(available.X, UiTheme.S(480)), Math.Min(available.Y, UiTheme.S(returningArtist ? 470 : 350)));
         ImGui.SetCursorScreenPos(ImGui.GetCursorScreenPos() + Vector2.Max(Vector2.Zero, (available - size) / 2));
         using var panel = new UiTheme.PaperPanel("welcome-card", size);
         if (!panel.Success) return;
@@ -161,6 +161,8 @@ public sealed partial class MainWindow
         using (ImRaii.Disabled(busy || client is null))
         {
             UiTheme.Field("Display name", "##new-name", ref displayName, 40, "Your character or artist name");
+            ImGui.Checkbox("Share my profile with friends and room partners", ref shareNewProfile);
+            UiTheme.Wrapped("Shared profiles reveal that you use this plugin. Uncheck to keep yours private; you can change this later. Lifetime statistics are a separate opt-in setting.", UiTheme.Muted);
             using (ImRaii.Disabled(!Protocol.ValidName(displayName)))
                 if (UiTheme.Button(busy ? "Creating your profile..." : "Create my profile", ImGui.GetContentRegionAvail().X, primary: true)) CreateAccount(false);
             UiTheme.Gap(3);
@@ -193,7 +195,7 @@ public sealed partial class MainWindow
         ImGui.Checkbox("I have saved my code somewhere private", ref savedRecovery);
         if (profile is not null)
         {
-            ImGui.Image(avatars.Get(profile).Handle, UiTheme.V(64, 64));
+            UiPortrait.Draw(avatars.Get(profile).Handle, UiTheme.V(64, 64));
             ImGui.SameLine(); ImGui.TextUnformatted("A little face to get you started.");
         }
         using (ImRaii.Disabled(!savedRecovery))
@@ -214,11 +216,12 @@ public sealed partial class MainWindow
         try
         {
             ImGui.TableNextColumn();
-            using (var card = new UiTheme.PaperPanel("join-card", new Vector2(0, UiTheme.S(250)), note: UiTheme.StickyYellow, scrollable: false))
+            using (var card = new UiTheme.PaperPanel("join-card", new Vector2(0, UiTheme.S(250)), note: ActiveInvitations().Length > 0 ? UiTheme.InvitationPaper : UiTheme.StickyYellow, scrollable: false))
             {
                 if (card.Success)
                 {
                     var invitation = ActiveInvitations().FirstOrDefault();
+                    if (invitation is not null) UiTheme.InvitationGlow(ImGui.GetWindowPos(), ImGui.GetWindowPos() + ImGui.GetWindowSize());
                     art.Heading(invitation is null ? "Join via code" : "You're invited!");
                     UiTheme.Wrapped(invitation is null ? "Enter a code from your friend below to play." : invitation.From.DisplayName + " invited you to " + invitation.RoomTitle, UiTheme.Muted);
                     UiTheme.Gap(10);
@@ -226,7 +229,7 @@ public sealed partial class MainWindow
                     else if (UiTheme.Button("Dismiss invitation", 0, quiet: true)) Send(new("dismiss-invite", TargetId: invitation.Id));
                     CardActionPosition();
                     using (ImRaii.Disabled(client?.Connected != true || invitation is null && string.IsNullOrWhiteSpace(joinCode)))
-                        if (UiTheme.NoteButton(invitation is null ? "Join room" : "Join invited game", ImGui.GetContentRegionAvail().X, UiTheme.StickyYellow, primary: true))
+                        if (UiTheme.NoteButton(invitation is null ? "Join room" : "Join invited game", ImGui.GetContentRegionAvail().X, invitation is null ? UiTheme.StickyYellow : UiTheme.InvitationPaper, primary: true))
                             Send(invitation is null ? new("join", Text: joinCode) : new("accept-invite", TargetId: invitation.Id));
                 }
             }
@@ -268,7 +271,7 @@ public sealed partial class MainWindow
         ImGui.SetCursorScreenPos(new Vector2(origin.X + UiTheme.S(6), ImGui.GetCursorScreenPos().Y));
         if (profile is not null)
         {
-            ImGui.Image(avatars.Get(profile).Handle, UiTheme.V(42, 42));
+            UiPortrait.Draw(avatars.Get(profile).Handle, UiTheme.V(42, 42));
             ImGui.SameLine(); ImGui.BeginGroup();
             ImGui.TextUnformatted(profile.DisplayName);
             UiTheme.Caption("Your sketchbook, your signature.");
@@ -506,7 +509,7 @@ public sealed partial class MainWindow
                 using (ImRaii.Disabled(online < 2 || client?.Connected != true))
                     if (UiTheme.Button(state.Phase == "results" ? "Play again" : "Start drawing", 0, primary: true)) Send(new("start"));
                 ImGui.SameLine(); if (UiTheme.Button("Room settings", 0, quiet: true)) { EditRoomSettings(); return; }
-                ImGui.SameLine(); if (UiTheme.Button("Invite friends", 0, quiet: true)) { OpenFriends(); return; }
+                ImGui.SameLine(); if (UiTheme.Button("Invite friends", 0, quiet: true)) { OpenFriends(inviting: true); return; }
                 if (online < 2) { ImGui.SameLine(); ImGui.AlignTextToFramePadding(); UiTheme.Caption("Invite another artist to begin."); }
             }
             else UiTheme.Caption("Waiting for the host to start.");
@@ -550,7 +553,7 @@ public sealed partial class MainWindow
                 draw.AddRectFilled(row - UiTheme.V(3, 2), row + UiTheme.V(0, 42), UiTheme.C(UiTheme.Rose), UiTheme.S(2));
             }
             ImGui.BeginGroup();
-            ImGui.Image(texture.Handle, UiTheme.V(40, 40));
+            UiPortrait.Draw(texture.Handle, UiTheme.V(40, 40));
             if (drawing && ImGui.IsItemHovered()) UiTheme.Tooltip("Current drawer");
             ImGui.SameLine(); ImGui.BeginGroup();
             UiTheme.Ellipsis(player.Profile.DisplayName, Math.Max(UiTheme.S(35), ImGui.GetContentRegionAvail().X));
@@ -646,6 +649,7 @@ public sealed partial class MainWindow
         avatarPreset = profile.AvatarPreset;
         avatarReset = profile.AvatarPixels is null && avatarPreset is null;
         avatarHistory.Clear();
+        profileSettingsPage = 0;
         screen = "profile";
     }
 
@@ -666,7 +670,7 @@ public sealed partial class MainWindow
                     bool emblem = AvatarPresets.Find(avatarPreset)?.Icon is > 0;
                     if (emblem && profile is not null)
                     {
-                        ImGui.Image(avatars.Get(profile with { AvatarPixels = null, AvatarPreset = avatarPreset }).Handle, UiTheme.V(128, 128));
+                        UiPortrait.Draw(avatars.Get(profile with { AvatarPixels = null, AvatarPreset = avatarPreset }).Handle, UiTheme.V(128, 128));
                         UiTheme.Wrapped("Job emblem from your game client. Choose a moogle or custom drawing to paint.", UiTheme.Muted);
                     }
                     else
@@ -688,9 +692,18 @@ public sealed partial class MainWindow
             ImGui.SetCursorPosX(ImGui.GetCursorPosX() + Math.Max(0, ImGui.GetContentRegionAvail().X - backWidth));
             if (BackButton()) return;
             UiTheme.Gap(4);
+            if (UiTheme.Tab("Artist", profileSettingsPage == 0)) profileSettingsPage = 0;
+            ImGui.SameLine(); if (UiTheme.Tab("Privacy & invitations", profileSettingsPage == 1)) profileSettingsPage = 1;
+            UiTheme.Gap(10);
+            if (profileSettingsPage == 1)
+            {
+                ProfilePrivacyControls();
+                UiTheme.Gap(8); UiTheme.Caption("Changes are saved automatically.");
+                return;
+            }
             UiTheme.Field("Display name", "##profile-name", ref displayName, 40, "Your artist name");
             UiTheme.Wrapped("Character unverified. Your name and avatar are shared with the people in your room.", UiTheme.Muted);
-            ProfilePrivacyControls();
+            if (UiTheme.Button("View my sketchbook", 0, quiet: true)) ViewArtistProfile(device!.AccountId);
             UiTheme.Gap(6);
             using (ImRaii.Disabled(savingProfile || client?.Connected != true || !Protocol.ValidName(displayName)))
                 if (UiTheme.NoteButton(savingProfile ? "Saving..." : "Save my profile", ImGui.GetContentRegionAvail().X, UiTheme.StickyRose, primary: true))

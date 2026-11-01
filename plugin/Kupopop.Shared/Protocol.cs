@@ -77,7 +77,7 @@ public static class Protocol
     }
 }
 
-public sealed record AccountRequest(string DisplayName);
+public sealed record AccountRequest(string DisplayName, bool ShareProfile = false);
 public sealed record RecoveryRequest(string RecoveryCode);
 public sealed record AccountCredentials(Guid AccountId, string AccessToken, string RecoveryCode, PlayerProfile Profile);
 public sealed record PlayerProfile(Guid Id, string DisplayName, int AvatarSeed, byte[]? AvatarPixels = null, string? AvatarPreset = null);
@@ -107,7 +107,7 @@ public sealed record RoomView(string Code, RoomOptions Options, string Phase, Gu
 public sealed record DrawOperation(string Tool, int X1, int Y1, int X2, int Y2, byte Color = 1, int Size = 3, Guid StrokeId = default);
 public sealed record ClientCommand(string Type, string? Text = null, RoomOptions? Options = null,
     DrawOperation? Draw = null, Guid TurnId = default, byte[]? Avatar = null, bool ResetAvatar = false, string? AvatarPreset = null,
-    BrushCursor? Cursor = null, Guid TargetId = default, bool Enabled = false, bool Shared = false);
+    BrushCursor? Cursor = null, Guid TargetId = default, bool Enabled = false, bool Shared = false, bool? BackgroundInvitations = null);
 public sealed record ServerEvent(string Type, RoomView? Room = null, RoomSummary[]? Rooms = null,
     ChatLine? Chat = null, DrawOperation? Draw = null, Guid? ActorId = null,
     string? Error = null, PlayerProfile? Profile = null, Guid TurnId = default, string? RejectedCommand = null,

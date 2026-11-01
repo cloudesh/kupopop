@@ -117,7 +117,7 @@ public sealed partial class GameEngine(AccountStore accounts, ILogger<GameEngine
         {
             if (!peers.TryGetValue(peer.Id, out var active) || !ReferenceEquals(active, peer)) return;
             peers.Remove(peer.Id);
-            invitations.Remove(peer.Id);
+            if (!accounts.Preferences(peer.Id).BackgroundInvitations) invitations.Remove(peer.Id);
             nextInvitation.Remove(peer.Id);
             if (intentional) recentPlayers.Remove(peer.Id);
             RefreshFriends(peer.Id, presenceOnly: true);
@@ -163,7 +163,9 @@ public sealed partial class GameEngine(AccountStore accounts, ILogger<GameEngine
                     case "friend-remove": ChangeFriend(peer, command.TargetId, "remove"); break;
                     case "view-profile": ViewProfile(peer, command.TargetId); break;
                     case "profile-privacy":
-                        accounts.SetPreferences(peer.Id, command.Enabled, command.Shared, command.ResetAvatar);
+                        accounts.SetPreferences(peer.Id, command.Enabled, command.Shared, command.ResetAvatar, command.BackgroundInvitations);
+                        if (command.BackgroundInvitations == false) invitations.Remove(peer.Id);
+                        RefreshFriends(peer.Id);
                         foreach (var activeRoom in rooms.Values) activeRoom.StatsParticipants.Remove(peer.Id);
                         SendSocial(peer); ViewProfile(peer, peer.Id);
                         break;
@@ -312,6 +314,7 @@ public sealed partial class GameEngine(AccountStore accounts, ILogger<GameEngine
     {
         lock (gate)
         {
+            CleanInvitationInboxes();
             foreach (var room in rooms.Values.ToArray())
             {
                 foreach (var member in room.Members.Values.Where(m => !m.Connected && Now - m.DisconnectedAt > TimeSpan.FromSeconds(30)).ToArray())

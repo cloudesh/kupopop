@@ -1,7 +1,8 @@
 namespace Kupopop.Shared;
 
-public sealed record SocialPerson(PlayerProfile Profile, string Relationship, bool Online = false);
-public sealed record ProfilePreferences(bool TrackStats, bool ShareProfile);
+public sealed record SocialPerson(PlayerProfile Profile, string Relationship, bool Online = false, bool AcceptsOfflineInvites = false);
+public sealed record ProfilePreferences(bool TrackStats, bool ShareProfile, bool BackgroundInvitations = false);
+public sealed record InvitationInbox(bool Enabled, GameInvitation[] Invitations);
 public sealed record LifetimeStats(long Games, long Wins, long Points, int BestScore);
 public sealed record SharedProfile(PlayerProfile Profile, bool Visible, LifetimeStats? Stats,
     ProfilePreferences? Preferences = null);

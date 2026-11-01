@@ -206,7 +206,7 @@ public sealed partial class MainWindow
                     portrait: (winner, at, extent) =>
                     {
                         var player = state.Players.FirstOrDefault(p => p.Profile.Id == winner.PlayerId);
-                        if (player is not null) ImGui.GetWindowDrawList().AddImage(avatars.Get(player.Profile).Handle, at, at + new Vector2(extent));
+                        if (player is not null) UiPortrait.DrawAt(avatars.Get(player.Profile).Handle, at, new Vector2(extent));
                         else UiStationery.Moogle(at + new Vector2(extent / 2), extent * 0.35f);
                     });
                 else UiPresentation.CenteredLabel("A fresh page is coming up.", inside, UiTheme.Muted);

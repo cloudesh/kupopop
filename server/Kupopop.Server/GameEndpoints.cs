@@ -10,11 +10,19 @@ public static class GameEndpoints
     {
         app.MapPost("/api/accounts", (AccountRequest request, AccountStore accounts) =>
         {
-            try { return Results.Json(accounts.Create(request.DisplayName), Protocol.Json, statusCode: 201); }
+            try { return Results.Json(accounts.Create(request.DisplayName, request.ShareProfile), Protocol.Json, statusCode: 201); }
             catch (DisplayNameTakenException) { return Results.Conflict(new { error = "That display name is unavailable. Please choose another." }); }
             catch (ArgumentException) { return Results.BadRequest(new { error = "Use a display name of 2–40 characters." }); }
             catch (InvalidOperationException) { return Results.StatusCode(503); }
         }).RequireRateLimiting("accounts");
+
+        app.MapGet("/api/invitations", (HttpContext context, AccountStore accounts, GameEngine engine) =>
+        {
+            string authorization = context.Request.Headers.Authorization.ToString();
+            string? token = authorization.StartsWith("Bearer ", StringComparison.Ordinal) ? authorization[7..] : null;
+            try { return engine.InvitationInbox(token) is { } inbox ? Results.Json(inbox, Protocol.Json) : Results.Unauthorized(); }
+            catch (InboxRateLimitException) { return Results.StatusCode(429); }
+        }).RequireRateLimiting("invitation-checks");
 
         app.MapPost("/api/recover", (RecoveryRequest request, AccountStore accounts, GameEngine engine) =>
         {

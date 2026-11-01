@@ -10,6 +10,7 @@ public sealed class Configuration : IPluginConfiguration
     public bool UseStandardFrame { get; set; }
     public bool DarkMode { get; set; }
     public bool CanvasToolsCollapsed { get; set; }
+    public bool BackgroundInvitations { get; set; }
     public bool? PaperPinned { get; set; }
     public string? DismissedUpdate { get; set; }
 }

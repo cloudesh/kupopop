@@ -46,7 +46,18 @@ public sealed class RemoteClient : IDisposable
             { BaseAddress = endpoint, Timeout = TimeSpan.FromSeconds(15) };
     }
 
-    public Task<AccountCredentials> CreateAsync(string name) => PostAsync("api/accounts", new AccountRequest(name));
+    public Task<AccountCredentials> CreateAsync(string name, bool shareProfile = false) => PostAsync("api/accounts", new AccountRequest(name, shareProfile));
+
+    public async Task<InvitationInbox> CheckInvitationsAsync(string token)
+    {
+        using var request = new HttpRequestMessage(HttpMethod.Get, "api/invitations");
+        request.Headers.Authorization = new("Bearer", token);
+        var inbox = await RequestAsync<InvitationInbox>(request, 32768).ConfigureAwait(false);
+        if (inbox.Invitations is not { Length: <= 20 } || inbox.Invitations.Any(i =>
+            i is null || !Protocol.ValidEvent(new("invitation", Invitation: i))))
+            throw new InvalidDataException("Invalid invitation inbox.");
+        return inbox;
+    }
     public Task<AccountCredentials> RecoverAsync(string code) => PostAsync("api/recover", new RecoveryRequest(code));
 
     public async Task CheckHealthAsync()

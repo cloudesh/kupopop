@@ -152,3 +152,5 @@ async completions to their owning client and cancels the retired client on close
 Normal WebSocket closure removes membership immediately; unexpected disconnects
 retain the bounded grace. Reopening waits for the old close handshake. Operational
 monitoring uses a private local snapshot, with no public HTTP route or identity data.
+
+0.9.1: SQLite schema 4 adds an opt-in invitation-check preference with default off, preserving all existing sharing/stats flags. Authenticated no-store inbox checks are bounded to 32 KiB, IP-limited and account-limited; they do not attach peers. Offline invitations require mutual friendship and the recipient's opt-in; queue contents are ephemeral, five-minute expiring, capped per account and globally. The optional client checker runs once per minute only while the window is closed, deduplicates IDs, caps visible notices, and uses Dalamud's notification manager. No timer reopens the window or creates a game socket. New account sharing is an explicit setup form choice; old privacy settings are not migrated to public. UI-only portrait backdrops preserve stored pixels.
