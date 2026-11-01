@@ -167,9 +167,15 @@ public sealed class CanvasWidget : IDisposable
         draw.PushClipRect(origin, origin + size, true);
         draw.AddCircle(point, radius + 1, UiTheme.C(UiTheme.CanvasInk), 24, UiTheme.S(2));
         draw.AddCircle(point, radius, Palette.Colors[cursor.Color], 24, UiTheme.S(1.5f));
-        var icon = cursor.Tool switch { "fill" => FontAwesomeIcon.FillDrip, "eraser" => FontAwesomeIcon.Eraser,
-            "circle" or "ellipse" => FontAwesomeIcon.Circle, "square" or "rectangle" => FontAwesomeIcon.Square,
-            "line" => FontAwesomeIcon.Slash, _ => FontAwesomeIcon.PencilAlt };
+        var icon = cursor.Tool switch
+        {
+            "fill" => FontAwesomeIcon.FillDrip,
+            "eraser" => FontAwesomeIcon.Eraser,
+            "circle" or "ellipse" => FontAwesomeIcon.Circle,
+            "square" or "rectangle" => FontAwesomeIcon.Square,
+            "line" => FontAwesomeIcon.Slash,
+            _ => FontAwesomeIcon.PencilAlt
+        };
         using (Plugin.PluginInterface.UiBuilder.IconFontFixedWidthHandle.Push())
             draw.AddText(point + UiTheme.V(10, 6), UiTheme.C(UiTheme.CanvasAccent), icon.ToIconString());
         draw.PopClipRect();

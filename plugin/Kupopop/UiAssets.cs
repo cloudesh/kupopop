@@ -12,13 +12,10 @@ public sealed class UiAssets : IDisposable
 {
     private readonly IFontHandle title = Plugin.PluginInterface.UiBuilder.FontAtlas.NewGameFontHandle(new GameFontStyle(GameFontFamilyAndSize.Jupiter23));
     private readonly IFontHandle large = Plugin.PluginInterface.UiBuilder.FontAtlas.NewGameFontHandle(new GameFontStyle(GameFontFamilyAndSize.Axis36));
-    private readonly DiagnosticLog log;
-    private bool mascotUnavailable;
-    private bool mascotReady;
     private static bool paperUnavailable;
     private static bool paperReady;
     private static DiagnosticLog? paperLog;
-    public UiAssets(DiagnosticLog log) { this.log = log; paperLog = log; }
+    public UiAssets(DiagnosticLog log) { paperLog = log; }
 
     public void Heading(string text)
     {
@@ -54,26 +51,6 @@ public sealed class UiAssets : IDisposable
     }
     public void CenteredHeading(string text, float width)
     { using var font = title.Push(); UiPresentation.CenteredLabel(text, width, UiTheme.Ink); }
-
-    public void Mascot(float size)
-    {
-        if (!mascotUnavailable)
-        {
-            try
-            {
-                // Painted Mogpendium artwork with transparent edges, not a minion
-                // item tile. This texture remains in the user's game installation.
-                var texture = Plugin.TextureProvider.GetFromGame("ui/uld/MoogleCollectionTitle_hr1.tex").GetWrapOrDefault();
-                if (texture is not null)
-                {
-                    if (!mascotReady) { mascotReady = true; log.Write($"ui.mascot_ready size={texture.Width}x{texture.Height}"); }
-                    ImGui.Image(texture.Handle, UiTheme.V(size, size)); return;
-                }
-            }
-            catch (Exception ex) { mascotUnavailable = true; log.Write("ui.mascot_unavailable", ex); }
-        }
-        ImGui.Dummy(UiTheme.V(size, size));
-    }
 
     public static bool PaperTexture(Vector2 min, Vector2 max, Vector4? tint = null)
     {

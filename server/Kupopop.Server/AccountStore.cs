@@ -2,90 +2,80 @@ using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json;
 using Kupopop.Shared;
+using Microsoft.Data.Sqlite;
 
 namespace Kupopop.Server;
 
+// Retained only for importing pre-SQLite installations.
 public sealed record StoredAccount(PlayerProfile Profile, string AccessHash, string RecoveryHash);
 
-public sealed class AccountStore
+/// <summary>Transactional account persistence. Game rooms and scores remain ephemeral.</summary>
+public sealed class AccountStore : IDisposable
 {
+    private const int SchemaVersion = 1;
+    private const int MaximumAccounts = 10_000;
+    private const string ProfileColumns = "id, display_name, avatar_seed, avatar_pixels, avatar_preset";
     private readonly object gate = new();
-    private readonly string path;
-    private readonly Dictionary<Guid, StoredAccount> accounts;
-    private readonly Dictionary<string, Guid> access = new(StringComparer.Ordinal);
+    private readonly SqliteConnection database;
 
     public AccountStore(string directory)
     {
         Directory.CreateDirectory(directory);
-        if (!OperatingSystem.IsWindows()) File.SetUnixFileMode(directory, UnixFileMode.UserRead | UnixFileMode.UserWrite | UnixFileMode.UserExecute);
-        path = Path.Combine(directory, "accounts.json");
-        // Fail closed if persistence is corrupt: never silently replace existing accounts.
-        accounts = File.Exists(path)
-            ? JsonSerializer.Deserialize<Dictionary<Guid, StoredAccount>>(File.ReadAllBytes(path), Protocol.Json)
-                ?? throw new InvalidDataException("Account store is empty or corrupt.")
-            : [];
-        foreach (var pair in accounts) access[pair.Value.AccessHash] = pair.Key;
+        Restrict(directory, directory: true);
+        string path = Path.Combine(directory, "accounts.db");
+        database = new SqliteConnection(new SqliteConnectionStringBuilder
+        {
+            DataSource = path,
+            Mode = SqliteOpenMode.ReadWriteCreate,
+            Pooling = false,
+            DefaultTimeout = 5,
+        }.ToString());
+        try
+        {
+            database.Open();
+            Restrict(path);
+            Execute("PRAGMA journal_mode=WAL; PRAGMA synchronous=FULL; PRAGMA trusted_schema=OFF;");
+            Initialize(directory);
+            VerifyIntegrity();
+        }
+        catch { database.Dispose(); throw; }
     }
 
     public AccountCredentials Create(string displayName)
     {
-        if (!Protocol.ValidName(displayName)) throw new ArgumentException("Use a display name of 2–40 characters.");
+        ValidateName(displayName);
         lock (gate)
         {
-            if (accounts.Count >= 10000) throw new InvalidOperationException("Account capacity reached; contact the host.");
-            string token = Secret(), recovery = Secret();
+            using var transaction = database.BeginTransaction();
+            if (Count(transaction) >= MaximumAccounts) throw new InvalidOperationException("Account capacity reached.");
+            string access = Secret(), recovery = Secret();
             var profile = new PlayerProfile(Guid.NewGuid(), displayName.Trim(), RandomNumberGenerator.GetInt32(int.MaxValue));
-            accounts[profile.Id] = new(profile, Hash(token), Hash(recovery));
-            access[Hash(token)] = profile.Id;
-            PersistOrRollback(profile.Id, null);
-            return new(profile.Id, token, recovery, profile);
+            Insert(new(profile, Hash(access), Hash(recovery)), transaction);
+            transaction.Commit();
+            return new(profile.Id, access, recovery, profile);
         }
     }
 
     public PlayerProfile? Authenticate(string? token)
     {
-        if (token is null || token.Length is < 40 or > 100) return null;
-        lock (gate) return access.TryGetValue(Hash(token), out var id) ? accounts[id].Profile : null;
+        if (token is not { Length: >= 40 and <= 100 }) return null;
+        lock (gate) return Find("access_hash", Hash(token));
     }
 
-    public PlayerProfile? Get(Guid id) { lock (gate) return accounts.GetValueOrDefault(id)?.Profile; }
+    public PlayerProfile? Get(Guid id)
+    {
+        lock (gate) return Find("id", id.ToString());
+    }
 
     public AccountCredentials? Recover(string code)
     {
-        if (code.Length is < 40 or > 100) return null;
-        string hash = Hash(code.Trim());
+        if (code is not { Length: >= 40 and <= 100 }) return null;
         lock (gate)
         {
-            var entry = accounts.Values.FirstOrDefault(a => CryptographicOperations.FixedTimeEquals(
-                Convert.FromHexString(a.RecoveryHash), Convert.FromHexString(hash)));
-            if (entry is null) return null;
-            string token = Secret(), recovery = Secret();
-            access.Remove(entry.AccessHash);
-            accounts[entry.Profile.Id] = entry with { AccessHash = Hash(token), RecoveryHash = Hash(recovery) };
-            access[Hash(token)] = entry.Profile.Id;
-            PersistOrRollback(entry.Profile.Id, entry);
-            return new(entry.Profile.Id, token, recovery, entry.Profile);
-        }
-    }
-
-    public PlayerProfile Update(Guid id, string? name, byte[]? avatar, bool reset, string? preset = null)
-    {
-        lock (gate)
-        {
-            var current = accounts[id];
-            if (name is not null && !Protocol.ValidName(name)) throw new ArgumentException("Use a display name of 2–40 characters.");
-            if (!Protocol.ValidAvatar(avatar)) throw new ArgumentException("Avatar format rejected.");
-            if (preset is not null && AvatarPresets.Find(preset) is null) throw new ArgumentException("Avatar preset rejected.");
-            if (avatar is not null && preset is not null) throw new ArgumentException("Choose a drawn avatar or a preset.");
-            var profile = current.Profile with
-            {
-                DisplayName = name?.Trim() ?? current.Profile.DisplayName,
-                AvatarPixels = reset || preset is not null ? null : avatar ?? current.Profile.AvatarPixels,
-                AvatarPreset = reset || avatar is not null ? null : preset ?? current.Profile.AvatarPreset,
-            };
-            accounts[id] = current with { Profile = profile };
-            PersistOrRollback(id, current);
-            return profile;
+            using var transaction = database.BeginTransaction();
+            var profile = Find("recovery_hash", Hash(code.Trim()), transaction);
+            if (profile is null) return null;
+            return Rotate(profile, transaction);
         }
     }
 
@@ -93,48 +83,204 @@ public sealed class AccountStore
     {
         lock (gate)
         {
-            var entry = accounts[id];
-            string token = Secret(), recovery = Secret();
-            access.Remove(entry.AccessHash);
-            accounts[id] = entry with { AccessHash = Hash(token), RecoveryHash = Hash(recovery) };
-            access[Hash(token)] = id;
-            PersistOrRollback(id, entry);
-            return new(id, token, recovery, entry.Profile);
+            using var transaction = database.BeginTransaction();
+            var profile = Find("id", id.ToString(), transaction) ?? throw new ArgumentException("Account not found.");
+            return Rotate(profile, transaction);
         }
     }
 
-    private void Save()
+    public AccountCredentials? RotateAuthenticated(string? accessToken)
     {
-        string temp = path + ".tmp";
-        using (var file = new FileStream(temp, FileMode.Create, FileAccess.Write, FileShare.None))
+        if (accessToken is not { Length: >= 40 and <= 100 }) return null;
+        lock (gate)
         {
-            if (!OperatingSystem.IsWindows()) File.SetUnixFileMode(temp, UnixFileMode.UserRead | UnixFileMode.UserWrite);
-            JsonSerializer.Serialize(file, accounts, Protocol.Json);
-            file.Flush(true);
-        }
-        // Windows indexers/virus scanners can briefly hold a destination open.
-        // Retry atomic replacement, preserving the original file on failure.
-        for (int attempt = 0; ; attempt++)
-        {
-            try { File.Move(temp, path, true); break; }
-            catch (Exception ex) when (attempt < 6 && ex is IOException or UnauthorizedAccessException)
-            { Thread.Sleep(20 * (attempt + 1)); }
+            using var transaction = database.BeginTransaction();
+            var profile = Find("access_hash", Hash(accessToken), transaction);
+            return profile is null ? null : Rotate(profile, transaction);
         }
     }
 
-    private void PersistOrRollback(Guid id, StoredAccount? previous)
+    private AccountCredentials Rotate(PlayerProfile profile, SqliteTransaction transaction)
     {
-        try { Save(); }
-        catch
+        string access = Secret(), recovery = Secret();
+        using var command = Command("UPDATE accounts SET access_hash=$access, recovery_hash=$recovery WHERE id=$id", transaction);
+        command.Parameters.AddWithValue("$id", profile.Id.ToString());
+        command.Parameters.AddWithValue("$access", Hash(access));
+        command.Parameters.AddWithValue("$recovery", Hash(recovery));
+        command.ExecuteNonQuery();
+        transaction.Commit();
+        return new(profile.Id, access, recovery, profile);
+    }
+
+    public PlayerProfile Update(Guid id, string? name, byte[]? avatar, bool reset, string? preset = null)
+    {
+        if (name is not null) ValidateName(name);
+        if (!Protocol.ValidAvatar(avatar)) throw new ArgumentException("Avatar format rejected.");
+        if (preset is not null && AvatarPresets.Find(preset) is null) throw new ArgumentException("Avatar preset rejected.");
+        if (avatar is not null && preset is not null) throw new ArgumentException("Choose a drawn avatar or a preset.");
+        lock (gate)
         {
-            if (previous is null) accounts.Remove(id); else accounts[id] = previous;
-            access.Clear();
-            foreach (var pair in accounts) access[pair.Value.AccessHash] = pair.Key;
-            throw;
+            using var transaction = database.BeginTransaction();
+            var current = Find("id", id.ToString(), transaction) ?? throw new ArgumentException("Account not found.");
+            var profile = current with
+            {
+                DisplayName = name?.Trim() ?? current.DisplayName,
+                AvatarPixels = reset || preset is not null ? null : avatar ?? current.AvatarPixels,
+                AvatarPreset = reset || avatar is not null ? null : preset ?? current.AvatarPreset,
+            };
+            using var command = Command("UPDATE accounts SET display_name=$name, avatar_pixels=$pixels, avatar_preset=$preset WHERE id=$id", transaction);
+            command.Parameters.AddWithValue("$id", id.ToString());
+            command.Parameters.AddWithValue("$name", profile.DisplayName);
+            command.Parameters.AddWithValue("$pixels", (object?)profile.AvatarPixels ?? DBNull.Value);
+            command.Parameters.AddWithValue("$preset", (object?)profile.AvatarPreset ?? DBNull.Value);
+            command.ExecuteNonQuery();
+            transaction.Commit();
+            return profile;
         }
     }
 
+    public int Count() => Count(null);
+
+    private int Count(SqliteTransaction? transaction)
+    {
+        lock (gate)
+        {
+            using var command = Command("SELECT COUNT(*) FROM accounts", transaction);
+            return Convert.ToInt32(command.ExecuteScalar());
+        }
+    }
+
+    public void VerifyIntegrity()
+    {
+        lock (gate)
+        {
+            using var command = Command("PRAGMA quick_check");
+            if (!string.Equals(command.ExecuteScalar()?.ToString(), "ok", StringComparison.Ordinal))
+                throw new InvalidDataException("Account database integrity check failed.");
+            if (Count() > MaximumAccounts) throw new InvalidDataException("Account capacity exceeded.");
+        }
+    }
+
+    public void Backup(string destination)
+    {
+        lock (gate)
+        {
+            // CreateNew prevents accidentally overwriting the live DB or an older backup.
+            using (File.Open(destination, FileMode.CreateNew, FileAccess.Write, FileShare.None)) { }
+            Restrict(destination);
+            using var backup = new SqliteConnection(new SqliteConnectionStringBuilder
+            { DataSource = destination, Mode = SqliteOpenMode.ReadWrite, Pooling = false }.ToString());
+            backup.Open();
+            database.BackupDatabase(backup);
+        }
+    }
+
+    private void Initialize(string directory)
+    {
+        using var versionQuery = Command("PRAGMA user_version");
+        int version = Convert.ToInt32(versionQuery.ExecuteScalar());
+        if (version == SchemaVersion) return;
+        if (version != 0) throw new InvalidDataException("Unsupported account database version. Use a compatible server release.");
+
+        using var transaction = database.BeginTransaction();
+        Execute("""
+            CREATE TABLE IF NOT EXISTS accounts (
+                id TEXT PRIMARY KEY NOT NULL,
+                display_name TEXT NOT NULL CHECK(length(display_name) BETWEEN 2 AND 40),
+                avatar_seed INTEGER NOT NULL,
+                avatar_pixels BLOB CHECK(avatar_pixels IS NULL OR length(avatar_pixels)=4096),
+                avatar_preset TEXT,
+                access_hash TEXT NOT NULL UNIQUE CHECK(length(access_hash)=64),
+                recovery_hash TEXT NOT NULL UNIQUE CHECK(length(recovery_hash)=64)
+            ) STRICT;
+            """, transaction);
+        if (Count(transaction) != 0) throw new InvalidDataException("Unversioned account database contains data; automatic import refused.");
+        ImportLegacy(Path.Combine(directory, "accounts.json"), transaction);
+        Execute($"PRAGMA user_version={SchemaVersion}", transaction);
+        transaction.Commit();
+    }
+
+    private void ImportLegacy(string path, SqliteTransaction transaction)
+    {
+        if (!File.Exists(path)) return;
+        if (new FileInfo(path).Length > 64 * 1024 * 1024) throw new InvalidDataException("Legacy account file exceeds the migration limit.");
+        Dictionary<Guid, StoredAccount> source;
+        try
+        {
+            source = JsonSerializer.Deserialize<Dictionary<Guid, StoredAccount>>(File.ReadAllBytes(path), Protocol.Json)
+                ?? throw new InvalidDataException("Legacy account file is empty.");
+        }
+        catch (JsonException) { throw new InvalidDataException("Legacy account file is invalid; import refused."); }
+        if (source.Count > MaximumAccounts) throw new InvalidDataException("Legacy account capacity exceeded.");
+        foreach (var (id, account) in source)
+        {
+            if (account?.Profile is not { } profile || id == Guid.Empty || id != profile.Id ||
+                !Protocol.ValidName(profile.DisplayName) || !Protocol.ValidAvatar(profile.AvatarPixels) ||
+                (profile.AvatarPreset is not null && AvatarPresets.Find(profile.AvatarPreset) is null) ||
+                !ValidHash(account.AccessHash) || !ValidHash(account.RecoveryHash))
+                throw new InvalidDataException("Legacy account validation failed; import refused.");
+            Insert(account, transaction);
+        }
+        // The original file remains untouched as the rollback copy. Schema version
+        // makes this a one-time import, even if that copy is present on every boot.
+        Restrict(path);
+    }
+
+    private void Insert(StoredAccount account, SqliteTransaction transaction)
+    {
+        using var command = Command("""
+            INSERT INTO accounts (id, display_name, avatar_seed, avatar_pixels, avatar_preset, access_hash, recovery_hash)
+            VALUES ($id, $name, $seed, $pixels, $preset, $access, $recovery)
+            """, transaction);
+        command.Parameters.AddWithValue("$id", account.Profile.Id.ToString());
+        command.Parameters.AddWithValue("$name", account.Profile.DisplayName);
+        command.Parameters.AddWithValue("$seed", account.Profile.AvatarSeed);
+        command.Parameters.AddWithValue("$pixels", (object?)account.Profile.AvatarPixels ?? DBNull.Value);
+        command.Parameters.AddWithValue("$preset", (object?)account.Profile.AvatarPreset ?? DBNull.Value);
+        command.Parameters.AddWithValue("$access", account.AccessHash);
+        command.Parameters.AddWithValue("$recovery", account.RecoveryHash);
+        command.ExecuteNonQuery();
+    }
+
+    private PlayerProfile? Find(string column, string value, SqliteTransaction? transaction = null)
+    {
+        // Column names are internal literals; every external value is a parameter.
+        using var command = Command($"SELECT {ProfileColumns} FROM accounts WHERE {column}=$value", transaction);
+        command.Parameters.AddWithValue("$value", value);
+        using var reader = command.ExecuteReader();
+        return reader.Read() ? new(Guid.Parse(reader.GetString(0)), reader.GetString(1), reader.GetInt32(2),
+            reader.IsDBNull(3) ? null : (byte[])reader[3], reader.IsDBNull(4) ? null : reader.GetString(4)) : null;
+    }
+
+    private SqliteCommand Command(string sql, SqliteTransaction? transaction = null)
+    {
+        var command = database.CreateCommand();
+        command.CommandText = sql;
+        command.Transaction = transaction;
+        return command;
+    }
+
+    private void Execute(string sql, SqliteTransaction? transaction = null)
+    {
+        using var command = Command(sql, transaction);
+        command.ExecuteNonQuery();
+    }
+
+    private static void ValidateName(string name)
+    {
+        if (!Protocol.ValidName(name?.Trim())) throw new ArgumentException("Use a display name of 2–40 characters.");
+    }
+
+    private static bool ValidHash(string? value) => value is { Length: 64 } && value.All(Uri.IsHexDigit);
     private static string Secret() => Convert.ToBase64String(RandomNumberGenerator.GetBytes(32))
         .TrimEnd('=').Replace('+', '-').Replace('/', '_');
     private static string Hash(string value) => Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(value)));
+
+    private static void Restrict(string path, bool directory = false)
+    {
+        if (!OperatingSystem.IsWindows()) File.SetUnixFileMode(path,
+            UnixFileMode.UserRead | UnixFileMode.UserWrite | (directory ? UnixFileMode.UserExecute : 0));
+    }
+
+    public void Dispose() { lock (gate) database.Dispose(); }
 }

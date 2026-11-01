@@ -1,5 +1,13 @@
 namespace Kupopop.Server;
 
+/// <summary>Reconnects retain their account's budgets and profile-write cooldown.</summary>
+public sealed class AccountInputLimits
+{
+    // Only authenticated IDs enter this map; AccountStore caps their total at 10,000.
+    private readonly System.Collections.Concurrent.ConcurrentDictionary<Guid, InputRateLimiter> accounts = new();
+    public InputRateLimiter For(Guid id) => accounts.GetOrAdd(id, _ => new InputRateLimiter());
+}
+
 /// <summary>Bounded bursts tolerate network delivery jitter without raising sustained traffic limits.</summary>
 public sealed class InputRateLimiter(TimeProvider? provider = null)
 {

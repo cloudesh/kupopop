@@ -109,75 +109,7 @@ public sealed partial class MainWindow : Window, IDisposable
         while (budget-- > 0 && client?.TryRead(out var message) == true)
         {
             if (message is null) continue;
-            received++;
-            switch (message.Type)
-            {
-                case "profile":
-                    profile = message.Profile;
-                    if (profile is not null) { sessionReady = serviceAvailable = true; connectionRetry.Connected(); }
-                    if (savingProfile)
-                    { savingProfile = false; screen = room is null ? "menu" : "game"; NotifyStatus("Profile saved."); }
-                    if (profile is not null && screen != "profile") displayName = profile.DisplayName;
-                    break;
-                case "state" when message.Room is { } state:
-                    if (state.Players.Length > 16) throw new InvalidDataException("Server player limit exceeded.");
-                    bool differentRoom = room?.Code != state.Code;
-                    bool newTurn = room?.TurnId != state.TurnId;
-                    if (differentRoom) chat.Clear();
-                    if (state.ResetCanvas || newTurn) canvas.Clear();
-                    if (state.Canvas is { } pixels) canvas.Load(pixels);
-                    if (newTurn || state.Canvas is not null) { undoPending = false; canUndoDrawing = state.CanUndo; }
-                    if (newTurn || state.Phase != "drawing") painting.RemoteCursor = null;
-                    if (state.Cursor is { } brush && state.DrawerId != device?.AccountId)
-                    { painting.RemoteCursor = brush; remoteCursorAt = Environment.TickCount64; }
-                    room = state;
-                    serverOffset = state.ServerTime - DateTimeOffset.UtcNow;
-                    if (screen != "profile" && !(screen == "create" && !differentRoom && state.Phase is "waiting" or "results")) screen = "game";
-                    log.Write($"room.state phase={state.Phase} round={state.Round} players={state.Players.Length} canvas_reset={state.ResetCanvas}");
-                    break;
-                case "draw" when message.Draw is { } op:
-                    if (room?.TurnId == message.TurnId && message.ActorId != device?.AccountId) canvas.Apply(op);
-                    break;
-                case "canvas" when message.Canvas is { } restored && room?.TurnId == message.TurnId:
-                    canvas.Load(restored); undoPending = false; canUndoDrawing = message.CanUndo;
-                    break;
-                case "cursor" when message.Cursor is { } pointer && room?.TurnId == message.TurnId && message.ActorId == room.DrawerId && message.ActorId != device?.AccountId:
-                    painting.RemoteCursor = pointer; remoteCursorAt = Environment.TickCount64;
-                    break;
-                case "wordlists":
-                    wordLists = message.WordLists ?? [];
-                    if (!wordListsChosen)
-                    {
-                        selectedWordLists.Clear();
-                        foreach (var list in wordLists.Where(l => l.DefaultEnabled)) selectedWordLists.Add(list.Id);
-                    }
-                    break;
-                case "rooms": publicRooms = message.Rooms ?? []; NotifyStatus($"{publicRooms.Length} public room(s)."); break;
-                case "room-configured":
-                    savingRoomSettings = false; screen = "game"; NotifyStatus("Room settings saved.");
-                    break;
-                case "chat" when message.Chat is { } line:
-                    chat.Add(line); if (chat.Count > 200) chat.RemoveAt(0); scrollChat = true;
-                    break;
-                case "left": room = null; chat.Clear(); screen = "menu"; NotifyStatus(message.Error ?? "You left the room."); break;
-                case "error":
-                    NotifyStatus(message.Error ?? "Server rejected the action.", error: true);
-                    if (message.RejectedCommand == "profile") savingProfile = false;
-                    if (message.RejectedCommand == "configure") savingRoomSettings = false;
-                    if (message.RejectedCommand == "undo") { undoPending = false; canUndoDrawing = false; Send(new("sync")); }
-                    log.Write("server.action_rejected action=" + SafeCommand(message.RejectedCommand) + " reason=" + SafeReason(message.Error));
-                    if (room is not null && message.RejectedCommand == "draw" && Environment.TickCount64 - lastSync > 1000)
-                    { lastSync = Environment.TickCount64; Send(new("sync")); }
-                    break;
-                case "disconnected":
-                    savingProfile = false;
-                    undoPending = false;
-                    painting.RemoteCursor = null;
-                    sessionReady = serviceAvailable = false;
-                    connectionStatus = "Connection interrupted. Rejoining your drawing room automatically...";
-                    if (connectionRetry.Due(Environment.TickCount64)) connectionRetry.Failed(Environment.TickCount64);
-                    break;
-            }
+            HandleEvent(message);
         }
         long now = Environment.TickCount64;
         if (now - remoteCursorAt > 2000) painting.RemoteCursor = null;
@@ -216,6 +148,80 @@ public sealed partial class MainWindow : Window, IDisposable
             log.Write($"client.stats connected={client?.Connected == true} events={received} drawings_sent={draws} room_phase={room?.Phase ?? "none"}");
             statsAt = now;
         }
+    }
+
+    private void HandleEvent(ServerEvent message)
+    {
+        received++;
+        switch (message.Type)
+        {
+            case "profile":
+                profile = message.Profile;
+                if (profile is not null) { sessionReady = serviceAvailable = true; connectionRetry.Connected(); }
+                if (savingProfile)
+                { savingProfile = false; screen = room is null ? "menu" : "game"; NotifyStatus("Profile saved."); }
+                if (profile is not null && screen != "profile") displayName = profile.DisplayName;
+                break;
+            case "state" when message.Room is { } state:
+                if (state.Players.Length > 16) throw new InvalidDataException("Server player limit exceeded.");
+                bool differentRoom = room?.Code != state.Code;
+                bool newTurn = room?.TurnId != state.TurnId;
+                if (differentRoom) chat.Clear();
+                if (state.ResetCanvas || newTurn) canvas.Clear();
+                if (state.Canvas is { } pixels) canvas.Load(pixels);
+                if (newTurn || state.Canvas is not null) { undoPending = false; canUndoDrawing = state.CanUndo; }
+                if (newTurn || state.Phase != "drawing") painting.RemoteCursor = null;
+                if (state.Cursor is { } brush && state.DrawerId != device?.AccountId)
+                { painting.RemoteCursor = brush; remoteCursorAt = Environment.TickCount64; }
+                room = state;
+                serverOffset = state.ServerTime - DateTimeOffset.UtcNow;
+                if (screen != "profile" && !(screen == "create" && !differentRoom && state.Phase is "waiting" or "results")) screen = "game";
+                log.Write($"room.state phase={state.Phase} round={state.Round} players={state.Players.Length} canvas_reset={state.ResetCanvas}");
+                break;
+            case "draw" when message.Draw is { } op:
+                if (room?.TurnId == message.TurnId && message.ActorId != device?.AccountId) canvas.Apply(op);
+                break;
+            case "canvas" when message.Canvas is { } restored && room?.TurnId == message.TurnId:
+                canvas.Load(restored); undoPending = false; canUndoDrawing = message.CanUndo;
+                break;
+            case "cursor" when message.Cursor is { } pointer && room?.TurnId == message.TurnId && message.ActorId == room.DrawerId && message.ActorId != device?.AccountId:
+                painting.RemoteCursor = pointer; remoteCursorAt = Environment.TickCount64;
+                break;
+            case "wordlists":
+                wordLists = message.WordLists ?? [];
+                if (!wordListsChosen)
+                {
+                    selectedWordLists.Clear();
+                    foreach (var list in wordLists.Where(l => l.DefaultEnabled)) selectedWordLists.Add(list.Id);
+                }
+                break;
+            case "rooms": publicRooms = message.Rooms ?? []; NotifyStatus($"{publicRooms.Length} public room(s)."); break;
+            case "room-configured":
+                savingRoomSettings = false; screen = "game"; NotifyStatus("Room settings saved.");
+                break;
+            case "chat" when message.Chat is { } line:
+                chat.Add(line); if (chat.Count > 200) chat.RemoveAt(0); scrollChat = true;
+                break;
+            case "left": room = null; chat.Clear(); screen = "menu"; NotifyStatus(message.Error ?? "You left the room."); break;
+            case "error":
+                NotifyStatus(message.Error ?? "Server rejected the action.", error: true);
+                if (message.RejectedCommand == "profile") savingProfile = false;
+                if (message.RejectedCommand == "configure") savingRoomSettings = false;
+                if (message.RejectedCommand == "undo") { undoPending = false; canUndoDrawing = false; Send(new("sync")); }
+                log.Write("server.action_rejected action=" + SafeCommand(message.RejectedCommand) + " reason=" + SafeReason(message.Error));
+                if (room is not null && message.RejectedCommand == "draw" && Environment.TickCount64 - lastSync > 1000)
+                { lastSync = Environment.TickCount64; Send(new("sync")); }
+                break;
+            case "disconnected":
+                savingProfile = false;
+                undoPending = false;
+                painting.RemoteCursor = null;
+                sessionReady = serviceAvailable = false;
+                connectionStatus = "Connection interrupted. Rejoining your drawing room automatically...";
+                if (connectionRetry.Due(Environment.TickCount64)) connectionRetry.Failed(Environment.TickCount64);
+                break;
+        }
+
     }
 
     private void CreateAccount(bool recovering)

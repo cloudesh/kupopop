@@ -25,13 +25,15 @@ function Zip-Directory {
     $taskZipStream = [IO.File]::Open($Destination, [IO.FileMode]::Create)
     $taskZip = New-Object IO.Compression.ZipArchive($taskZipStream, [IO.Compression.ZipArchiveMode]::Create)
     try {
-        foreach ($taskFile in Get-ChildItem -LiteralPath $taskSourceRoot -File -Recurse) {
-            $taskName = $taskFile.FullName.Substring($taskSourceRoot.Length).TrimStart([IO.Path]::DirectorySeparatorChar, [IO.Path]::AltDirectorySeparatorChar).Replace('\','/')
-            # Never ship a running host's state, credentials, TLS keys, logs, or proxy cache.
-            if ($taskName -match '^(data|logs|local|caddy-download)(/|$)' -or
-                $taskName -match '(^|/)(accounts\.json(?:\.tmp)?|word-lists\.json(?:\.tmp)?|hostname\.txt|Caddyfile)$' -or
-                $taskName -match '(^|/)caddy([_.-]|$)' -or
-                $taskName -match '\.(pfx|cer|pem|key|dpapi|log)(\..*)?$') { continue }
+        # Only standalone application files and our source-controlled templates.
+        # Unknown backups/state are excluded even when they have no extension.
+        $taskAllowed = @('README.md','WORD_LISTS.md','LICENSE','THIRD_PARTY_NOTICES.md',
+            'deploy/Dockerfile','deploy/.dockerignore','deploy/compose.yaml','deploy/Caddyfile.example')
+        if ($Linux) { $taskAllowed += @('Kupopop.Server','start-server.sh','start-local.sh') }
+        else { $taskAllowed += @('Kupopop.Server.exe','Start-Server.cmd','Start-Local.cmd','Start-Server.ps1') }
+        foreach ($taskName in $taskAllowed) {
+            $taskFile = Get-Item -LiteralPath (Join-Path $taskSourceRoot $taskName) -ErrorAction SilentlyContinue
+            if (-not $taskFile -or $taskFile.PSIsContainer) { continue }
             $taskEntry = $taskZip.CreateEntry($taskName, [IO.Compression.CompressionLevel]::Optimal)
             if ($Linux -and ($taskName.EndsWith('.sh') -or $taskName -eq 'Kupopop.Server')) { $taskEntry.ExternalAttributes = -2115174400 }
             $taskInput = [IO.File]::OpenRead($taskFile.FullName)
@@ -39,4 +41,13 @@ function Zip-Directory {
             try { $taskInput.CopyTo($taskDest) } finally { $taskInput.Dispose(); $taskDest.Dispose() }
         }
     } finally { $taskZip.Dispose(); $taskZipStream.Dispose() }
+}
+
+function Remove-StandalonePublishExtras {
+    param([Parameter(Mandatory=$true)][string]$Root)
+    # The packaged server does not serve static assets or run behind IIS.
+    foreach ($taskName in @('web.config','Kupopop.Server.staticwebassets.endpoints.json')) {
+        $taskPath = Join-Path ([IO.Path]::GetFullPath($Root)) $taskName
+        if (Test-Path -LiteralPath $taskPath -PathType Leaf) { Remove-Item -LiteralPath $taskPath -Force }
+    }
 }

@@ -8,19 +8,13 @@ public sealed class UpdateChecker : IDisposable
     private readonly CancellationTokenSource stop = new();
     public async Task<Version?> CheckAsync(Version current)
     {
+        using var timeout = CancellationTokenSource.CreateLinkedTokenSource(stop.Token);
+        timeout.CancelAfter(TimeSpan.FromSeconds(10));
         using var response = await http.GetAsync("https://raw.githubusercontent.com/cloudesh/kupopop/main/plugin/releases/repo.json",
-            HttpCompletionOption.ResponseHeadersRead, stop.Token).ConfigureAwait(false);
+            HttpCompletionOption.ResponseHeadersRead, timeout.Token).ConfigureAwait(false);
         response.EnsureSuccessStatusCode();
-        using var stream = await response.Content.ReadAsStreamAsync(stop.Token).ConfigureAwait(false);
-        using var bytes = new MemoryStream();
-        byte[] buffer = new byte[4096];
-        int count;
-        while ((count = await stream.ReadAsync(buffer, stop.Token).ConfigureAwait(false)) > 0)
-        {
-            if (bytes.Length + count > 65536) throw new InvalidDataException("Update metadata exceeds limit.");
-            bytes.Write(buffer, 0, count);
-        }
-        return UpdateFeed.NewerVersion(bytes.ToArray(), current);
+        byte[] body = await BoundedHttp.ReadAsync(response, 65536, timeout.Token).ConfigureAwait(false);
+        return UpdateFeed.NewerVersion(body, current);
     }
     public void Dispose() { stop.Cancel(); http.Dispose(); stop.Dispose(); }
 }

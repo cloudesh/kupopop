@@ -32,6 +32,7 @@ if (Get-Command dotnet -ErrorAction SilentlyContinue) {
 } else {
     Write-Host 'The .NET SDK is unavailable; using the existing prebuilt server bundle.'
 }
+Remove-StandalonePublishExtras -Root $taskBundle
 if ($BuildOnly) { Write-Host 'Local server ready. Build-only check complete; the server was not started.'; exit 0 }
 
 Write-Host ''

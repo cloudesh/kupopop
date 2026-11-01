@@ -26,7 +26,8 @@ foreach ($taskDirectory in @('data','logs','local','caddy-download','nested')) {
 foreach ($taskPublicFile in @('Kupopop.Server.exe','README.md','Start-Local.cmd')) {
     [IO.File]::WriteAllText((Join-Path $taskPayload $taskPublicFile), 'public-fixture')
 }
-foreach ($taskPrivateFile in @('data\accounts.json','data\localhost.pfx','logs\server.log','local\account.json',
+foreach ($taskPrivateFile in @('mystery-backup','unused.txt','accounts.db','accounts.db-wal','accounts.db-shm','backup.sqlite','nested\backup.sqlite3',
+    'data\accounts.json','data\localhost.pfx','logs\server.log','local\account.json',
     'caddy-download\caddy.exe','accounts.json','word-lists.json','nested\word-lists.json','hostname.txt','Caddyfile','caddy.exe','caddy_2.11.7_windows_amd64.zip',
     'nested\device.dpapi','localhost.pfx','private.key')) {
     [IO.File]::WriteAllText((Join-Path $taskPayload $taskPrivateFile), 'private-fixture-never-package')

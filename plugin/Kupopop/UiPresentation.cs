@@ -61,15 +61,15 @@ public static class UiPresentation
         var draw = ImGui.GetWindowDrawList();
         foreach (var (letter, offset) in layout.Slots)
         {
-                var position = origin + offset;
-                if (letter == '_')
-                    draw.AddLine(position + new Vector2(2, rowHeight - UiTheme.S(5)),
-                        position + new Vector2(cell - 2, rowHeight - UiTheme.S(5)), UiTheme.C(UiTheme.Muted), UiTheme.S(1.5f));
-                else
-                {
-                    string text = char.ToUpperInvariant(letter).ToString();
-                    draw.AddText(position + new Vector2((cell - ImGui.CalcTextSize(text).X) / 2, 0), UiTheme.C(UiTheme.Ink), text);
-                }
+            var position = origin + offset;
+            if (letter == '_')
+                draw.AddLine(position + new Vector2(2, rowHeight - UiTheme.S(5)),
+                    position + new Vector2(cell - 2, rowHeight - UiTheme.S(5)), UiTheme.C(UiTheme.Muted), UiTheme.S(1.5f));
+            else
+            {
+                string text = char.ToUpperInvariant(letter).ToString();
+                draw.AddText(position + new Vector2((cell - ImGui.CalcTextSize(text).X) / 2, 0), UiTheme.C(UiTheme.Ink), text);
+            }
         }
         ImGui.Dummy(layout.Size);
         if (ImGui.IsItemHovered()) UiTheme.Tooltip($"{hint.Count(c => c == '_' || char.IsLetterOrDigit(c))} letters");

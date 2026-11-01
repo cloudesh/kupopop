@@ -103,8 +103,10 @@ RoundFlowChecks.Run(working, Check);
 RoomRulesChecks.Run(working, Check);
 PolishChecks.Run(working, Check);
 RateLimitChecks.Run(Check);
+StorageChecks.Run(working, Check);
 var credentials = Enumerable.Range(0, 18).Select(i => accounts.Create("Artist " + i)).ToArray();
-string accountFile = File.ReadAllText(Path.Combine(working, "accounts", "accounts.json"));
+string accountFile = ReadShared(Path.Combine(working, "accounts", "accounts.db")) +
+    ReadShared(Path.Combine(working, "accounts", "accounts.db-wal"));
 Check(!accountFile.Contains(credentials[0].AccessToken) && !accountFile.Contains(credentials[0].RecoveryCode), "account persistence contains credential verifiers, not bearer secrets");
 Check(new AccountStore(Path.Combine(working, "accounts")).Authenticate(credentials[0].AccessToken)?.Id == credentials[0].AccountId, "accounts survive server restart");
 var recovered = accounts.Recover(credentials[17].RecoveryCode)!;

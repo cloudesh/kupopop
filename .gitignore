@@ -20,4 +20,8 @@ server/deploy/backups/
 plugin/releases/*
 !plugin/releases/README.md
 !plugin/releases/repo.json
-!plugin/releases/testing.zip
+AGENTS.md
+DALAMUD_COMPLIANCE.md
+*.db
+*.db-*
+*.sqlite*

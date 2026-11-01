@@ -13,10 +13,10 @@ public interface IGamePeer
     void Close();
 }
 
-public sealed class Peer(Guid id, WebSocket socket) : IGamePeer
+public sealed class Peer(Guid id, WebSocket socket, InputRateLimiter? limiter = null) : IGamePeer
 {
     private readonly Channel<byte[]> queue = Channel.CreateBounded<byte[]>(128);
-    private readonly InputRateLimiter limits = new();
+    private readonly InputRateLimiter limits = limiter ?? new();
     private int queuedBytes;
     public Guid Id { get; } = id;
     public string? RoomCode { get; set; }
@@ -33,13 +33,17 @@ public sealed class Peer(Guid id, WebSocket socket) : IGamePeer
 
     public async Task PumpAsync(CancellationToken cancel)
     {
-        await foreach (var bytes in queue.Reader.ReadAllAsync(cancel))
+        try
         {
-            Interlocked.Add(ref queuedBytes, -bytes.Length);
-            using var timeout = CancellationTokenSource.CreateLinkedTokenSource(cancel);
-            timeout.CancelAfter(TimeSpan.FromSeconds(10));
-            await Socket.SendAsync(bytes, WebSocketMessageType.Text, true, timeout.Token);
+            await foreach (var bytes in queue.Reader.ReadAllAsync(cancel))
+            {
+                Interlocked.Add(ref queuedBytes, -bytes.Length);
+                using var timeout = CancellationTokenSource.CreateLinkedTokenSource(cancel);
+                timeout.CancelAfter(TimeSpan.FromSeconds(10));
+                await Socket.SendAsync(bytes, WebSocketMessageType.Text, true, timeout.Token);
+            }
         }
+        finally { Socket.Abort(); }
     }
 
     public void Complete() => queue.Writer.TryComplete();

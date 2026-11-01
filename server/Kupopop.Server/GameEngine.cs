@@ -63,6 +63,18 @@ public sealed class GameEngine(AccountStore accounts, ILogger<GameEngine> log, T
     }
     private DateTimeOffset Now => clock.GetUtcNow();
 
+    public bool TryAttach(IGamePeer peer, string accessToken)
+    {
+        lock (gate)
+        {
+            // Recheck under the same lock used by Revoke: recovery cannot race
+            // an already-authenticated WebSocket handshake into a new session.
+            if (accounts.Authenticate(accessToken)?.Id != peer.Id) return false;
+            Attach(peer);
+            return true;
+        }
+    }
+
     public void Attach(IGamePeer peer)
     {
         lock (gate)
@@ -407,7 +419,11 @@ public sealed class GameEngine(AccountStore accounts, ILogger<GameEngine> log, T
         if (room is null || room.Host != peer.Id) throw new ArgumentException("Only the room host can do that.");
     }
 
-    private void State(Room room, IGamePeer peer, bool snapshot = false, bool reset = false)
+    private PlayerView[] PlayerViews(Room room) => room.Members.Values.Select(member => new PlayerView(
+        accounts.Get(member.Id)!, member.Score, member.Connected, member.Solved,
+        member.Id == room.Host, member.Id == room.Drawer)).ToArray();
+
+    private void State(Room room, IGamePeer peer, bool snapshot = false, bool reset = false, PlayerView[]? players = null)
     {
         var member = room.Members.GetValueOrDefault(peer.Id);
         bool done = room.Phase == "drawing" && (room.Drawer == peer.Id || member?.Solved == true);
@@ -417,8 +433,7 @@ public sealed class GameEngine(AccountStore accounts, ILogger<GameEngine> log, T
         peer.Send(new("state", Room: new(room.Code, room.Options, room.Phase, room.Host, room.Drawer,
             room.TurnId, room.RotationSize == 0 ? 0 : Math.Min(room.Options.Rounds, room.Position / room.RotationSize + 1),
             room.Deadline, hint, showWord ? room.Word : null, done,
-            room.Members.Values.Select(m => new PlayerView(accounts.Get(m.Id)!, m.Score, m.Connected,
-                m.Solved, m.Id == room.Host, m.Id == room.Drawer)).ToArray(), Now,
+            players ?? PlayerViews(room), Now,
             snapshot ? (byte[])room.Canvas.Pixels.Clone() : null, reset,
             room.Phase == "drawing" && room.Drawer == peer.Id && room.History.CanUndo,
             room.Vote is { } vote ? new(vote.Target, vote.Votes.Count, vote.Required, vote.Votes.Contains(peer.Id), vote.Expires) : null,
@@ -434,8 +449,9 @@ public sealed class GameEngine(AccountStore accounts, ILogger<GameEngine> log, T
 
     private void BroadcastState(Room room, bool reset = false, Guid? except = null)
     {
+        var players = PlayerViews(room);
         foreach (var member in room.Members.Values)
-            if (member.Id != except && member.Connected && peers.TryGetValue(member.Id, out var peer)) State(room, peer, reset: reset);
+            if (member.Id != except && member.Connected && peers.TryGetValue(member.Id, out var peer)) State(room, peer, reset: reset, players: players);
     }
 
     private void Broadcast(Room room, ServerEvent message)

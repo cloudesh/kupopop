@@ -59,7 +59,7 @@ static class FeatureChecks
         string metadata = Encoding.UTF8.GetString(Protocol.Encode(new ServerEvent("wordlists", WordLists: bank.Catalog)));
         check(!metadata.Contains("Private alpha") && !metadata.Contains("Hidden gamma") && bank.Catalog[0].Count == 2,
             "catalog protocol reveals list metadata/counts without any answer bank");
-        check(Enumerable.Range(0, 50).All(_ => bank.Choose(["complex"], "Hidden gamma").StartsWith("Hidden ") && bank.Choose(["complex"], "Hidden gamma") != "Hidden gamma"),
+        check(Enumerable.Range(0, 50).All(_ => bank.Choices(["complex"], "Hidden gamma", 1)[0].StartsWith("Hidden ") && bank.Choices(["complex"], "Hidden gamma", 1)[0] != "Hidden gamma"),
             "selected lists constrain server words and immediate repeats are avoided");
         foreach (var selection in new[] { Array.Empty<string>(), new[] { "unknown" }, new[] { "normal", "normal" } })
         {

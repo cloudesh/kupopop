@@ -28,8 +28,12 @@ public sealed class WordBank
                 !words.Contains(pair.Key, StringComparer.OrdinalIgnoreCase) || pair.Value is null || pair.Value.Length > 12 ||
                 pair.Value.Any(a => string.IsNullOrWhiteSpace(a) || a.Length > 64 || a.Any(char.IsControl)))))
                 throw new InvalidDataException("Invalid private answer aliases.");
-            return list with { Words = words, Aliases = list.Aliases?.ToDictionary(p => p.Key,
-                p => (string[])p.Value.Clone(), StringComparer.OrdinalIgnoreCase) };
+            return list with
+            {
+                Words = words,
+                Aliases = list.Aliases?.ToDictionary(p => p.Key,
+                p => (string[])p.Value.Clone(), StringComparer.OrdinalIgnoreCase)
+            };
         }).ToArray();
         if (!lists.Any(l => l.DefaultEnabled)) throw new InvalidDataException("Enable at least one default list.");
     }
@@ -44,13 +48,6 @@ public sealed class WordBank
             selected.Distinct(StringComparer.Ordinal).Count() != selected.Length)
             throw new ArgumentException("Choose at least one valid word list.");
         return (string[])selected.Clone();
-    }
-    public string Choose(string[]? selected, string previous)
-    {
-        string[] ids = Selection(selected);
-        string[] pool = lists.Where(l => ids.Contains(l.Id)).SelectMany(l => l.Words)
-            .Where(w => !w.Equals(previous, StringComparison.OrdinalIgnoreCase)).Distinct(StringComparer.OrdinalIgnoreCase).ToArray();
-        return pool[RandomNumberGenerator.GetInt32(pool.Length)];
     }
     public string[] Choices(string[]? selected, string previous, int count = 4)
     {

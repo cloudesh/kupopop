@@ -16,6 +16,11 @@ services:
   game:
     build: .
     restart: unless-stopped
+    read_only: true
+    cap_drop: [ALL]
+    security_opt: [no-new-privileges:true]
+    tmpfs:
+      - /tmp:rw,noexec,nosuid,size=64m
     # Sharing the proxy's network lets the backend stay on loopback. Only the
     # proxy's HTTPS/ACME ports are published to the internet.
     network_mode: "service:proxy"

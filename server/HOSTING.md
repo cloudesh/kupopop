@@ -6,7 +6,7 @@ players and hosts do not need to install an SDK or runtime.
 
 The maintained service is **https://play.kupopop.com**. Regular players connect
 automatically; they do not need these self-hosting tools. For unattended Linux
-hosting, see [the Docker Compose deployment](deploy/README.md).
+hosting, see [the Docker Compose deployment](#kupo-skribbl-unattended-linux-server).
 
 Version 0.6.0 uses protocol 4: update both plugin and server for square canvases
 and configurable word offers/voting. Existing accounts
@@ -83,7 +83,37 @@ store. The launcher does not install a system certificate on Linux.
 
 ## Persistence, backups, logs
 
-- `data/accounts.json`: profiles, custom avatars, and access/recovery verifiers.
+### SQLite migration and backups
+
+On first 0.8 startup, `data/accounts.json` is validated and imported in a single
+transaction into `data/accounts.db`. IDs, names, avatar bytes/seeds/presets and
+access/recovery hashes are preserved. The schema version prevents a second import.
+The JSON file remains unchanged as a private pre-migration rollback copy; the
+running service reads/writes SQLite exclusively. Corrupt/unsupported data fails
+startup instead of creating replacement accounts. Back up the complete data
+folder before upgrading and verify the migration before retiring that backup.
+
+SQLite uses WAL, so do not copy only `accounts.db` from a running server. Create
+an online snapshot with the server executable and a new destination filename:
+
+```sh
+KUPOPOP_ROOT=/path/to/state ./Kupopop.Server --backup-database /private/backup/accounts.db
+KUPOPOP_ROOT=/path/to/state ./Kupopop.Server --database-check
+```
+
+On Windows, set `$env:KUPOPOP_ROOT` and run the equivalent `.exe` commands.
+In Docker, `docker compose exec game /app/Kupopop.Server --backup-database
+/var/lib/kupopop/accounts-backup.db` makes a consistent snapshot in the private
+volume. Copy that snapshot out with `docker cp`. The command refuses to overwrite
+existing files. Maintenance output contains integrity status and row count only.
+A stopped-server backup of the whole data directory is also safe and includes
+the database plus any WAL/SHM sidecars. Restore only while the server is stopped.
+
+The private word catalog remains `data/word-lists.json`, an editable host
+configuration file. Preferences and protected device credentials are client
+configuration, separate from the account database.
+
+- `data/accounts.db`: SQLite profiles, custom avatars, and access/recovery verifiers.
   Back up the complete `data/` directory while the server is stopped. Protect
   backups and server files from other machine users. Do not publish this directory.
 - `data/localhost.pfx`: private development certificate; protect it and never upload.
@@ -109,3 +139,42 @@ limits and bounded queues. Account capacity is currently 10,000 and room capacit
 `KUPOPOP_ROOT` selects the folder holding data/logs. `KUPOPOP_PORT` overrides the
 backend port. `--test-http` is solely for isolated loopback automated testing;
 it is never used by normal launchers and is not accepted by the plugin.
+
+# Kupo Skribbl unattended Linux server
+
+This deployment runs the game and Caddy using Docker Compose. It starts after
+host reboots and retains profiles and TLS certificates in named Docker volumes.
+The backend remains on loopback; only ports 80 and 443 are published.
+
+Copy these deployment files and the published Linux x64 `Kupopop.Server` binary
+into a dedicated folder. Copy `Caddyfile.example` to `Caddyfile`, replace the
+hostname with the public DNS name pointing to the host, then run:
+
+```sh
+docker compose up -d --build
+docker compose ps
+docker compose logs --tail=30 game
+```
+
+The first run pulls official .NET dependency and Caddy images and obtains a
+trusted TLS certificate. Incoming TCP 80 and 443 must be reachable. The game
+process runs as the unprivileged `app` container user. No accounts or passwords
+belong in the image/build context, configuration, or repository.
+
+For an update, back up account data, replace the binary, then run
+`docker compose up -d --build game`. This ends active rooms but preserves profiles.
+Do not run `docker compose down -v`: that deliberately deletes persistent volumes.
+
+With the game stopped, an account backup can be made from its existing container:
+
+```sh
+umask 077
+mkdir -p backups
+docker compose stop game
+docker cp "$(docker compose ps -aq game):/var/lib/kupopop/data" "backups/data-$(date -u +%Y%m%d-%H%M%S)"
+docker compose start game
+```
+
+Keep backups private and off-host. For a full host migration, preserve the
+`accounts` and `certificates` volumes, deployment files, and the same hostname.
+Caddy access logs are not enabled; game diagnostics omit chat, words and tokens.

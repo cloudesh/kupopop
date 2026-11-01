@@ -11,13 +11,23 @@ public sealed class RemoteClient : IDisposable
     private readonly Uri endpoint;
     private readonly HttpClient http;
     private readonly Action<string, Exception?>? diagnostic;
-    private readonly ConcurrentQueue<ServerEvent> events = new();
+    private readonly ConcurrentQueue<(ServerEvent Event, int Bytes)> events = new();
+    private readonly CancellationTokenSource lifetime = new();
+    private int queuedEventBytes;
+    private int disposed;
     private ClientWebSocket? socket;
     private CancellationTokenSource? stop;
     private Channel<byte[]>? outgoing;
     private Task? connection;
     public bool Connected => socket?.State == WebSocketState.Open;
-    public bool TryRead(out ServerEvent? message) => events.TryDequeue(out message);
+    public bool TryRead(out ServerEvent? message)
+    {
+        message = null;
+        if (!events.TryDequeue(out var entry)) return false;
+        Interlocked.Add(ref queuedEventBytes, -entry.Bytes);
+        message = entry.Event;
+        return true;
+    }
 
     public RemoteClient(Uri endpoint, Action<string, Exception?>? diagnostic = null, bool allowTestHttp = false)
     {
@@ -28,7 +38,8 @@ public sealed class RemoteClient : IDisposable
             throw new ArgumentException("Use an HTTPS server hostname, without a path, credentials, or query string.");
         this.endpoint = endpoint;
         this.diagnostic = diagnostic;
-        http = new HttpClient { BaseAddress = endpoint, Timeout = TimeSpan.FromSeconds(15) };
+        http = new HttpClient(new HttpClientHandler { AllowAutoRedirect = false })
+            { BaseAddress = endpoint, Timeout = TimeSpan.FromSeconds(15) };
     }
 
     public Task<AccountCredentials> CreateAsync(string name) => PostAsync("api/accounts", new AccountRequest(name));
@@ -36,9 +47,8 @@ public sealed class RemoteClient : IDisposable
 
     public async Task CheckHealthAsync()
     {
-        using var response = await http.GetAsync("health").ConfigureAwait(false);
-        response.EnsureSuccessStatusCode();
-        var health = await response.Content.ReadFromJsonAsync<ServiceHealth>(Protocol.Json).ConfigureAwait(false);
+        using var request = new HttpRequestMessage(HttpMethod.Get, "health");
+        var health = await RequestAsync<ServiceHealth>(request, 4096).ConfigureAwait(false);
         if (health?.Protocol != Protocol.Version)
             throw new InvalidDataException("The server protocol is incompatible. Update the plugin.");
     }
@@ -49,24 +59,40 @@ public sealed class RemoteClient : IDisposable
     {
         using var request = new HttpRequestMessage(HttpMethod.Post, "api/recovery-code");
         request.Headers.Authorization = new("Bearer", token);
-        using var response = await http.SendAsync(request).ConfigureAwait(false);
-        response.EnsureSuccessStatusCode();
-        return await response.Content.ReadFromJsonAsync<AccountCredentials>(Protocol.Json).ConfigureAwait(false)
-            ?? throw new InvalidDataException("Server returned no account.");
+        return ValidateCredentials(await RequestAsync<AccountCredentials>(request).ConfigureAwait(false));
     }
 
     private async Task<AccountCredentials> PostAsync<T>(string path, T body)
     {
-        using var response = await http.PostAsJsonAsync(path, body, Protocol.Json).ConfigureAwait(false);
-        if (!response.IsSuccessStatusCode) throw new HttpRequestException($"Account request failed (HTTP {(int)response.StatusCode}).", null, response.StatusCode);
-        return await response.Content.ReadFromJsonAsync<AccountCredentials>(Protocol.Json).ConfigureAwait(false)
-            ?? throw new InvalidDataException("Server returned no account.");
+        using var request = new HttpRequestMessage(HttpMethod.Post, path) { Content = JsonContent.Create(body, options: Protocol.Json) };
+        return ValidateCredentials(await RequestAsync<AccountCredentials>(request).ConfigureAwait(false));
+    }
+
+    private async Task<T> RequestAsync<T>(HttpRequestMessage request, int maximumBytes = 65536)
+    {
+        using var timeout = CancellationTokenSource.CreateLinkedTokenSource(lifetime.Token);
+        timeout.CancelAfter(TimeSpan.FromSeconds(15));
+        using var response = await http.SendAsync(request, HttpCompletionOption.ResponseHeadersRead, timeout.Token).ConfigureAwait(false);
+        response.EnsureSuccessStatusCode();
+        byte[] body = await BoundedHttp.ReadAsync(response, maximumBytes, timeout.Token).ConfigureAwait(false);
+        try { return JsonSerializer.Deserialize<T>(body, Protocol.Json) ?? throw new InvalidDataException("The server returned an empty response."); }
+        finally { System.Security.Cryptography.CryptographicOperations.ZeroMemory(body); }
+    }
+
+    private static AccountCredentials ValidateCredentials(AccountCredentials account)
+    {
+        static bool Secret(string? value) => value is { Length: 43 } && value.All(c => char.IsAsciiLetterOrDigit(c) || c is '-' or '_');
+        if (account.AccountId == Guid.Empty || account.Profile is not { } profile || profile.Id != account.AccountId ||
+            !Secret(account.AccessToken) || !Secret(account.RecoveryCode) || !Protocol.ValidName(profile.DisplayName) ||
+            !Protocol.ValidAvatar(profile.AvatarPixels) || (profile.AvatarPreset is not null && AvatarPresets.Find(profile.AvatarPreset) is null))
+            throw new InvalidDataException("The server returned an invalid account.");
+        return account;
     }
 
     public async Task ConnectAsync(string accessToken)
     {
         await DisconnectAsync().ConfigureAwait(false);
-        while (events.TryDequeue(out _)) { }
+        while (TryRead(out _)) { }
         stop = new CancellationTokenSource();
         socket = new ClientWebSocket();
         socket.Options.SetRequestHeader("Authorization", "Bearer " + accessToken);
@@ -121,8 +147,10 @@ public sealed class RemoteClient : IDisposable
                 var bytes = await Protocol.ReceiveAsync(ws, 1024 * 1024, linked.Token).ConfigureAwait(false);
                 if (bytes is null) break;
                 var message = JsonSerializer.Deserialize<ServerEvent>(bytes, Protocol.Json);
-                if (message is null || events.Count >= 512) throw new InvalidDataException("Inbound queue limit or invalid event.");
-                events.Enqueue(message);
+                if (message is null || !Protocol.ValidEvent(message) || events.Count >= 512) throw new InvalidDataException("Inbound queue limit or invalid event.");
+                if (Interlocked.Add(ref queuedEventBytes, bytes.Length) > 4 * 1024 * 1024)
+                { Interlocked.Add(ref queuedEventBytes, -bytes.Length); throw new InvalidDataException("Inbound byte budget exceeded."); }
+                events.Enqueue((message, bytes.Length));
             }
         }
         catch (Exception ex) when (ex is WebSocketException or OperationCanceledException or InvalidDataException or JsonException)
@@ -130,7 +158,6 @@ public sealed class RemoteClient : IDisposable
             if (!cancel.IsCancellationRequested)
             {
                 diagnostic?.Invoke("websocket.receive_failed", ex);
-                events.Enqueue(new("disconnected", Error: $"Connection interrupted ({ex.GetType().Name}). Reconnect to restore your room within 30 seconds."));
             }
         }
         finally
@@ -139,7 +166,7 @@ public sealed class RemoteClient : IDisposable
             sends.Writer.TryComplete();
             ws.Abort();
             try { await sending.ConfigureAwait(false); } catch (Exception ex) when (ex is WebSocketException or OperationCanceledException) { }
-            if (!cancel.IsCancellationRequested) events.Enqueue(new("disconnected"));
+            if (!cancel.IsCancellationRequested) events.Enqueue((new("disconnected"), 0));
             diagnostic?.Invoke("websocket.disconnected", null);
         }
     }
@@ -158,6 +185,8 @@ public sealed class RemoteClient : IDisposable
 
     public void Dispose()
     {
+        if (Interlocked.Exchange(ref disposed, 1) != 0) return;
+        lifetime.Cancel();
         stop?.Cancel();
         socket?.Abort();
         http.Dispose();
@@ -168,7 +197,7 @@ public sealed class RemoteClient : IDisposable
         _ = Task.Run(async () =>
         {
             if (pending is not null) try { await pending.ConfigureAwait(false); } catch (OperationCanceledException) { }
-            ws?.Dispose(); cts?.Dispose();
+            ws?.Dispose(); cts?.Dispose(); lifetime.Dispose();
         });
     }
 }

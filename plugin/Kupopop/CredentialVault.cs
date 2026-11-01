@@ -25,6 +25,7 @@ public sealed class CredentialVault(string directory)
     {
         string path = PathFor(server);
         if (!File.Exists(path)) return null;
+        if (new FileInfo(path).Length > 16384) throw new InvalidDataException("Saved credential exceeds its size limit.");
         byte[] clear = Protect(File.ReadAllBytes(path), false);
         try { return JsonSerializer.Deserialize<DeviceAccount>(clear, Protocol.Json); }
         finally { CryptographicOperations.ZeroMemory(clear); }

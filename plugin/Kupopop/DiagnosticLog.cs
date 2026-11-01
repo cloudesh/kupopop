@@ -4,6 +4,7 @@ public sealed class DiagnosticLog
 {
     private readonly object gate = new();
     private readonly string directory;
+    private DateTime nextCleanup;
     public string FilePath => Path.Combine(directory, $"plugin-{DateTime.UtcNow:yyyyMMdd}.log");
 
     public DiagnosticLog(string configDirectory)
@@ -18,8 +19,12 @@ public sealed class DiagnosticLog
         {
             try
             {
-                foreach (var old in Directory.EnumerateFiles(directory, "plugin-*.log").Where(p => File.GetLastWriteTimeUtc(p) < DateTime.UtcNow.AddDays(-7)))
-                    File.Delete(old);
+                if (DateTime.UtcNow >= nextCleanup)
+                {
+                    foreach (var old in Directory.EnumerateFiles(directory, "plugin-*.log*").Where(p => File.GetLastWriteTimeUtc(p) < DateTime.UtcNow.AddDays(-7)))
+                        File.Delete(old);
+                    nextCleanup = DateTime.UtcNow.AddHours(1);
+                }
                 if (File.Exists(FilePath) && new FileInfo(FilePath).Length > 5 * 1024 * 1024)
                     File.Move(FilePath, FilePath + ".previous", true);
                 using var stream = new FileStream(FilePath, FileMode.Append, FileAccess.Write, FileShare.ReadWrite);

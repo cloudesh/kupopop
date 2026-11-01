@@ -1,97 +1,57 @@
 # Kupo Skribbl
 
-A native Dalamud drawing-and-guessing game for Final Fantasy XIV. Draw with
-friends, race to solve the word, and make a little avatar of your own.
+A native Dalamud drawing-and-guessing game for Final Fantasy XIV.
 
-**Experimental 0.7.0 — compiled and automatically tested; in-game testing required.**
+**Experimental 0.8.0 · Dalamud API 15 · Protocol 4.**
 
-## Try it
+## Install
 
-The plugin automatically connects to **https://play.kupopop.com**. Players do not
-need to run a server or enter an address. An unavailable service shows a short
-connection page; it retries automatically and opens the game when ready.
-
-Custom plugin repository URL:
+Add this under Dalamud Settings → Experimental → Custom Plugin Repositories:
 
 `https://raw.githubusercontent.com/cloudesh/kupopop/main/plugin/releases/repo.json`
 
-Add it under Dalamud Settings -> Experimental -> Custom Plugin Repositories,
-install **Kupo Skribbl**, and open **`/kuposkribbl`** (`/kupopop` remains an alias).
-The installation ID stays `Kupopop` so existing installations update normally.
-This custom release is not an
-official Dalamud repository submission.
+Install **Kupo Skribbl**, then open `/kuposkribbl` (`/kupopop` is an alias).
+Clients connect automatically to `https://play.kupopop.com`. The stable installation
+ID is `Kupopop`, preserving existing configuration and device credentials.
+This is a custom repository release; official listing has not been requested.
 
-Self-hosting/development: [Windows/Linux server packages](https://github.com/cloudesh/kupopop/releases/tag/v0.7.0)
-and [unattended Linux deployment](server/deploy/README.md) remain available. The
-stable PC launcher is **[Start-My-Server.cmd](Start-My-Server.cmd)**; its data stays
-in `server/local/`. A development plugin can target localhost by changing
-`OfficialService.Origin` before building. The distributed plugin uses the single
-maintained service and has no connection settings.
+## Play
 
-Profiles belong to the backend that created them. A local development profile
-does not automatically migrate to the maintained server; its encrypted local
-credential and server data remain intact.
+- Create a profile and save its private recovery code. Draw an avatar or use a
+  moogle face or a locally loaded job emblem.
+- Join via code, host a room, or browse opt-in public lobbies.
+- Up to 16 players; defaults are 90 seconds per drawer and two rounds.
+- Draw with pencil, fill, eraser, shapes, 32 colors and stroke undo.
+- Choose privately from four words by default. A rare 10% custom-word option
+  can be disabled by the host. Selection lasts 15 seconds before drawing time.
+- FFXIV, General, Internet Memes and Video Games themes contain 39 private lists
+  and 2,631 entries. Select whole categories or individual lists.
+- Server-owned scoring, random letter hints, recaps and final-match podiums.
+  Accepted spelling/name variants score normally; other close guesses get
+  private feedback. Done-mode chat reaches the drawer and correct guessers only.
+- Leader moderation and configurable room votes. Under five players, all other
+  voters must agree; five or more requires 70%, rounded up.
+- Light/dark paper themes, collapsible tools, compact notifications and a 3:2 window.
 
-[Testing and logs](TESTING.md) · [Hosting instructions](server/HOSTING.md)
+Profiles persist in SQLite. Rooms, drawings, chat and match scores are ephemeral.
+Persistent currency, shops and Lodestone verification are outside this release.
+The plugin performs no automated FFXIV-server interactions or player scans.
 
-## Included
+## Build and host
 
-- Welcome/account setup with private recovery codes and protected device login.
-- Generated avatars and a skippable editor for hand-drawn profile avatars.
-- Join via code, Host Room, and Browse Lobbies with opt-in public listings.
-- Attached Basic / Advanced / Word Lists setup tabs, sliders and selectable list buttons.
-- A resizable 3:2 paper window, centered home choices and a saved light/dark theme.
-- Word/hints centered above the canvas, with a collapsible floating drawing toolbox.
-- Compact tooltips, consistent slider handles and status/error toasts inside the plugin.
-- Up to 16 players; default 90-second drawing turns and two complete rounds.
-- Pencil, palette, flood fill, and eraser; user list left, canvas center, chat right.
-- Server-owned timing, hints, solve-order scores, and drawer rewards.
-- One chat input for guessing/conversation, with private done-mode chat for the
-  current drawer and correct guessers.
-- Self-contained Windows x64/Linux x64 server packages and file diagnostics.
+- [Development, architecture, review findings and testing](DEVELOPMENT.md)
+- [Windows/Linux server setup, deployment and backups](server/HOSTING.md)
+- [Private word-list configuration](server/WORD_LISTS.md)
+- [Latest release and server downloads](https://github.com/cloudesh/kupopop/releases/latest)
 
-The maintained service has 39 private word lists with 2,631 entries across FFXIV,
-General (1,586 everyday prompts), Internet Memes and Video Games. Normal lists
-default on; specialist lists default off. Hosts select lists/categories and can
-disable the 10% rare custom-word offer. Full word banks and answer aliases never
-travel in the catalog. Private word data is configured separately from open
-server source; see [word-list hosting](server/WORD_LISTS.md).
+Run **Start-My-Server.cmd** for PC development hosting. It incrementally builds
+current source and preserves `server/local/`. Public plugin installations use the
+maintained service; a source build can change `OfficialService.Origin` for local
+hosting. Accounts belong to their originating backend.
 
-Both canvases have stroke undo. Portraits support transparency, seven moogle
-presets and 22 game-provided job emblems. Mute is removed; a server-authoritative
-drawer vote requires unanimity below five players or 70% of others for five or
-more, with a thirty-second ballot. Protocol 4 requires matching updated clients
-and server for the square 384 x 384 canvas; existing profiles are preserved.
+Source lives under `plugin/` and `server/`; build output is ignored. The live
+installer feed is promoted only after its matching release ZIP is verified.
 
-Drawers choose privately from one to eight words (four by default); a 15-second selection timeout is
-separate from drawing time. Random-position hints and six-second answer/top-three
-recaps pace turns. The toolkit includes shape previews and a 32-color popup.
-Live canvas cursors show the drawer's tool; chat uses compact message cards.
-Leader kicks are on artist-row right-click; Kick/Skip votes sit on the canvas.
-Dismissible update notices stay inside the plugin, with manual updates through
-Dalamud. One-letter near misses receive private “So close!” feedback without
-echoing the guess to the room. Cursor positions, guesses and unused word choices
-never go in diagnostic logs.
-
-No Kupo-Points, shop,
-Lodestone verification, or Homeworld Rooms yet. The shared Kupopop profile is
-designed for future games; the initial product focuses on drawing.
-
-## Source and build
-
-- `plugin/Kupopop/`: native C# Dalamud API 15 plugin.
-- `plugin/Kupopop.Shared/`: protocol, deterministic canvas, avatars, WebSocket client.
-- `plugin/releases/`: local plugin ZIP and custom repository metadata.
-- `server/Kupopop.Server/`: .NET 10 backend, account persistence, room/game rules.
-- `server/Kupopop.Tests/`: engine, privacy, credential, and real-network checks.
-- `server/hosting/`: Windows/Linux launchers for local and public hosting.
-- `Build-Release.ps1`: builds the plugin and self-contained server archives.
-
-See [TESTING.md](TESTING.md) for build commands and current rule defaults, and
-[PROJECT_PLAN.md](PROJECT_PLAN.md) for the design record.
-
-[Dalamud compatibility record](DALAMUD_COMPLIANCE.md) distinguishes published rules
-from design judgments. Meaningful human review/testing and human-written official
-submission text will be needed before pursuing an official listing.
-
-MIT licensed. Not affiliated with Square Enix or skribbl.io.
+MIT licensed. Not affiliated with Square Enix or skribbl.io. See
+[component notices](THIRD_PARTY_NOTICES.md). In-game rendering, dragging and
+unload/reload behavior require owner verification; automated checks run outside FFXIV.
