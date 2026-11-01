@@ -137,18 +137,18 @@ public static class UiTheme
     // sparse and stationary, and keep the synchronized drawing pixels untouched.
     public static void PaperGrain(Vector2 min, Vector2 max, Vector4? tint = null)
     {
-        if (UiAssets.PaperTexture(min, max, tint)) return;
+        bool textured = UiAssets.PaperTexture(min, max, tint);
         var draw = ImGui.GetWindowDrawList();
-        var fiber = Brass; fiber.W = 0.10f;
+        var fiber = DarkMode ? Ink : Brass; fiber.W = textured ? 0.045f : DarkMode ? 0.06f : 0.10f;
         uint color = C(fiber);
-        float step = S(16);
+        float step = S(28);
         int rows = Math.Min(70, (int)((max.Y - min.Y) / step));
         int columns = Math.Min(90, (int)((max.X - min.X) / step));
         for (int row = 0; row < rows; row++)
             for (int col = 0; col < columns; col++)
             {
                 uint hash = unchecked((uint)(row * 73856093 ^ col * 19349663)) * 2654435761u;
-                var point = min + new Vector2(col * step + S(2 + hash % 10), row * step + S(2 + (hash >> 8) % 10));
+                var point = min + new Vector2(col * step + S(2 + hash % 24), row * step + S(2 + (hash >> 8) % 24));
                 draw.AddLine(point, point + V(1 + (hash >> 16) % 3, 0.3f), color, S(0.6f));
             }
     }

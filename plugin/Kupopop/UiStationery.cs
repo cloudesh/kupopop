@@ -28,6 +28,7 @@ public static class UiStationery
         var pageMax = max;
         draw.AddRectFilled(min, pageMax, UiTheme.C(UiTheme.Paper), UiTheme.S(2));
         UiTheme.PaperGrain(min, pageMax);
+        PencilEdges(min, pageMax);
         draw.AddLine(min + UiTheme.V(8, 4), new Vector2(min.X + UiTheme.S(8), pageMax.Y - UiTheme.S(4)), UiTheme.C(UiTheme.Line));
         var margin = UiTheme.Rose; margin.W = 0.15f;
         draw.AddLine(min + UiTheme.V(10, 6), new Vector2(min.X + UiTheme.S(10), pageMax.Y - UiTheme.S(6)), UiTheme.C(margin));
@@ -38,6 +39,28 @@ public static class UiStationery
             draw.AddLine(new Vector2(min.X - UiTheme.S(5), y - UiTheme.S(1)), new Vector2(min.X + UiTheme.S(3), y - UiTheme.S(1)), UiTheme.C(UiTheme.Line));
         }
         draw.PopClipRect();
+    }
+
+    private static void PencilEdges(Vector2 min, Vector2 max)
+    {
+        var draw = ImGui.GetWindowDrawList();
+        var ink = UiTheme.Ink; ink.W = 0.12f;
+        // Stationary, slightly uneven pencil marks sit inside the paper margin.
+        // They never alter the rectangular controls or precise drawing surface.
+        for (int side = 0; side < 2; side++)
+        {
+            float y = side == 0 ? min.Y + UiTheme.S(3) : max.Y - UiTheme.S(3);
+            for (int i = 0; i < (max.X - min.X - UiTheme.S(14)) / UiTheme.S(23); i++)
+            {
+                float x = min.X + UiTheme.S(7 + i * 23);
+                float wobble = UiTheme.S((i % 3 - 1) * 0.35f);
+                draw.AddLine(new Vector2(x, y + wobble), new Vector2(x + UiTheme.S(19), y - wobble), UiTheme.C(ink), UiTheme.S(0.7f));
+            }
+        }
+        var corner = max - UiTheme.V(6, 6);
+        var crease = UiTheme.Brass; crease.W = 0.16f;
+        draw.AddTriangleFilled(corner, corner - UiTheme.V(13, 0), corner - UiTheme.V(0, 13), UiTheme.C(crease));
+        draw.AddLine(corner - UiTheme.V(13, 0), corner - UiTheme.V(0, 13), UiTheme.C(ink), UiTheme.S(0.8f));
     }
 
     public static void PaperLeaf(Vector2 min, Vector2 max, float degrees, Vector2 offset, Vector4 color)

@@ -17,4 +17,5 @@ Open with /kupopop or /kuposkribbl.</Description>
     <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
   </PropertyGroup>
   <ItemGroup><ProjectReference Include="../Kupopop.Shared/Kupopop.Shared.csproj" /></ItemGroup>
+  <ItemGroup><EmbeddedResource Include="Audio/*.wav" /></ItemGroup>
 </Project>

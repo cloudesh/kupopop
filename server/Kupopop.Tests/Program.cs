@@ -22,6 +22,7 @@ void Check(bool condition, string description)
     passed++; Console.WriteLine("PASS " + description);
 }
 
+SoundEventChecks.Run(Check);
 var canvas = new PixelCanvas(64, 64);
 canvas.Apply(new("pencil", 10, 10, 50, 10, 1, 1));
 canvas.Apply(new("pencil", 50, 10, 50, 50, 1, 1));

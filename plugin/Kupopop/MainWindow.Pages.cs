@@ -284,7 +284,7 @@ public sealed partial class MainWindow
         else UiTheme.Wrapped("Your profile will appear here when it has loaded.", UiTheme.Muted);
         ImGui.SameLine();
         float suggestionWidth = ImGui.CalcTextSize("Suggestions").X + UiTheme.S(36);
-        ImGui.SetCursorPosX(Math.Max(ImGui.GetCursorPosX(), ImGui.GetWindowContentRegionMax().X - suggestionWidth));
+        ImGui.SetCursorScreenPos(new Vector2(origin.X + width - UiTheme.S(6) - suggestionWidth, ImGui.GetCursorScreenPos().Y));
         if (UiTheme.Button("Suggestions", suggestionWidth, primary: true)) { ShowDebug = false; screen = "suggestions"; }
     }
 
@@ -735,6 +735,8 @@ public sealed partial class MainWindow
         if (!card.Success) return;
         bool reduceMotion = plugin.Config.ReduceMotion;
         bool darkMode = plugin.Config.DarkMode;
+        bool sounds = plugin.Config.GameSounds;
+        if (ImGui.Checkbox("Game sounds", ref sounds)) { plugin.Config.GameSounds = sounds; plugin.Save(); if (!sounds) audio.Stop(); }
         if (ImGui.Checkbox("Dark paper", ref darkMode)) { plugin.Config.DarkMode = darkMode; plugin.Save(); }
         if (ImGui.Checkbox("Reduce decorative motion", ref reduceMotion)) { plugin.Config.ReduceMotion = reduceMotion; plugin.Save(); }
         UiTheme.Caption("Keep the moogle pom still while moving the book.");

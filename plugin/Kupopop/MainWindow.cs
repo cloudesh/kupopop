@@ -25,6 +25,8 @@ public sealed partial class MainWindow : Window, IDisposable
     private bool wordListsChosen, undoPending, canUndoDrawing;
     private readonly ToastQueue toasts = new();
     private readonly UpdateChecker updates = new();
+    private readonly GameAudio audio;
+    private bool audioStateReady;
     private bool updateCheckPending;
     private long nextUpdateCheck, remoteCursorAt;
     private readonly AvatarTextures avatars;
@@ -69,6 +71,7 @@ public sealed partial class MainWindow : Window, IDisposable
     {
         this.plugin = plugin;
         this.log = log;
+        audio = new(log);
         avatars = new();
         art = new(log);
         vault = new(directory);
@@ -90,6 +93,8 @@ public sealed partial class MainWindow : Window, IDisposable
     {
         var closing = client;
         client = null;
+        audio.Stop();
+        audioStateReady = false;
         room = null; profile = null; device = null;
         chat.Clear(); publicRooms = [];
         social = null; sharedProfile = null; showSharedProfile = false;
@@ -144,6 +149,7 @@ public sealed partial class MainWindow : Window, IDisposable
     {
         SynchronizeVisibility();
         if (disposed || !IsOpen) return;
+        audio.Tick();
         while (pendingCredentials.TryDequeue(out var pending))
         {
             // A completed recovery must not lose its new code when the user
@@ -221,6 +227,7 @@ public sealed partial class MainWindow : Window, IDisposable
                 if (state.Players.Length > 16) throw new InvalidDataException("Server player limit exceeded.");
                 bool differentRoom = room?.Code != state.Code;
                 bool newTurn = room?.TurnId != state.TurnId;
+                if (differentRoom) audio.Stop();
                 if (differentRoom) chat.Clear();
                 if (state.ResetCanvas || newTurn) canvas.Clear();
                 if (state.Canvas is { } pixels) canvas.Load(pixels);
@@ -228,6 +235,9 @@ public sealed partial class MainWindow : Window, IDisposable
                 if (newTurn || state.Phase != "drawing") painting.RemoteCursor = null;
                 if (state.Cursor is { } brush && state.DrawerId != device?.AccountId)
                 { painting.RemoteCursor = brush; remoteCursorAt = Environment.TickCount64; }
+                if (audioStateReady && plugin.Config.GameSounds)
+                    foreach (var cue in GameSoundEvents.Transition(room, state, device?.AccountId)) audio.Enqueue(cue);
+                audioStateReady = true;
                 room = state;
                 if (differentRoom) Send(new("social"));
                 serverOffset = state.ServerTime - DateTimeOffset.UtcNow;
@@ -260,7 +270,7 @@ public sealed partial class MainWindow : Window, IDisposable
             case "chat" when message.Chat is { } line:
                 chat.Add(line); if (chat.Count > 200) chat.RemoveAt(0); scrollChat = true;
                 break;
-            case "left": room = null; chat.Clear(); screen = "menu"; NotifyStatus(message.Error ?? "You left the room."); break;
+            case "left": audio.Stop(); room = null; chat.Clear(); screen = "menu"; NotifyStatus(message.Error ?? "You left the room."); break;
             case "error":
                 NotifyStatus(message.Error ?? "Server rejected the action.", error: true);
                 if (message.RejectedCommand == "profile") savingProfile = false;
@@ -271,6 +281,8 @@ public sealed partial class MainWindow : Window, IDisposable
                 { lastSync = Environment.TickCount64; Send(new("sync")); }
                 break;
             case "disconnected":
+                audio.Stop();
+                audioStateReady = false;
                 savingProfile = false;
                 undoPending = false;
                 painting.RemoteCursor = null;
@@ -390,6 +402,7 @@ public sealed partial class MainWindow : Window, IDisposable
         CloseSession();
         disposed = true;
         updates.Dispose();
+        audio.Dispose();
         painting.Dispose(); avatarEditor.Dispose(); avatars.Dispose(); art.Dispose();
         newRecovery = ""; recoveryInput = "";
     }

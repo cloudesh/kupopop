@@ -1,7 +1,8 @@
-Kupo Skribbl 0.11.3 gives the tools a simpler cartoon look.
+Kupo Skribbl 0.12.0 adds game sounds and subtle notebook polish.
 
-- Pencil, fill bucket, eraser and Shapes use flat colours and bold black borders.
-- The compact 28-unit buttons and tool behaviour stay the same. Dark paper gets a subtle outer keyline to keep the black outlines readable.
-- Original native geometry follows the requested cartoon direction; no reference artwork is copied or bundled.
+- Suggestions now aligns with the home cards, alongside your profile.
+- Faint paper fibres, pencil edges and a folded corner add a little handmade character in both themes.
+- New sounds celebrate correct guesses, the next drawing turn and top-three finishes. A separate cue marks a missed guessing timer.
+- Sounds can be disabled in appearance settings. Reconnecting and repeated snapshots do not replay them, and closing the book stops playback.
 
-Plugin-only visual update. Checked in light/dark native previews outside FFXIV; in-game verification is still needed.
+Plugin-only update; the server and protocol are unchanged. In-game verification is still needed.
