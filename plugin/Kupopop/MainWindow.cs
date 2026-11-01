@@ -27,6 +27,7 @@ public sealed partial class MainWindow : Window, IDisposable
     private readonly UpdateChecker updates = new();
     private readonly GameAudio audio;
     private bool audioStateReady;
+    private readonly DrawingCountdown countdown = new();
     private bool updateCheckPending;
     private long nextUpdateCheck, remoteCursorAt;
     private readonly AvatarTextures avatars;
@@ -95,6 +96,7 @@ public sealed partial class MainWindow : Window, IDisposable
         client = null;
         audio.Stop();
         audioStateReady = false;
+        countdown.Reset();
         room = null; profile = null; device = null;
         chat.Clear(); publicRooms = [];
         social = null; sharedProfile = null; showSharedProfile = false;
@@ -149,7 +151,6 @@ public sealed partial class MainWindow : Window, IDisposable
     {
         SynchronizeVisibility();
         if (disposed || !IsOpen) return;
-        audio.Tick();
         while (pendingCredentials.TryDequeue(out var pending))
         {
             // A completed recovery must not lose its new code when the user
@@ -170,6 +171,9 @@ public sealed partial class MainWindow : Window, IDisposable
             HandleEvent(message);
         }
         long now = Environment.TickCount64;
+        bool clockTick = countdown.Update(client?.Connected == true && sessionReady ? room : null, DateTimeOffset.UtcNow + serverOffset);
+        if (plugin.Config.GameSounds && clockTick) audio.Enqueue("clock");
+        audio.Tick();
         if (now - remoteCursorAt > 2000) painting.RemoteCursor = null;
         if (!updateCheckPending && now >= nextUpdateCheck)
         {

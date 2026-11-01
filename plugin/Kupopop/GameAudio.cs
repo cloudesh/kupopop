@@ -13,6 +13,9 @@ internal sealed class GameAudio(DiagnosticLog log) : IDisposable
 
     public void Enqueue(string cue)
     {
+        // Countdown ticks are disposable: never queue them behind celebration sounds.
+        if (cue == "clock" && (pending.Count != 0 || active is not null &&
+            (Marshal.PtrToStructure<WaveHeader>(active.Header).Flags & 1) == 0)) return;
         if (!unavailable && pending.Count < 4) pending.Enqueue(cue);
     }
 

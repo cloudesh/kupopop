@@ -25,9 +25,24 @@ internal static class SoundEventChecks
         check(Cues(solved, podium).SequenceEqual(["top_3"]) && Cues(podium, podium).Length == 0, "turn podium sounds once for its first three guessers");
         var final = podium with { Phase = "results", MatchResults = [new(me, "Artist", 2000)] };
         check(Cues(podium, final).SequenceEqual(["top_3"]) && Cues(final, final).Length == 0, "match podium sounds once for a top-three finish");
-        check(Cues(podium, final with { MatchResults = [] }).Length == 0, "unranked match finish stays silent");
+        check(Cues(podium, final with { MatchResults = [] }).Length == 0, "empty match results do not invent a podium cue");
         check(Cues(drawing, solved with { Code = "OTHER" }).Length == 0 &&
             Cues(drawing, solved with { TurnId = Guid.NewGuid() }).Length == 0, "room and turn changes do not invent correct guesses");
         check(Cues(choosing, drawing with { Players = [] }).Length == 0, "spectator without membership receives no game cues");
+        var countdown = new DrawingCountdown();
+        check(!countdown.Update(drawing, drawing.Deadline.AddSeconds(-11)), "clock stays quiet above ten seconds");
+        check(countdown.Update(drawing, drawing.Deadline.AddSeconds(-10)) &&
+            !countdown.Update(drawing, drawing.Deadline.AddSeconds(-9.9)), "clock ticks once at each displayed second");
+        check(countdown.Update(drawing, drawing.Deadline.AddSeconds(-7)) &&
+            !countdown.Update(drawing, drawing.Deadline.AddSeconds(-8)) &&
+            !countdown.Update(drawing, drawing.Deadline.AddSeconds(-7)), "clock skips missed seconds and never repeats after clock correction");
+        check(countdown.Update(drawing, drawing.Deadline.AddSeconds(-1)) &&
+            !countdown.Update(drawing, drawing.Deadline) &&
+            !countdown.Update(drawing, drawing.Deadline.AddSeconds(1)), "clock ticks at one but stops at zero");
+        check(!countdown.Update(choosing, choosing.Deadline.AddSeconds(-5)) &&
+            !countdown.Update(ended, ended.Deadline.AddSeconds(-5)), "word selection and recaps have no countdown audio");
+        check(countdown.Update(drawing with { TurnId = Guid.NewGuid() }, drawing.Deadline.AddSeconds(-10)), "new drawing turn resets countdown cadence");
+        countdown.Reset();
+        check(countdown.Update(drawing, drawing.Deadline.AddSeconds(-5)), "fresh sessions do not inherit old countdown state");
     }
 }
