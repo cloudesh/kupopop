@@ -11,6 +11,7 @@
     <Use_Dalamud_Lumina_Excel>false</Use_Dalamud_Lumina_Excel>
     <Use_Dalamud_Serilog>false</Use_Dalamud_Serilog>
     <Use_Dalamud_MSObjectPool>false</Use_Dalamud_MSObjectPool>
+    <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
   </PropertyGroup>
   <ItemGroup><ProjectReference Include="../Kupopop.Shared/Kupopop.Shared.csproj" /></ItemGroup>
 </Project>

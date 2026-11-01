@@ -56,16 +56,9 @@ public static class UiRoomSettings
     private static void Number(string id, ref int value, int minimum, int maximum)
     {
         using var unique = ImRaii.PushId(id);
-        using var padding = ImRaii.PushStyle(ImGuiStyleVar.FramePadding, new Vector2(UiTheme.S(6), Math.Max(0, (UiTheme.S(28) - ImGui.GetFontSize()) / 2)));
-        float width = ImGui.GetContentRegionAvail().X;
-        if (UiTheme.Button("-", UiTheme.S(26), quiet: true)) value = Math.Clamp(Math.Clamp(value, minimum, maximum) - 1, minimum, maximum);
-        if (ImGui.IsItemHovered()) ImGui.SetTooltip("Decrease " + id);
-        ImGui.SameLine(0, UiTheme.S(3));
-        ImGui.SetNextItemWidth(Math.Max(UiTheme.S(30), width - UiTheme.S(58)));
-        ImGui.InputInt("##value", ref value, 0, 0);
-        if (ImGui.IsItemDeactivatedAfterEdit()) value = Math.Clamp(value, minimum, maximum);
-        ImGui.SameLine(0, UiTheme.S(3));
-        if (UiTheme.Button("+", UiTheme.S(26), quiet: true)) value = Math.Clamp(Math.Clamp(value, minimum, maximum) + 1, minimum, maximum);
-        if (ImGui.IsItemHovered()) ImGui.SetTooltip("Increase " + id);
+        value = Math.Clamp(value, minimum, maximum);
+        ImGui.SetNextItemWidth(-1);
+        ImGui.SliderInt("##value", ref value, minimum, maximum, "", ImGuiSliderFlags.AlwaysClamp | ImGuiSliderFlags.NoInput);
+        UiPresentation.CenteredLabel(value == 0 && id == "hints" ? "Off" : value.ToString(), ImGui.GetContentRegionAvail().X, UiTheme.Ink);
     }
 }

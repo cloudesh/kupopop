@@ -9,25 +9,30 @@ namespace Kupopop;
 /// <summary>Window-scoped stationery palette. No global Dalamud style is changed.</summary>
 public static class UiTheme
 {
-    public static readonly Vector4 Paper = Hex(0xF1E8D3);
-    public static readonly Vector4 Panel = Hex(0xFBF6E8);
-    public static readonly Vector4 Inset = Hex(0xDED0B4);
-    public static readonly Vector4 Cover = Hex(0xB89A91);
-    public static readonly Vector4 Tape = Hex(0xE3C990);
-    public static readonly Vector4 StickyYellow = Hex(0xF5E7AD);
-    public static readonly Vector4 StickyRose = Hex(0xEECFD3);
-    public static readonly Vector4 StickySage = Hex(0xDCE7C9);
-    public static readonly Vector4 StickyBlue = Hex(0xD7E6EC);
-    public static readonly Vector4 Ink = Hex(0x372E39);
-    public static readonly Vector4 Muted = Hex(0x70626B);
-    public static readonly Vector4 Line = Hex(0xCFBEA1);
-    public static readonly Vector4 Brass = Hex(0x876339);
-    public static readonly Vector4 Rose = Hex(0x824459);
-    public static readonly Vector4 RoseHover = Hex(0x9B536B);
-    public static readonly Vector4 RoseTint = Hex(0xEAD6D8);
-    public static readonly Vector4 Green = Hex(0x3C6D61);
-    public static readonly Vector4 GreenTint = Hex(0xDDE8DE);
+    public static bool DarkMode { get; private set; }
+    public static Vector4 Paper => Hex(DarkMode ? 0x252329 : 0xF1E8D3);
+    public static Vector4 Panel => Hex(DarkMode ? 0x312D34 : 0xFBF6E8);
+    public static Vector4 Inset => Hex(DarkMode ? 0x423A43 : 0xDED0B4);
+    public static Vector4 Cover => Hex(DarkMode ? 0x51414C : 0xB89A91);
+    public static Vector4 Tape => Hex(DarkMode ? 0x8E744B : 0xE3C990);
+    public static Vector4 StickyYellow => Hex(DarkMode ? 0x494335 : 0xF5E7AD);
+    public static Vector4 StickyRose => Hex(DarkMode ? 0x493641 : 0xEECFD3);
+    public static Vector4 StickySage => Hex(DarkMode ? 0x34443B : 0xDCE7C9);
+    public static Vector4 StickyBlue => Hex(DarkMode ? 0x2F414B : 0xD7E6EC);
+    public static Vector4 Ink => Hex(DarkMode ? 0xE8E0D3 : 0x372E39);
+    public static Vector4 Muted => Hex(DarkMode ? 0xB8AAAD : 0x70626B);
+    public static Vector4 Line => Hex(DarkMode ? 0x61535C : 0xCFBEA1);
+    public static Vector4 Brass => Hex(DarkMode ? 0xD0B17F : 0x876339);
+    public static Vector4 Rose => Hex(DarkMode ? 0xD58BA3 : 0x824459);
+    public static Vector4 RoseHover => Hex(DarkMode ? 0xE5A1B6 : 0x9B536B);
+    public static Vector4 RoseTint => Hex(DarkMode ? 0x593D4B : 0xEAD6D8);
+    public static Vector4 Green => Hex(DarkMode ? 0x88BFA8 : 0x3C6D61);
+    public static Vector4 GreenTint => Hex(DarkMode ? 0x2E483C : 0xDDE8DE);
     public static readonly Vector4 White = Hex(0xFFF9F1);
+    public static readonly Vector4 CanvasInk = Hex(0x372E39);
+    public static readonly Vector4 CanvasAccent = Hex(0x824459);
+    public static Vector4 Shadow => DarkMode ? Hex(0x050407) : Ink;
+    public static Vector4 OnAccent => DarkMode ? Hex(0x251D23) : White;
     public static float Scale => ImGuiHelpers.GlobalScale;
     public static float S(float value) => value * Scale;
     public static Vector2 V(float x, float y) => new(S(x), S(y));
@@ -35,23 +40,25 @@ public static class UiTheme
 
     private static Vector4 Hex(int rgb) => new(((rgb >> 16) & 255) / 255f, ((rgb >> 8) & 255) / 255f, (rgb & 255) / 255f, 1);
 
-    public static IDisposable Apply(bool compactRoom = false) => new ThemeScope(compactRoom);
+    public static IDisposable Apply(bool compactRoom = false, bool darkMode = false) => new ThemeScope(compactRoom, darkMode);
 
     private sealed class ThemeScope : IDisposable
     {
         private int colors, styles;
-        public ThemeScope(bool compactRoom)
+        private readonly bool previousMode;
+        public ThemeScope(bool compactRoom, bool darkMode)
         {
+            previousMode = DarkMode; DarkMode = darkMode;
             Color(ImGuiCol.Text, Ink); Color(ImGuiCol.TextDisabled, Muted);
             Color(ImGuiCol.WindowBg, Cover); Color(ImGuiCol.ChildBg, Panel); Color(ImGuiCol.PopupBg, Panel);
             Color(ImGuiCol.Border, Line); Color(ImGuiCol.BorderShadow, Vector4.Zero);
             Color(ImGuiCol.TitleBg, Inset); Color(ImGuiCol.TitleBgActive, Inset); Color(ImGuiCol.TitleBgCollapsed, Inset);
-            Color(ImGuiCol.FrameBg, Hex(0xE9DFC7)); Color(ImGuiCol.FrameBgHovered, Hex(0xE0D2B3)); Color(ImGuiCol.FrameBgActive, White);
-            Color(ImGuiCol.Button, Inset); Color(ImGuiCol.ButtonHovered, Hex(0xDED0BB)); Color(ImGuiCol.ButtonActive, Hex(0xD1BFA9));
-            Color(ImGuiCol.Header, RoseTint); Color(ImGuiCol.HeaderHovered, Hex(0xE2CBCF)); Color(ImGuiCol.HeaderActive, RoseTint);
+            Color(ImGuiCol.FrameBg, Hex(DarkMode ? 0x39333C : 0xE9DFC7)); Color(ImGuiCol.FrameBgHovered, Hex(DarkMode ? 0x473F49 : 0xE0D2B3)); Color(ImGuiCol.FrameBgActive, DarkMode ? Inset : White);
+            Color(ImGuiCol.Button, Inset); Color(ImGuiCol.ButtonHovered, Vector4.Lerp(Inset, Ink, 0.08f)); Color(ImGuiCol.ButtonActive, Vector4.Lerp(Inset, Ink, 0.16f));
+            Color(ImGuiCol.Header, RoseTint); Color(ImGuiCol.HeaderHovered, Vector4.Lerp(RoseTint, Rose, 0.15f)); Color(ImGuiCol.HeaderActive, RoseTint);
             Color(ImGuiCol.CheckMark, Rose); Color(ImGuiCol.SliderGrab, Rose); Color(ImGuiCol.SliderGrabActive, RoseHover);
             Color(ImGuiCol.Separator, Line); Color(ImGuiCol.SeparatorHovered, Brass); Color(ImGuiCol.SeparatorActive, Rose);
-            Color(ImGuiCol.ScrollbarBg, Paper); Color(ImGuiCol.ScrollbarGrab, Hex(0xC3B399));
+            Color(ImGuiCol.ScrollbarBg, Paper); Color(ImGuiCol.ScrollbarGrab, Hex(DarkMode ? 0x786873 : 0xC3B399));
             Color(ImGuiCol.ScrollbarGrabHovered, Brass); Color(ImGuiCol.ScrollbarGrabActive, Rose);
             Color(ImGuiCol.TextSelectedBg, RoseTint); Color(ImGuiCol.TableHeaderBg, Inset);
             Color(ImGuiCol.TableBorderLight, Line); Color(ImGuiCol.TableBorderStrong, Line);
@@ -68,7 +75,7 @@ public static class UiTheme
         private void Color(ImGuiCol index, Vector4 value) { ImGui.PushStyleColor(index, value); colors++; }
         private void Style(ImGuiStyleVar index, Vector2 value) { ImGui.PushStyleVar(index, value); styles++; }
         private void Style(ImGuiStyleVar index, float value) { ImGui.PushStyleVar(index, value); styles++; }
-        public void Dispose() { ImGui.PopStyleVar(styles); ImGui.PopStyleColor(colors); }
+        public void Dispose() { ImGui.PopStyleVar(styles); ImGui.PopStyleColor(colors); DarkMode = previousMode; }
     }
 
     public static void Caption(string text) => ImGui.TextColored(Muted, text);
@@ -115,7 +122,7 @@ public static class UiTheme
         using var normal = ImRaii.PushColor(ImGuiCol.Button, primary ? Rose : quiet ? Vector4.Zero : Inset);
         using var hover = ImRaii.PushColor(ImGuiCol.ButtonHovered, primary ? RoseHover : RoseTint);
         using var active = ImRaii.PushColor(ImGuiCol.ButtonActive, primary ? Rose : Inset);
-        using var text = ImRaii.PushColor(ImGuiCol.Text, primary ? White : Ink);
+        using var text = ImRaii.PushColor(ImGuiCol.Text, primary ? OnAccent : Ink);
         bool clicked = ImGui.Button(label, new Vector2(width, S(28)));
         if (!quiet)
         {
@@ -128,11 +135,47 @@ public static class UiTheme
 
     public static bool Tab(string label, bool selected)
     {
-        using var fill = ImRaii.PushColor(ImGuiCol.Button, selected ? RoseTint : Panel);
+        using var fill = ImRaii.PushColor(ImGuiCol.Button, selected ? Panel : Vector4.Zero);
+        using var hover = ImRaii.PushColor(ImGuiCol.ButtonHovered, RoseTint);
+        using var rounding = ImRaii.PushStyle(ImGuiStyleVar.FrameRounding, S(5));
         using var text = ImRaii.PushColor(ImGuiCol.Text, selected ? Rose : Muted);
-        bool clicked = ImGui.Button(label, new Vector2(ImGui.CalcTextSize(label).X + S(22), S(28)));
-        var a = ImGui.GetItemRectMin(); var b = ImGui.GetItemRectMax();
-        ImGui.GetWindowDrawList().AddLine(new Vector2(a.X + S(6), b.Y - S(3)), new Vector2(b.X - S(6), b.Y - S(3)), C(selected ? Rose : Line), S(selected ? 2 : 1));
+        bool clicked = ImGui.Button(label, new Vector2(ImGui.CalcTextSize(label).X + S(26), S(30)));
+        if (selected) ImGui.GetWindowDrawList().AddRect(ImGui.GetItemRectMin(), ImGui.GetItemRectMax(), C(UiPresentation.Alpha(Line, 0.55f)), S(5));
+        return clicked;
+    }
+
+    public static bool PanelTab(string label, bool selected)
+    {
+        var start = ImGui.GetCursorScreenPos();
+        var size = new Vector2(ImGui.CalcTextSize(label).X + S(30), S(34));
+        bool clicked = ImGui.InvisibleButton(label, size);
+        var fill = selected ? Panel : ImGui.IsItemHovered() ? RoseTint : Inset;
+        var draw = ImGui.GetWindowDrawList();
+        draw.AddRectFilled(start, start + size, C(fill), S(5), ImDrawFlags.RoundCornersTop);
+        if (selected)
+        {
+            draw.AddRectFilled(start + new Vector2(0, size.Y - 1), start + size + new Vector2(0, 2), C(Panel));
+            draw.AddLine(start + V(9, 2), start + new Vector2(size.X - S(9), S(2)), C(Rose), S(2));
+        }
+        draw.AddText(start + (size - ImGui.CalcTextSize(label)) / 2, C(selected ? Ink : Muted), label);
+        return clicked;
+    }
+
+    public static bool ListButton(string id, string name, string detail, bool selected)
+    {
+        using var unique = ImRaii.PushId(id);
+        using var normal = ImRaii.PushColor(ImGuiCol.Button, selected ? RoseTint : UiPresentation.Alpha(Inset, 0.55f));
+        using var hover = ImRaii.PushColor(ImGuiCol.ButtonHovered, Vector4.Lerp(RoseTint, Rose, 0.12f));
+        using var text = ImRaii.PushColor(ImGuiCol.Text, selected ? Ink : Muted);
+        using var padding = ImRaii.PushStyle(ImGuiStyleVar.FramePadding, V(29, 7));
+        using var align = ImRaii.PushStyle(ImGuiStyleVar.ButtonTextAlign, new Vector2(0, 0.5f));
+        using var rounding = ImRaii.PushStyle(ImGuiStyleVar.FrameRounding, S(5));
+        bool clicked = ImGui.Button(name + "\n" + detail + "##list", new Vector2(ImGui.GetContentRegionAvail().X, S(52)));
+        var min = ImGui.GetItemRectMin();
+        var point = min + V(14, 26);
+        var draw = ImGui.GetWindowDrawList();
+        draw.AddCircle(point, S(5), C(selected ? Rose : Muted), 16, S(1));
+        if (selected) draw.AddCircleFilled(point, S(2.5f), C(Rose), 12);
         return clicked;
     }
 
@@ -177,7 +220,7 @@ public static class UiTheme
     {
         private ImRaii.ChildDisposable child;
         public bool Success { get; }
-        public PaperPanel(string id, Vector2 size, bool inset = false, bool compact = false, bool taped = false, Vector4? note = null, bool scrollable = true, bool plainTop = false, bool flush = false)
+        public PaperPanel(string id, Vector2 size, bool inset = false, bool compact = false, bool taped = false, Vector4? note = null, bool scrollable = true, bool plainTop = false, bool flush = false, bool attachedTabs = false)
         {
             using var color = ImRaii.PushColor(ImGuiCol.ChildBg, Vector4.Zero);
             using var border = ImRaii.PushColor(ImGuiCol.Border, Vector4.Zero);
@@ -195,13 +238,19 @@ public static class UiTheme
                 var surface = note ?? (inset ? Inset : Panel);
                 if (note.HasValue)
                 {
-                    var shadow = Ink; shadow.W = 0.12f;
+                    var shadow = Shadow; shadow.W = 0.12f;
                     draw.AddRectFilled(min + V(1, 3), max + V(1, 3), C(shadow));
                 }
-                else SheetEdges(min, max);
+                else if (!attachedTabs) SheetEdges(min, max);
                 draw.AddRectFilled(min, max, C(surface), S(1));
                 var outline = note.HasValue ? Vector4.Lerp(surface, Brass, 0.3f) : Line;
-                draw.AddRect(min, max, C(outline), S(1));
+                if (attachedTabs)
+                {
+                    draw.AddLine(min, new Vector2(min.X, max.Y), C(outline));
+                    draw.AddLine(new Vector2(min.X, max.Y), max, C(outline));
+                    draw.AddLine(max, new Vector2(max.X, min.Y), C(outline));
+                }
+                else draw.AddRect(min, max, C(outline), S(1));
                 PaperGrain(min, max, note);
                 if (note.HasValue && !plainTop)
                 {

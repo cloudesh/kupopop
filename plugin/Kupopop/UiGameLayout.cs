@@ -10,6 +10,8 @@ public readonly record struct UiGameLayout(float Canvas, float Artists, float Ch
         float canvas = Math.Max(64 * scale, Math.Min(available.Y - 10 * scale,
             available.X - artists - chat - gap * 2 - 9 * scale));
         float width = artists + chat + canvas + gap * 2 + 9 * scale;
-        return new(canvas, artists, chat, gap, Math.Max(0, (available.X - width) / 2), width);
+        float extra = Math.Max(0, available.X - width);
+        artists += extra * (172f / 372); chat += extra * (200f / 372);
+        return new(canvas, artists, chat, gap, 0, width + extra);
     }
 }

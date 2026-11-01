@@ -105,6 +105,19 @@ static class RoomRulesChecks
                 check(layout.Canvas > 0 && layout.Width + layout.Inset * 2 <= available.X + 0.01f && layout.Canvas + 10 * scale <= available.Y + 0.01f,
                     "square canvas and matching-height fixed side panels fit minimum/default/large room sizes at UI scale");
             }
+        foreach (float scale in new[] { 1f, 1.5f, 2f })
+            foreach (var display in new[] { new System.Numerics.Vector2(1280, 720), new System.Numerics.Vector2(1920, 1080), new System.Numerics.Vector2(2560, 1440) })
+            {
+                var bounds = Kupopop.UiWindowGeometry.Bounds(display / scale);
+                var minimum = bounds.Minimum * scale; var maximum = bounds.Maximum * scale;
+                var current = Kupopop.UiWindowGeometry.DefaultSize * scale;
+                var requests = new[] { current + new System.Numerics.Vector2(120, 0), current + new System.Numerics.Vector2(0, 120), new System.Numerics.Vector2(1), display * 4 };
+                check(requests.Select(request => Kupopop.UiWindowGeometry.Constrain(request, current, minimum, maximum)).All(size =>
+                    Math.Abs(size.X - size.Y * Kupopop.UiWindowGeometry.Aspect) <= 1.5f &&
+                    size.X >= minimum.X - 1 && size.Y >= minimum.Y - 1 && size.X <= maximum.X + 1 && size.Y <= maximum.Y + 1 &&
+                    size.X < display.X && size.Y < display.Y),
+                    "locked window ratio handles width/height resizing and bounds without double-applying UI scale");
+            }
     }
 
     private sealed class Peer(Guid id) : IGamePeer

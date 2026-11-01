@@ -3,7 +3,7 @@
 A native Dalamud drawing-and-guessing game for Final Fantasy XIV. Draw with
 friends, race to solve the word, and make a little avatar of your own.
 
-**Experimental 0.6.0 — compiled and automatically tested; in-game testing required.**
+**Experimental 0.6.1 — compiled and automatically tested; in-game testing required.**
 
 ## Try it
 
@@ -21,7 +21,7 @@ The installation ID stays `Kupopop` so existing installations update normally.
 This custom release is not an
 official Dalamud repository submission.
 
-Self-hosting/development: [Windows/Linux server packages](https://github.com/cloudesh/kupopop/releases/tag/v0.6.0)
+Self-hosting/development: [Windows/Linux server packages](https://github.com/cloudesh/kupopop/releases/tag/v0.6.1)
 and [unattended Linux deployment](server/deploy/README.md) remain available. The
 stable PC launcher is **[Start-My-Server.cmd](Start-My-Server.cmd)**; its data stays
 in `server/local/`. A development plugin can target localhost by changing
@@ -39,7 +39,8 @@ credential and server data remain intact.
 - Welcome/account setup with private recovery codes and protected device login.
 - Generated avatars and a skippable editor for hand-drawn profile avatars.
 - Join via code, Host Room, and Browse Lobbies with opt-in public listings.
-- Basic/Advanced room setup with configurable word offers and separate voting switches.
+- Attached Basic / Advanced / Word Lists setup tabs, sliders and selectable list buttons.
+- A resizable 3:2 paper window, centered home choices and a saved light/dark theme.
 - Up to 16 players; default 90-second drawing turns and two complete rounds.
 - Pencil, palette, flood fill, and eraser; user list left, canvas center, chat right.
 - Server-owned timing, hints, solve-order scores, and drawer rewards.

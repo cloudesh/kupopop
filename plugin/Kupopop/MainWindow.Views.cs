@@ -14,6 +14,7 @@ public sealed partial class MainWindow
     private Vector2 lastCanvasSize;
     private long nextLayoutLog;
     private readonly PomMotion pom = new();
+    private readonly UiAspectConstraint aspect = new();
     private Vector2? pendingWindowPosition;
     private bool topDragActive;
     private static string UiVersion => typeof(Plugin).Assembly.GetName().Version?.ToString(3) ?? "dev";
@@ -33,13 +34,10 @@ public sealed partial class MainWindow
         Position = !IsPinned && !plugin.Config.UseStandardFrame ? pendingWindowPosition : null;
         PositionCondition = ImGuiCond.Always;
         pendingWindowPosition = null;
-        // WindowSystem applies UI scale to these logical dimensions itself.
-        var logicalDisplay = display / UiTheme.Scale;
-        SizeConstraints = new()
-        {
-            MinimumSize = new(Math.Min(820, Math.Max(640, logicalDisplay.X - 40)), Math.Min(540, Math.Max(420, logicalDisplay.Y - 60))),
-            MaximumSize = new(float.MaxValue),
-        };
+        // Supply the native callback directly: WindowSystem's optional bounds
+        // would otherwise replace it after PreDraw. Scale exactly once here.
+        SizeConstraints = null;
+        aspect.Apply(display, UiTheme.Scale);
     }
 
     public override void Draw()
@@ -95,13 +93,13 @@ public sealed partial class MainWindow
     {
         bool framed = plugin.Config.UseStandardFrame;
         bool compact = IsDrawingRoom;
-        if (!ImGui.BeginTable("brand-paper-controls", framed ? 3 : 4, ImGuiTableFlags.NoPadOuterX)) return;
+        if (!ImGui.BeginTable("brand-paper-controls", 4, ImGuiTableFlags.NoPadOuterX)) return;
         try
         {
             ImGui.TableSetupColumn("Brand", ImGuiTableColumnFlags.WidthFixed, UiTheme.S(215));
             ImGui.TableSetupColumn("Navigation", ImGuiTableColumnFlags.WidthStretch);
             ImGui.TableSetupColumn("Service status", ImGuiTableColumnFlags.WidthFixed, UiTheme.S(114));
-            if (!framed) ImGui.TableSetupColumn("Paper controls", ImGuiTableColumnFlags.WidthFixed, UiTheme.S(64));
+            ImGui.TableSetupColumn("Paper controls", ImGuiTableColumnFlags.WidthFixed, UiTheme.S(framed ? 32 : 100));
             ImGui.TableNextColumn();
             var face = ImGui.GetCursorScreenPos();
             var move = UiChrome.DragHandle(UiTheme.V(211, compact ? 34 : 45), IsPinned, !framed);
@@ -125,9 +123,13 @@ public sealed partial class MainWindow
             UiAssets.Glyph(FontAwesomeIcon.Circle, online ? UiTheme.Green : UiTheme.Muted);
             ImGui.SameLine();
             ImGui.TextUnformatted(online ? "Connected" : "Connecting...");
+            ImGui.TableNextColumn(); UiTheme.Gap(compact ? 1 : 6);
+            if (ToolAction(plugin.Config.DarkMode ? FontAwesomeIcon.Sun : FontAwesomeIcon.Moon,
+                plugin.Config.DarkMode ? "Use light paper" : "Use dark paper"))
+            { plugin.Config.DarkMode = !plugin.Config.DarkMode; plugin.Save(); }
             if (!framed)
             {
-                ImGui.TableNextColumn(); UiTheme.Gap(compact ? 1 : 6);
+                ImGui.SameLine();
                 if (ToolAction(FontAwesomeIcon.Thumbtack, IsPinned ? "Unpin book" : "Pin book", IsPinned))
                 { IsPinned = !IsPinned; plugin.Config.PaperPinned = IsPinned; plugin.Save(); }
                 ImGui.SameLine();
@@ -139,9 +141,14 @@ public sealed partial class MainWindow
 
     private void Navigation()
     {
-        if (UiTheme.Tab(room is null ? "Play" : "Your room", !ShowDebug && screen != "profile"))
+        string play = room is null ? "Play" : "Your room";
+        var start = ImGui.GetCursorScreenPos();
+        float width = ImGui.CalcTextSize(play).X + ImGui.CalcTextSize("Profile").X + UiTheme.S(58);
+        ImGui.GetWindowDrawList().AddRectFilled(start - UiTheme.V(3, 3), start + new Vector2(width, UiTheme.S(33)),
+            UiTheme.C(UiPresentation.Alpha(UiTheme.Inset, 0.55f)), UiTheme.S(7));
+        if (UiTheme.Tab(play, !ShowDebug && screen != "profile"))
         { ShowDebug = false; screen = room is null ? "menu" : "game"; }
-        ImGui.SameLine();
+        ImGui.SameLine(0, UiTheme.S(2));
         using (ImRaii.Disabled(profile is null))
             if (UiTheme.Tab("Profile", !ShowDebug && screen == "profile")) { ShowDebug = false; OpenProfile(); }
     }
@@ -251,10 +258,11 @@ public sealed partial class MainWindow
 
     private void Menu()
     {
-        art.Heading("Open a page. Make a little magic.");
-        UiTheme.Wrapped("Join a friend, open your own room, or find some company.", UiTheme.Muted);
-        UiTheme.Gap(6);
-        if (!ImGui.BeginTable("play-actions", 3, ImGuiTableFlags.SizingStretchSame)) return;
+        var available = ImGui.GetContentRegionAvail();
+        float width = Math.Min(available.X, UiTheme.S(900));
+        var origin = ImGui.GetCursorScreenPos() + new Vector2(Math.Max(0, (available.X - width) / 2), Math.Max(0, (available.Y - UiTheme.S(310)) / 2));
+        ImGui.SetCursorScreenPos(origin);
+        if (!ImGui.BeginTable("play-actions", 3, ImGuiTableFlags.SizingStretchSame | ImGuiTableFlags.NoPadOuterX, new Vector2(width, 0))) return;
         try
         {
             ImGui.TableNextColumn();
@@ -306,6 +314,7 @@ public sealed partial class MainWindow
         }
         finally { ImGui.EndTable(); }
         UiTheme.Gap(8);
+        ImGui.SetCursorScreenPos(new Vector2(origin.X + UiTheme.S(6), ImGui.GetCursorScreenPos().Y));
         if (profile is not null)
         {
             ImGui.Image(avatars.Get(profile).Handle, UiTheme.V(42, 42));
@@ -319,38 +328,70 @@ public sealed partial class MainWindow
 
     private void CreateRoomScreen()
     {
-        if (BackButton()) return;
-        ImGui.SameLine(); art.Heading("Host Room");
-        UiTheme.Gap(4);
-        if (UiTheme.Tab("Basic", !roomAdvanced)) roomAdvanced = false;
-        ImGui.SameLine(); if (UiTheme.Tab("Advanced", roomAdvanced)) roomAdvanced = true;
-        UiTheme.Gap(6);
-        using var card = new UiTheme.PaperPanel("room-settings", Vector2.Zero);
+        if (PageHeading("Host Room")) return;
+        var tabs = ImGui.GetCursorScreenPos();
+        float tabHeight = UiTheme.S(34);
+        ImGui.GetWindowDrawList().AddLine(tabs + new Vector2(0, tabHeight), tabs + new Vector2(ImGui.GetContentRegionAvail().X, tabHeight), UiTheme.C(UiTheme.Line));
+        if (UiTheme.PanelTab("Basic", roomSetupPage == 0)) roomSetupPage = 0;
+        ImGui.SameLine(0, UiTheme.S(3)); if (UiTheme.PanelTab("Advanced", roomSetupPage == 1)) roomSetupPage = 1;
+        ImGui.SameLine(0, UiTheme.S(3)); if (UiTheme.PanelTab("Word Lists", roomSetupPage == 2)) roomSetupPage = 2;
+        ImGui.SetCursorScreenPos(tabs + new Vector2(0, tabHeight));
+        using var card = new UiTheme.PaperPanel("room-settings", Vector2.Zero, scrollable: false, flush: true, attachedTabs: true);
         if (!card.Success) return;
-        if (roomAdvanced)
+        using (ImRaii.PushColor(ImGuiCol.ChildBg, Vector4.Zero))
+        using (var body = ImRaii.Child("room-settings-page", new Vector2(0, -UiTheme.S(46)), false))
         {
-            UiRoomSettings.Advanced(ref hints, ref wordChoiceCount, ref voteKickEnabled, ref voteSkipEnabled);
+            if (body.Success)
+            {
+                if (roomSetupPage == 1) UiRoomSettings.Advanced(ref hints, ref wordChoiceCount, ref voteKickEnabled, ref voteSkipEnabled);
+                else if (roomSetupPage == 2) WordListPage();
+                else
+                {
+                    UiTheme.Field("Room name", "##room-name", ref roomTitle, 40, "Name your drawing room");
+                    UiTheme.Gap(5);
+                    UiRoomSettings.Basic(ref seconds, ref rounds, ref capacity);
+                    UiTheme.Gap(12);
+                    ImGui.Checkbox("Public lobby", ref publicRoom);
+                    UiTheme.Wrapped(publicRoom
+                        ? "Anyone can see the room name and player count. Your profile is visible after they join."
+                        : "Private room. Only people with your code can join.", UiTheme.Muted);
+                }
+            }
         }
-        else
-        {
-            UiTheme.Field("Room name", "##room-name", ref roomTitle, 40, "Name your drawing room");
-            UiTheme.Gap(5);
-            UiRoomSettings.Basic(ref seconds, ref rounds, ref capacity);
-            UiTheme.Gap(5); WordListSelector(); UiTheme.Gap(8);
-            ImGui.Checkbox("Public lobby", ref publicRoom);
-            UiTheme.Wrapped(publicRoom
-                ? "Anyone can see the room name and player count. Your profile is visible after they join."
-                : "Private room. Only people with your code can join.", UiTheme.Muted);
-        }
-        UiTheme.Gap(12);
+        UiTheme.Gap(4);
         using (ImRaii.Disabled(client?.Connected != true || !Protocol.ValidName(roomTitle) || selectedWordLists.Count == 0))
             if (UiTheme.Button("Host Room", UiTheme.S(170), primary: true))
                 Send(new("create", Options: new(roomTitle, publicRoom, Math.Clamp(seconds, 15, 300), Math.Clamp(rounds, 1, 5),
                     Math.Clamp(hints, 0, 300), Math.Clamp(capacity, 2, 16), selectedWordLists.ToArray(),
                     Math.Clamp(wordChoiceCount, 1, 8), voteKickEnabled, voteSkipEnabled)));
+        ImGui.SameLine(); ImGui.AlignTextToFramePadding(); UiTheme.Caption($"{selectedWordLists.Count} word lists selected");
     }
 
-    private void OpenRoomSetup() { roomAdvanced = false; screen = "create"; }
+    private void OpenRoomSetup(bool publicByDefault = false) { roomSetupPage = 0; publicRoom = publicByDefault; screen = "create"; }
+
+    private bool PageHeading(string title, bool refresh = false)
+    {
+        bool back = false;
+        if (ImGui.BeginTable("page-heading", 2, ImGuiTableFlags.NoPadOuterX))
+        {
+            try
+            {
+                float actions = ImGui.CalcTextSize(room is null ? "< Back to home" : "< Back to room").X + UiTheme.S(20);
+                if (refresh) actions += ImGui.CalcTextSize("Refresh").X + UiTheme.S(24);
+                ImGui.TableSetupColumn("Title", ImGuiTableColumnFlags.WidthStretch);
+                ImGui.TableSetupColumn("Actions", ImGuiTableColumnFlags.WidthFixed, actions);
+                ImGui.TableNextColumn(); art.Heading(title);
+                ImGui.TableNextColumn(); back = BackButton();
+                if (refresh)
+                {
+                    ImGui.SameLine(); if (UiTheme.Button("Refresh", 0, quiet: true)) Send(new("list"));
+                }
+            }
+            finally { ImGui.EndTable(); }
+        }
+        UiTheme.Gap(6);
+        return back;
+    }
 
     private bool BackButton()
     {
@@ -364,44 +405,51 @@ public sealed partial class MainWindow
         if (ImGui.GetCursorPosY() < bottom) ImGui.SetCursorPosY(bottom);
     }
 
-    private void WordListSelector()
+    private void WordListPage()
     {
-        UiTheme.Caption("Word Lists");
-        ImGui.SetNextItemWidth(-1);
-        if (!ImGui.BeginCombo("##word-lists", $"{selectedWordLists.Count} lists selected")) return;
+        if (UiTheme.Button("Normal lists", 0, quiet: true))
+        {
+            selectedWordLists.Clear();
+            foreach (var list in wordLists.Where(l => l.DefaultEnabled)) selectedWordLists.Add(list.Id);
+            wordListsChosen = true;
+        }
+        ImGui.SameLine();
+        if (UiTheme.Button("All", 0, quiet: true)) { foreach (var list in wordLists) selectedWordLists.Add(list.Id); wordListsChosen = true; }
+        ImGui.SameLine();
+        if (UiTheme.Button("None", 0, quiet: true)) { selectedWordLists.Clear(); wordListsChosen = true; }
+        UiTheme.Gap(5);
+        int columns = ImGui.GetContentRegionAvail().X >= UiTheme.S(760) ? 3 : 2;
+        if (!ImGui.BeginTable("word-list-buttons", columns, ImGuiTableFlags.SizingStretchSame | ImGuiTableFlags.NoPadOuterX)) return;
         try
         {
-            if (ImGui.Selectable("Use normal lists"))
-            {
-                selectedWordLists.Clear();
-                foreach (var list in wordLists.Where(l => l.DefaultEnabled)) selectedWordLists.Add(list.Id);
-                wordListsChosen = true;
-            }
             foreach (var list in wordLists)
             {
+                ImGui.TableNextColumn();
                 bool enabled = selectedWordLists.Contains(list.Id);
-                if (ImGui.Checkbox($"{list.Name} - {list.Count}##{list.Id}", ref enabled))
-                { if (enabled) selectedWordLists.Add(list.Id); else selectedWordLists.Remove(list.Id); wordListsChosen = true; }
-                if (ImGui.IsItemHovered()) ImGui.SetTooltip(list.Complex ? "Advanced: disabled by default." : "Standard word list.");
+                string detail = $"{list.Count} words" + (list.Complex ? " - Advanced" : "");
+                if (UiTheme.ListButton(list.Id, list.Name, detail, enabled))
+                { if (enabled) selectedWordLists.Remove(list.Id); else selectedWordLists.Add(list.Id); wordListsChosen = true; }
+                if (ImGui.IsItemHovered()) ImGui.SetTooltip(list.Name + "\n" + detail + (list.Complex ? "\nDisabled by default." : ""));
             }
         }
-        finally { ImGui.EndCombo(); }
+        finally { ImGui.EndTable(); }
     }
 
     private void PublicRooms()
     {
-        if (BackButton()) return;
-        ImGui.SameLine(); art.Heading("Browse Lobbies");
-        ImGui.SameLine();
-        if (UiTheme.Button("Refresh", 0, quiet: true)) Send(new("list"));
+        if (PageHeading("Browse Lobbies", refresh: true)) return;
         using var panel = new UiTheme.PaperPanel("public-list", Vector2.Zero);
         if (!panel.Success) return;
         if (publicRooms.Length == 0)
         {
-            UiTheme.Gap(10); art.Mascot(56); UiTheme.Gap(6);
-            art.Heading("The next room could be yours.");
-            UiTheme.Wrapped("No public invitations just yet. Open a room and welcome the next artist.", UiTheme.Muted);
-            if (UiTheme.Button("Host Room", 0, primary: true)) OpenRoomSetup();
+            string invitation = "No rooms available, would you like to make your own?";
+            float width = Math.Min(UiTheme.S(430), ImGui.GetContentRegionAvail().X);
+            var text = ImGui.CalcTextSize(invitation, false, width);
+            var origin = ImGui.GetCursorScreenPos() + new Vector2(Math.Max(0, (ImGui.GetContentRegionAvail().X - width) / 2), Math.Max(0, (ImGui.GetContentRegionAvail().Y - text.Y - UiTheme.S(52)) / 2));
+            ImGui.SetCursorScreenPos(origin);
+            ImGui.PushTextWrapPos(ImGui.GetCursorPosX() + width); ImGui.TextUnformatted(invitation); ImGui.PopTextWrapPos();
+            ImGui.SetCursorScreenPos(origin + new Vector2(Math.Max(0, (width - UiTheme.S(160)) / 2), text.Y + UiTheme.S(14)));
+            if (UiTheme.Button("Host Room", UiTheme.S(160), primary: true)) OpenRoomSetup(publicByDefault: true);
             return;
         }
         foreach (var listed in publicRooms)
@@ -598,8 +646,7 @@ public sealed partial class MainWindow
 
     private void ProfileScreen()
     {
-        if (BackButton()) return;
-        ImGui.SameLine(); art.Heading("A little face. Entirely yours.");
+        if (PageHeading("A little face. Entirely yours.")) return;
         UiTheme.Wrapped("Draw your own signature character, or keep the face we made for you.", UiTheme.Muted);
         UiTheme.Gap(10);
         if (!ImGui.BeginTable("profile-layout", 2)) return;
@@ -659,12 +706,13 @@ public sealed partial class MainWindow
 
     private void Preferences()
     {
-        if (BackButton()) return;
-        ImGui.SameLine(); art.Heading("Your sketchbook");
+        if (PageHeading("Your sketchbook")) return;
         UiTheme.Gap(10);
         using var card = new UiTheme.PaperPanel("sketchbook-preferences", Vector2.Zero);
         if (!card.Success) return;
         bool reduceMotion = plugin.Config.ReduceMotion;
+        bool darkMode = plugin.Config.DarkMode;
+        if (ImGui.Checkbox("Dark paper", ref darkMode)) { plugin.Config.DarkMode = darkMode; plugin.Save(); }
         if (ImGui.Checkbox("Reduce decorative motion", ref reduceMotion)) { plugin.Config.ReduceMotion = reduceMotion; plugin.Save(); }
         UiTheme.Caption("Keep the moogle pom still while moving the book.");
         bool standardFrame = plugin.Config.UseStandardFrame;

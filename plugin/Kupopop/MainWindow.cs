@@ -50,7 +50,8 @@ public sealed partial class MainWindow : Window, IDisposable
     private long sessionDeadline;
     private int seconds = 90, rounds = 2, hints = 30, capacity = 16;
     private int wordChoiceCount = 4;
-    private bool roomAdvanced, voteKickEnabled = true, voteSkipEnabled = true;
+    private int roomSetupPage;
+    private bool voteKickEnabled = true, voteSkipEnabled = true;
     private long heartbeatAt, statsAt, lastSync;
     private int received, draws;
     private TimeSpan serverOffset;
@@ -64,9 +65,8 @@ public sealed partial class MainWindow : Window, IDisposable
         avatars = new(log);
         art = new(log);
         vault = new(directory);
-        Size = new(980, 650);
+        Size = UiWindowGeometry.DefaultSize;
         SizeCondition = ImGuiCond.FirstUseEver;
-        SizeConstraints = new() { MinimumSize = new(820, 540), MaximumSize = new(float.MaxValue) };
         ConfigureClient();
     }
 

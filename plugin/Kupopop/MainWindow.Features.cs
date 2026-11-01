@@ -14,7 +14,7 @@ public sealed partial class MainWindow
         string text = left + "s";
         var size = art.MeasureLarge(text, painting.RenderSize.X);
         var position = painting.RenderOrigin + new Vector2(Math.Max(UiTheme.S(4), painting.RenderSize.X - size.X - UiTheme.S(10)), UiTheme.S(6));
-        art.DrawLarge(text, position, UiPresentation.Alpha(left <= 15 && state.Phase == "drawing" ? UiTheme.Rose : UiTheme.Ink, 0.62f));
+        art.DrawLarge(text, position, UiPresentation.Alpha(left <= 15 && state.Phase == "drawing" ? UiTheme.CanvasAccent : UiTheme.CanvasInk, 0.62f));
     }
 
     private void DrawWordChoices(RoomView state)

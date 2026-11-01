@@ -137,7 +137,7 @@ public sealed class CanvasWidget : IDisposable
         var scale = size / new Vector2(canvas.Width, canvas.Height);
         Vector2 a = origin + new Vector2(op.X1, op.Y1) * scale, b = origin + new Vector2(op.X2, op.Y2) * scale;
         var draw = ImGui.GetWindowDrawList();
-        uint color = op.Color == Palette.Transparent ? UiTheme.C(UiTheme.Rose) : Palette.Colors[op.Color];
+        uint color = op.Color == Palette.Transparent ? UiTheme.C(UiTheme.CanvasAccent) : Palette.Colors[op.Color];
         float thickness = Math.Max(1, op.Size * scale.X);
         draw.PushClipRect(origin, origin + size, true);
         if (op.Tool == "line") draw.AddLine(a, b, color, thickness);
@@ -162,13 +162,13 @@ public sealed class CanvasWidget : IDisposable
         Vector2 point = origin + new Vector2(cursor.X + 0.5f, cursor.Y + 0.5f) * size / new Vector2(canvas.Width, canvas.Height);
         float radius = Math.Max(UiTheme.S(4), cursor.Size * size.X / canvas.Width / 2);
         draw.PushClipRect(origin, origin + size, true);
-        draw.AddCircle(point, radius + 1, UiTheme.C(UiTheme.Ink), 24, UiTheme.S(2));
+        draw.AddCircle(point, radius + 1, UiTheme.C(UiTheme.CanvasInk), 24, UiTheme.S(2));
         draw.AddCircle(point, radius, Palette.Colors[cursor.Color], 24, UiTheme.S(1.5f));
         var icon = cursor.Tool switch { "fill" => FontAwesomeIcon.FillDrip, "eraser" => FontAwesomeIcon.Eraser,
             "circle" or "ellipse" => FontAwesomeIcon.Circle, "square" or "rectangle" => FontAwesomeIcon.Square,
             "line" => FontAwesomeIcon.Slash, _ => FontAwesomeIcon.PencilAlt };
         using (Plugin.PluginInterface.UiBuilder.IconFontFixedWidthHandle.Push())
-            draw.AddText(point + UiTheme.V(10, 6), UiTheme.C(UiTheme.Rose), icon.ToIconString());
+            draw.AddText(point + UiTheme.V(10, 6), UiTheme.C(UiTheme.CanvasAccent), icon.ToIconString());
         draw.PopClipRect();
     }
 

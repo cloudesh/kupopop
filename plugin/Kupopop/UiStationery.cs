@@ -8,7 +8,8 @@ public static class UiStationery
 {
     public static void PaperMaterial(ImTextureID texture, Vector2 min, Vector2 max, Vector4? tint = null)
     {
-        var material = tint ?? Vector4.One; material.W = tint.HasValue ? 0.18f : 0.32f;
+        var material = tint ?? (UiTheme.DarkMode ? UiTheme.Paper : Vector4.One);
+        material.W = UiTheme.DarkMode ? 0.10f : tint.HasValue ? 0.18f : 0.32f;
         // One flat interior below the game's divider, without repeated shading.
         ImGui.GetWindowDrawList().AddImage(texture, min, max, new Vector2(0.08f, 0.39f), new Vector2(0.94f, 0.83f), UiTheme.C(material));
     }
@@ -51,7 +52,7 @@ public static class UiStationery
         var a = Rotate(min); var b = Rotate(new Vector2(max.X, min.Y));
         var c = Rotate(max); var d = Rotate(new Vector2(min.X, max.Y));
         var draw = ImGui.GetWindowDrawList();
-        var shadow = UiTheme.Ink; shadow.W = 0.12f;
+        var shadow = UiTheme.Shadow; shadow.W = 0.12f;
         var drop = UiTheme.V(1, 2);
         draw.AddQuadFilled(a + drop, b + drop, c + drop, d + drop, UiTheme.C(shadow));
         draw.AddQuadFilled(a, b, c, d, UiTheme.C(color));
@@ -86,7 +87,7 @@ public static class UiStationery
     {
         var draw = ImGui.GetWindowDrawList();
         Vector2 P(float x, float y) => center + new Vector2(x, y) * radius;
-        uint ink = UiTheme.C(UiTheme.Ink), cream = UiTheme.C(UiTheme.White), pink = UiTheme.C(UiTheme.RoseTint);
+        uint ink = UiTheme.C(UiTheme.CanvasInk), cream = UiTheme.C(UiTheme.White), pink = UiTheme.C(UiTheme.RoseTint);
         draw.AddTriangleFilled(P(-0.85f, -0.2f), P(-0.85f, -1.05f), P(-0.2f, -0.65f), cream);
         draw.AddTriangleFilled(P(0.85f, -0.2f), P(0.85f, -1.05f), P(0.2f, -0.65f), cream);
         draw.AddTriangle(P(-0.85f, -0.2f), P(-0.85f, -1.05f), P(-0.2f, -0.65f), ink, UiTheme.S(1));

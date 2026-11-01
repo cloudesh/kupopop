@@ -41,9 +41,9 @@ public static class UiPresentation
 
     public static bool SoftButton(string label)
     {
-        using var normal = ImRaii.PushColor(ImGuiCol.Button, Alpha(UiTheme.Panel, 0.64f));
-        using var hover = ImRaii.PushColor(ImGuiCol.ButtonHovered, Alpha(UiTheme.Panel, 0.82f));
-        using var active = ImRaii.PushColor(ImGuiCol.ButtonActive, Alpha(UiTheme.Panel, 0.94f));
+        using var normal = ImRaii.PushColor(ImGuiCol.Button, Alpha(UiTheme.Panel, UiTheme.DarkMode ? 0.82f : 0.64f));
+        using var hover = ImRaii.PushColor(ImGuiCol.ButtonHovered, Alpha(UiTheme.Panel, UiTheme.DarkMode ? 0.92f : 0.82f));
+        using var active = ImRaii.PushColor(ImGuiCol.ButtonActive, Alpha(UiTheme.Panel, UiTheme.DarkMode ? 0.97f : 0.94f));
         using var border = ImRaii.PushStyle(ImGuiStyleVar.FrameBorderSize, 0);
         return ImGui.Button(label, new Vector2(0, UiTheme.S(26)));
     }
@@ -57,7 +57,7 @@ public static class UiPresentation
         float height = ImGui.CalcTextSize(line.Text, false, bodyWidth).Y + pad * 2 +
             (line.System ? 0 : ImGui.GetTextLineHeight() + UiTheme.S(2));
         var draw = ImGui.GetWindowDrawList();
-        var fill = line.Done ? Alpha(UiTheme.Muted, 0.14f) : Alpha(UiTheme.White, line.System ? 0.48f : 0.40f);
+        var fill = line.Done ? Alpha(UiTheme.Muted, 0.14f) : Alpha(UiTheme.DarkMode ? UiTheme.Panel : UiTheme.White, line.System ? 0.48f : 0.40f);
         draw.AddRectFilled(start, start + new Vector2(width, height), UiTheme.C(fill), UiTheme.S(3));
         ImGui.SetCursorScreenPos(start + new Vector2(pad, pad));
         ImGui.BeginGroup();
