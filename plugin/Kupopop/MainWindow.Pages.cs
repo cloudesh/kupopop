@@ -41,6 +41,7 @@ public sealed partial class MainWindow
         var position = ImGui.GetWindowPos();
         pom.Step(position.X + position.Y * 0.35f, ImGui.GetIO().DeltaTime, !plugin.Config.ReduceMotion);
         UiStationery.Book(position, position + ImGui.GetWindowSize(), ShowDebug ? ImGui.GetFrameHeight() : 0);
+        UiStationery.PomBookmark(position + UiTheme.V(235, 30) + new Vector2(0, ShowDebug ? ImGui.GetFrameHeight() : 0), pom.Angle);
         DrawHeader();
         UiTheme.Rule();
         using (var transparent = ImRaii.PushColor(ImGuiCol.ChildBg, Vector4.Zero))
@@ -79,10 +80,10 @@ public sealed partial class MainWindow
             ImGui.TableSetupColumn("Paper controls", ImGuiTableColumnFlags.WidthFixed, UiTheme.S(ShowDebug ? 32 : 100));
             ImGui.TableNextColumn();
             var face = ImGui.GetCursorScreenPos();
-            ImGui.Dummy(UiTheme.V(211, 34));
+            ImGui.Dummy(UiTheme.V(211, 42));
             var afterBrand = ImGui.GetCursorScreenPos();
-            UiStationery.Logo(face + UiTheme.V(20, 23), UiTheme.S(14), pom.Angle);
-            UiBrand.Wordmark(face + UiTheme.V(46, 2), UiTheme.V(161, 30));
+            UiStationery.Logo(face + UiTheme.V(20, 31), UiTheme.S(14), pom.Angle);
+            UiBrand.Wordmark(face + UiTheme.V(46, 10), UiTheme.V(161, 30));
             ImGui.SetCursorScreenPos(afterBrand);
             ImGui.TableNextColumn();
             UiTheme.Gap(1);
@@ -212,7 +213,7 @@ public sealed partial class MainWindow
         var available = ImGui.GetContentRegionAvail();
         float width = Math.Min(available.X, UiTheme.S(900));
         var cover = ImGui.GetCursorScreenPos() + new Vector2(Math.Max(0, (available.X - width) / 2), Math.Max(0, (available.Y - UiTheme.S(402)) / 2));
-        UiStationery.Logo(cover + UiTheme.V(35, 44), UiTheme.S(23));
+        DrawCoverMoogle(cover + UiTheme.V(35, 44));
         UiBrand.Wordmark(cover + UiTheme.V(80, 5), new Vector2(Math.Min(width - UiTheme.S(90), UiTheme.S(440)), UiTheme.S(74)), cover: true);
         var origin = cover + UiTheme.V(0, 92);
         ImGui.SetCursorScreenPos(origin);

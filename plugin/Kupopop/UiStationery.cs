@@ -106,6 +106,19 @@ public static class UiStationery
         UiTheme.Gap(3);
     }
 
+    public static void PomBookmark(Vector2 root, float angle)
+    {
+        var draw = ImGui.GetWindowDrawList();
+        var ball = root + new Vector2(MathF.Sin(angle) * UiTheme.S(14), -MathF.Cos(angle) * UiTheme.S(14));
+        draw.AddBezierCubic(root, root - UiTheme.V(4, 6), ball + UiTheme.V(3, 6), ball,
+            UiTheme.C(UiTheme.Brass), UiTheme.S(1.5f));
+        draw.AddCircleFilled(root, UiTheme.S(2), UiTheme.C(UiTheme.Brass), 16);
+        draw.AddCircleFilled(ball + UiTheme.V(1, 1), UiTheme.S(6), UiTheme.C(UiPresentation.Alpha(UiTheme.CanvasInk, 0.18f)), 24);
+        draw.AddCircleFilled(ball, UiTheme.S(6), UiTheme.C(UiTheme.RoseHover), 24);
+        draw.AddCircle(ball, UiTheme.S(6), UiTheme.C(UiTheme.Rose), 24, UiTheme.S(1));
+        draw.AddCircleFilled(ball - UiTheme.V(2, 2), UiTheme.S(1.5f), UiTheme.C(UiTheme.White), 12);
+    }
+
     public static void SketchNote(Vector2 min, Vector2 max)
     {
         var draw = ImGui.GetWindowDrawList();

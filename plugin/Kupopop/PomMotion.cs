@@ -7,6 +7,11 @@ public sealed class PomMotion
     private float velocity, previousX;
     private bool initialized;
 
+    public void Nudge(float impulse = 2.8f)
+    {
+        if (float.IsFinite(impulse)) velocity = Math.Clamp(velocity + impulse, -5, 5);
+    }
+
     public void Step(float windowX, float elapsed, bool enabled)
     {
         if (!initialized) { initialized = true; previousX = windowX; }

@@ -5,7 +5,7 @@
     <Punchline>A drawing and guessing party game, right inside FFXIV.</Punchline>
     <Description>Kupo Skribbl is a drawing and guessing pictionary game. Each player takes turns to draw their chosen word and others have to guess it to gain points! The person with the most points is the winner!
 
-Open with /kupopop or /kuposkribbl.</Description>
+Open with /kupo, /kupopop or /kuposkribbl.</Description>
     <IconUrl>https://raw.githubusercontent.com/cloudesh/kupopop/main/plugin/images/icon.png?v=$(Version)</IconUrl>
     <RepoUrl>https://github.com/cloudesh/kupopop</RepoUrl>
     <Tags>drawing;game;multiplayer;social</Tags>

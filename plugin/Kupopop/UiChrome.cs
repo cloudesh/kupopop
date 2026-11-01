@@ -37,6 +37,16 @@ public static class UiChrome
     public static void Footer(Vector2 min, Vector2 max, string version, bool locked)
     {
         var size = ImGui.CalcTextSize(version) * 0.8f;
+        const string credit = "Made by cloudesh with";
+        float fontSize = ImGui.GetFontSize() * 0.8f;
+        var creditPosition = new Vector2(min.X + UiTheme.S(34), max.Y - UiTheme.S(17) - size.Y);
+        var draw = ImGui.GetWindowDrawList();
+        draw.AddText(ImGui.GetFont(), fontSize, creditPosition, UiTheme.C(UiTheme.Muted), credit);
+        var heart = creditPosition + new Vector2(ImGui.CalcTextSize(credit).X * 0.8f + UiTheme.S(9), fontSize * 0.4f);
+        uint red = UiTheme.C(new Vector4(0.9f, 0.22f, 0.32f, 1));
+        draw.AddCircleFilled(heart - UiTheme.V(2, 0), UiTheme.S(2.7f), red, 12);
+        draw.AddCircleFilled(heart + UiTheme.V(2, 0), UiTheme.S(2.7f), red, 12);
+        draw.AddTriangleFilled(heart + UiTheme.V(-4.6f, 0.5f), heart + UiTheme.V(4.6f, 0.5f), heart + UiTheme.V(0, 6), red);
         ImGui.GetWindowDrawList().AddText(ImGui.GetFont(), ImGui.GetFontSize() * 0.8f,
             max - new Vector2(UiTheme.S(34) + size.X, UiTheme.S(17) + size.Y), UiTheme.C(UiTheme.Muted), version);
         ResizeCorner(min, max, locked);

@@ -40,6 +40,7 @@ public sealed class Plugin : IDalamudPlugin
         { HelpMessage = "Open Kupo Skribbl. Use /kuposkribbl debug for appearance preferences and file diagnostics." };
         CommandManager.AddHandler("/kuposkribbl", openCommand);
         CommandManager.AddHandler("/kupopop", openCommand);
+        CommandManager.AddHandler("/kupo", openCommand);
         PluginInterface.UiBuilder.Draw += Draw;
         PluginInterface.UiBuilder.OpenMainUi += Open;
         PluginInterface.UiBuilder.OpenConfigUi += OpenSettings;
@@ -90,6 +91,7 @@ public sealed class Plugin : IDalamudPlugin
         PluginInterface.UiBuilder.OpenMainUi -= Open;
         PluginInterface.UiBuilder.OpenConfigUi -= OpenSettings;
         CommandManager.RemoveHandler("/kupopop");
+        CommandManager.RemoveHandler("/kupo");
         CommandManager.RemoveHandler("/kuposkribbl");
         windows.RemoveAllWindows();
         main.Dispose();

@@ -1,73 +1,69 @@
 <p align="center">
-  <img src="plugin/images/icon.png" alt="Kupo Skribbl moogle" width="112" />
+  <img src="plugin/images/banner.png" alt="Kupo Skribbl — a moogle's drawing book" width="100%" />
 </p>
 
-<h1 align="center">Kupo Skribbl — FFXIV Drawing &amp; Guessing Plugin</h1>
+<h1 align="center">Kupo Skribbl · FFXIV Drawing &amp; Guessing Game</h1>
 
-<p align="center">A little drawing. A little guessing. A lot of questionable art.<br />A multiplayer drawing and guessing game, right inside Final Fantasy XIV.</p>
+<p align="center">Turn your next get-together into a drawing party.<br />Pick a word, draw something questionable, and let your friends guess — a party for 2–16 players, right inside Final Fantasy XIV.</p>
+
+<p align="center">
+  <a href="#install-in-dalamud"><strong>Install in Dalamud</strong></a> ·
+  <a href="#how-to-play">How to play</a> ·
+  <a href="https://github.com/cloudesh/kupopop/releases">What's new</a> ·
+  <a href="https://github.com/cloudesh/kupopop/issues">Feedback &amp; help</a>
+</p>
 
 <p align="center">
   <a href="https://github.com/cloudesh/kupopop/releases"><img src="https://img.shields.io/github/downloads/cloudesh/kupopop/total?style=flat-square&amp;color=9a506b&amp;label=downloads" alt="GitHub release downloads" /></a>
   <a href="https://github.com/cloudesh/kupopop/releases"><img src="https://img.shields.io/github/v/release/cloudesh/kupopop?include_prereleases&amp;style=flat-square&amp;color=42766b&amp;label=latest" alt="Latest experimental release" /></a>
-  <a href="https://github.com/cloudesh/kupopop/issues"><img src="https://img.shields.io/github/issues/cloudesh/kupopop?style=flat-square&amp;color=9c7844" alt="Open issues" /></a>
+  <a href="LICENSE"><img src="https://img.shields.io/github/license/cloudesh/kupopop?style=flat-square&amp;color=9c7844" alt="MIT license" /></a>
 </p>
 
-## Install & play
+**A party game in your game.** Private room codes, public lobbies and friend invitations make it easy to gather a group. Everyone draws in turn; faster guesses earn more points. No browser window needed.
 
-In Dalamud, open **Settings → Experimental → Custom Plugin Repositories**. Paste the link below, save, then find **Kupo Skribbl** in the plugin installer.
+**Your own little art book.** Draw your portrait, pick light or dark paper, rescue a masterpiece with undo, and give a good drawing a thumbs-up. Tap the home-page moogle for a little surprise.
 
-```text
-https://raw.githubusercontent.com/cloudesh/kupopop/main/plugin/releases/repo.json
-```
+**Something for every group.** Choose FFXIV, everyday things, internet memes or video games. Hosts can set the timer, rounds and word choices, or bring their own custom words for an unranked game.
 
-**Open the game with `/kupopop` or `/kuposkribbl`.** Everyone connects automatically—create your profile and you're ready to play.
+## Install in Dalamud
 
-This is an experimental plugin distributed through a custom repository. It is not currently listed in the official Dalamud repository.
+1. Open **Dalamud Settings → Experimental → Custom Plugin Repositories**.
+2. Paste this address, add it and save:
+
+   ```text
+   https://raw.githubusercontent.com/cloudesh/kupopop/main/plugin/releases/repo.json
+   ```
+
+3. Find **Kupo Skribbl** in the plugin installer and install it.
+4. Type **`/kupo`** to open your drawing book. **`/kuposkribbl`** and **`/kupopop`** work too.
+
+Create your profile, save its private recovery code, and invite a friend. Everyone connects automatically to the same service. Keep the recovery code somewhere safe and never share it.
+
+**Experimental release:** Kupo Skribbl is available through the custom repository above; it is not currently listed in the official Dalamud repository. All players need Dalamud/XIVLauncher and their own copy of the plugin.
 
 ## How to play
 
-1. **Find your group.** Join a friend with a room code, host a room, or browse public lobbies. Bring up to 16 players.
-2. **Pick and draw.** When it's your turn, choose a word and bring it to life on the canvas. Artistic talent is entirely optional.
-3. **Guess in chat.** When someone else draws, type your guesses into the room chat. Solve earlier to earn more points; drawers earn points when others get it right.
-4. **Celebrate the winner.** Everyone takes a turn each round. The player with the most points at the end wins!
+1. **Gather your artists.** Join via code, Host Room or Browse Lobbies. Rooms support 2–16 players.
+2. **Choose your word.** On your turn, pick from the offered words and draw it with the pencil, fill, eraser or shapes. Artistic talent is optional.
+3. **Guess in room chat.** Earlier correct guesses earn more points. The drawer earns points when others solve it.
+4. **Enjoy the reveal.** See the answer, celebrate the quickest guessers, and pass the pencil along. After the final round, the highest score wins.
 
-## Make it your own
+Right-click an artist to add a friend or view their shared profile. Manage requests and invitations in **Friends**. Use **Suggestions** on the home page to send feedback or suggest a drawable word or category.
 
-- Choose from FFXIV, everyday things, internet memes, and video games.
-- Set your room's timer, rounds, and word lists, or add comma-separated custom words for an unranked room game.
-- Draw your own profile picture or choose a moogle face.
-- Use pencils, shapes, fill, a colour palette, and undo to rescue your masterpiece.
-- Pick light or dark paper to suit your setup.
-- Use Suggestions on the home page to share feedback or suggest a drawable word for review.
-- Give a good drawing a thumbs-up: one like per drawing, with no change to match points.
-- Compare best game scores, overall points, games played and drawing likes in Leaderboards.
-- Add artists as friends, accept requests, and invite online friends to your room.
-- Opt into lifetime game statistics and share your profile with friends and room partners.
+## Your profile, your choices
 
-Save your private recovery code when you create your profile. Keep it somewhere safe and don't share it.
+The book starts closed. Closing it leaves your room and disconnects you. Friends see you online only while it is open; recently played partners clear when you close it.
 
-## Friends & privacy
+Setup offers a choice to enable lifetime statistics, profile sharing and closed-window invitations, or create a private profile. Change these separately in **Profile → Privacy & invitations**. Optional closed-window invitations use a short check once a minute; they never open the book automatically.
 
-Right-click an artist in a room to add them or view their profile. Manage friend requests, invitations, and recently played partners in **Friends**. Invitations appear inside Kupo Skribbl, and the Play screen lets you join an invited game directly.
+Shared profiles are available to friends and people you played with, without global player search. Recorded lifetime statistics appear on leaderboards with anonymous names and your portrait by default. You can include your name, hide your portrait or leave the leaderboards. A recognisable portrait can identify you. Reset or disable statistics at any time. Game scores are not a currency.
 
-New-profile setup offers an explained choice to enable lifetime stats, profile sharing and closed-window invitations together, or create a private profile. Existing privacy choices stay unchanged. You can change each setting in **Profile → Privacy & invitations**. Shared profiles show your avatar and recorded games, wins, total points, and best match. They are visible to friends and people you have played with, with no global player search. Game points are statistics, not a currency.
+## Help us make it better
 
-The plugin starts closed. Closing it leaves your room and disconnects you; friends only see you online while your book is open. If you enable **Invitations while my book is closed**, a short authenticated check once a minute can notify you about friend invitations without keeping a game connection. Clicking the notification opens your book; it never opens itself. Recently played partners are private to the current session. You can remove friends and reset or disable your statistics at any time.
+[Report a bug or suggest an idea](https://github.com/cloudesh/kupopop/issues). Include the plugin version, what happened and what you expected. Keep passwords, recovery codes and private chat out of reports.
 
-Recorded lifetime statistics appear on leaderboards with anonymous names and your portrait by default. Use **Leaderboards** or **Profile → Privacy & invitations** to include your name, hide your portrait, or opt out entirely. A recognisable portrait can identify you; profile sharing is a separate setting.
+Enjoyed a game? Share the install link with your group, or star this repository to find it again. A short clip of a terrible drawing says more than a perfect one.
 
-## Quick questions
-
-**Is Kupo Skribbl a browser game?** No—drawing, guessing, chat, and profiles run inside FFXIV through Dalamud.
-
-**Do my friends need the plugin?** Yes. Everyone installs Kupo Skribbl, then joins by code or an in-plugin friend invitation.
-
-**Is it on the official Dalamud repository?** Not yet. Use the experimental repository link above.
-
-## Something gone wonky?
-
-[Report a bug or suggest an idea](https://github.com/cloudesh/kupopop/issues). For bugs, tell us what happened and what you expected. Please leave passwords and recovery codes out of reports.
-
-Download badges count release-asset downloads, including repeat downloads and older releases; they aren't a player count.
+Download badges count release-asset downloads, including repeats and older releases; they are not a player count.
 
 Not affiliated with Square Enix or skribbl.io.

@@ -78,6 +78,12 @@ pom.Step(100, 1f / 60, true); pom.Step(100, 1f / 60, false);
 bool reducedPom = pom.Angle == 0;
 pom.Step(200, 1f / 60, true); pom.Step(200, 1, true);
 Check(reducedPom && pom.Angle == 0, "reduced motion and long frame pauses reset decorative movement");
+pom.Step(0, 1f / 60, true); pom.Nudge(); pom.Step(0, 1f / 60, true);
+Check(pom.Angle > 0 && pom.Angle <= 0.62f, "cover moogle taps give a bounded spring impulse without changing window position");
+for (int i = 0; i < 1000; i++) { pom.Nudge(1000); pom.Step(0, 1f / 144, true); }
+Check(float.IsFinite(pom.Angle) && MathF.Abs(pom.Angle) <= 0.62f, "repeated cover taps cannot produce an unbounded pom animation");
+pom.Nudge(float.NaN); pom.Step(0, 1f / 60, false);
+Check(pom.Angle == 0, "reduced motion still clears tapped pom movement and ignores invalid impulses");
 if (OperatingSystem.IsWindows())
 {
     var vault = new CredentialVault(Path.Combine(working, "vault"));
