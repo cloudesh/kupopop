@@ -46,7 +46,7 @@ public sealed class RemoteClient : IDisposable
             { BaseAddress = endpoint, Timeout = TimeSpan.FromSeconds(15) };
     }
 
-    public Task<AccountCredentials> CreateAsync(string name, bool shareProfile = false) => PostAsync("api/accounts", new AccountRequest(name, shareProfile));
+    public Task<AccountCredentials> CreateAsync(string name, bool shareProfile = false, bool trackStats = false, bool backgroundInvitations = false) => PostAsync("api/accounts", new AccountRequest(name, shareProfile, trackStats, backgroundInvitations));
 
     public async Task<InvitationInbox> CheckInvitationsAsync(string token)
     {

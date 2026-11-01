@@ -172,6 +172,7 @@ public sealed partial class MainWindow
         bool track = social.Preferences.TrackStats, share = social.Preferences.ShareProfile;
         bool background = social.Preferences.BackgroundInvitations;
         UiTheme.Caption("YOUR PRIVACY");
+        if (UiTheme.Button("Enable all three", 0, primary: true)) Send(new("profile-privacy", Enabled: true, Shared: true, BackgroundInvitations: true));
         bool changed = ImGui.Checkbox("Record my lifetime game stats", ref track);
         changed |= ImGui.Checkbox("Share my profile", ref share);
         changed |= ImGui.Checkbox("Invitations while my book is closed", ref background);

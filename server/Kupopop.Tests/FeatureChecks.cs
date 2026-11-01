@@ -79,7 +79,8 @@ static class FeatureChecks
             foreach (var p in peers) engine.Attach(p);
             engine.Handle(peers[0], new("create", Options: new("Feature room", WordLists: ["complex"])));
             for (int i = 1; i < count; i++) engine.Handle(peers[i], new("join", Text: peers[0].State.Code));
-            engine.Handle(peers[0], new("start"));
+            engine.Detach(peers[0]); engine.Attach(peers[0]);
+            engine.Handle(peers[1], new("start"));
             engine.Handle(peers[0], new("choose-word", Text: peers[0].State.WordChoices![0], TurnId: peers[0].State.TurnId));
             return (engine, time, peers);
         }
@@ -111,6 +112,11 @@ static class FeatureChecks
             check(test.peers[0].RoomCode is null && test.peers[0].Events.Last().Type == "left", "vote removes current drawer at the correct threshold for population " + population);
         }
         var expiry = Room(4); Guid expiryTurn = expiry.peers[0].State.TurnId;
+        var promotion = Room(3);
+        promotion.engine.Handle(promotion.peers[1], new("vote-kick", TurnId: promotion.peers[0].State.TurnId));
+        promotion.engine.Detach(promotion.peers[1]);
+        check(promotion.peers[0].State.HostId == promotion.peers[0].Id && promotion.peers[0].State.KickVote is null && !promotion.peers[2].State.KickVoteAvailable,
+            "promotion to room leader cancels a removal ballot against the new leader");
         expiry.engine.Handle(expiry.peers[1], new("vote-kick", TurnId: expiryTurn));
         check(expiry.peers[2].Events.Any(e => e.Chat is { System: true, Text: "Vote to kick: 1/3. 2 more votes needed." }),
             "accepted kick votes announce the server-owned tally and remaining agreement in room chat");

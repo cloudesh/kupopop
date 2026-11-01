@@ -15,10 +15,10 @@ public static class UiTheme
     public static Vector4 Inset => Hex(DarkMode ? 0x39414F : 0xDED0B4);
     public static Vector4 Cover => Hex(DarkMode ? 0x414858 : 0xB89A91);
     public static Vector4 Tape => Hex(DarkMode ? 0x8E744B : 0xE3C990);
-    public static Vector4 StickyYellow => Hex(DarkMode ? 0x414032 : 0xF5E7AD);
+    public static Vector4 StickyYellow => Hex(DarkMode ? 0x3A3540 : 0xF5E7AD);
     public static Vector4 StickyRose => Hex(DarkMode ? 0x453441 : 0xEECFD3);
     public static Vector4 StickySage => Hex(DarkMode ? 0x30423B : 0xDCE7C9);
-    public static Vector4 StickyBlue => Hex(DarkMode ? 0x2F4050 : 0xD7E6EC);
+    public static Vector4 StickyBlue => Hex(DarkMode ? 0x303844 : 0xD7E6EC);
     public static Vector4 InvitationPaper => Hex(DarkMode ? 0x513949 : 0xF3CCD9);
     public static Vector4 Ink => Hex(DarkMode ? 0xF2EEE7 : 0x372E39);
     public static Vector4 Muted => Hex(DarkMode ? 0xB9C1CF : 0x70626B);

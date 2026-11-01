@@ -263,11 +263,8 @@ try
     Check(thirdEvents.All(e => e.Chat?.Text != "integration-private-message" && e.Room?.Word is null),
         "real network unsolved client receives neither done-mode content nor answer");
     third.Send(new("vote-kick", TurnId: drawing.Room.TurnId));
-    Check((await WaitEvent(third, e => e.Room?.KickVote?.Votes == 1)).Room!.KickVote!.Required == 2,
-        "real network ballot sends only tally, threshold and per-client voting status");
-    second.Send(new("vote-kick", TurnId: drawing.Room.TurnId));
-    Check((await WaitEvent(first, e => e.Type == "left")).Error == "The room voted to remove you.",
-        "real network unanimous vote removes the drawer and notifies their client");
+    Check((await WaitEvent(third, e => e.Type == "error", allowError: true)).Error == "The room leader cannot be vote-kicked.", "a forged vote-kick cannot remove the room leader");
+    first.Send(new("leave")); await WaitEvent(first, e => e.Type == "left");
     using var wrongVersion = new ClientWebSocket();
     wrongVersion.Options.SetRequestHeader("Authorization", "Bearer " + one.AccessToken);
     wrongVersion.Options.SetRequestHeader("X-Kupopop-Protocol", "999");
@@ -387,14 +384,14 @@ if (OperatingSystem.IsWindows() && File.Exists(packagedExe))
 }
 Console.WriteLine($"SUCCESS: {passed} checks passed. Test artifacts: {working}");
 
-static async Task<ServerEvent> WaitEvent(RemoteClient client, Func<ServerEvent, bool> predicate)
+static async Task<ServerEvent> WaitEvent(RemoteClient client, Func<ServerEvent, bool> predicate, bool allowError = false)
 {
     var until = DateTime.UtcNow.AddSeconds(10);
     while (DateTime.UtcNow < until)
     {
         while (client.TryRead(out var message))
         {
-            if (message?.Type == "error") throw new Exception("Integration command rejected: " + message.Error);
+            if (!allowError && message?.Type == "error") throw new Exception("Integration command rejected: " + message.Error);
             if (message?.Room is { Phase: "choosing", WordChoices: { Length: > 0 } choices } choosing)
                 client.Send(new("choose-word", Text: choices[0], TurnId: choosing.TurnId));
             if (message is not null && predicate(message)) return message;

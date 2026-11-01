@@ -43,7 +43,7 @@ public sealed partial class AccountStore : IDisposable
         catch { database.Dispose(); throw; }
     }
 
-    public AccountCredentials Create(string displayName, bool shareProfile = false)
+    public AccountCredentials Create(string displayName, bool shareProfile = false, bool trackStats = false, bool backgroundInvitations = false)
     {
         ValidateName(displayName);
         lock (gate)
@@ -55,10 +55,10 @@ public sealed partial class AccountStore : IDisposable
             EnsureNameAvailable(profile.DisplayName, profile.Id, transaction);
             Insert(new(profile, Hash(access), Hash(recovery)), transaction);
             SetNameKey(profile, transaction);
-            using (var preferences = Command("INSERT INTO preferences(id,track,share,invite_checks) VALUES($id,0,$share,0)", transaction))
+            using (var preferences = Command("INSERT INTO preferences(id,track,share,invite_checks) VALUES($id,$track,$share,$invites)", transaction))
             {
                 preferences.Parameters.AddWithValue("$id", profile.Id.ToString()); preferences.Parameters.AddWithValue("$share", shareProfile);
-                preferences.ExecuteNonQuery();
+                preferences.Parameters.AddWithValue("$track", trackStats); preferences.Parameters.AddWithValue("$invites", backgroundInvitations); preferences.ExecuteNonQuery();
             }
             transaction.Commit();
             return new(profile.Id, access, recovery, profile);

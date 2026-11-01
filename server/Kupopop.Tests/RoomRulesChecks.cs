@@ -60,7 +60,7 @@ static class RoomRulesChecks
         {
             var test = Room(new("Independent votes", VoteKickEnabled: kick, VoteSkipEnabled: !kick));
             check(test.peers[0].State.Options.VoteKickEnabled == kick && test.peers[0].State.Options.VoteSkipEnabled != kick &&
-                test.peers[1].State.KickVoteAvailable == kick && test.peers[1].State.SkipVoteAvailable != kick,
+                !test.peers[1].State.KickVoteAvailable && test.peers[1].State.SkipVoteAvailable != kick,
                 "kick and skip switches round-trip independently");
         }
 

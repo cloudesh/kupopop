@@ -77,7 +77,7 @@ public static class Protocol
     }
 }
 
-public sealed record AccountRequest(string DisplayName, bool ShareProfile = false);
+public sealed record AccountRequest(string DisplayName, bool ShareProfile = false, bool TrackStats = false, bool BackgroundInvitations = false);
 public sealed record RecoveryRequest(string RecoveryCode);
 public sealed record AccountCredentials(Guid AccountId, string AccessToken, string RecoveryCode, PlayerProfile Profile);
 public sealed record PlayerProfile(Guid Id, string DisplayName, int AvatarSeed, byte[]? AvatarPixels = null, string? AvatarPreset = null);

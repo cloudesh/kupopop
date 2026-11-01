@@ -10,7 +10,7 @@ public static class GameEndpoints
     {
         app.MapPost("/api/accounts", (AccountRequest request, AccountStore accounts) =>
         {
-            try { return Results.Json(accounts.Create(request.DisplayName, request.ShareProfile), Protocol.Json, statusCode: 201); }
+            try { return Results.Json(accounts.Create(request.DisplayName, request.ShareProfile, request.TrackStats, request.BackgroundInvitations), Protocol.Json, statusCode: 201); }
             catch (DisplayNameTakenException) { return Results.Conflict(new { error = "That display name is unavailable. Please choose another." }); }
             catch (ArgumentException) { return Results.BadRequest(new { error = "Use a display name of 2–40 characters." }); }
             catch (InvalidOperationException) { return Results.StatusCode(503); }

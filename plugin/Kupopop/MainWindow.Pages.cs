@@ -13,7 +13,7 @@ public sealed partial class MainWindow
     private long nextLayoutLog;
     private readonly PomMotion pom = new();
     private readonly UiAspectConstraint aspect = new();
-    private bool topDragActive;
+
     private static string UiVersion => typeof(Plugin).Assembly.GetName().Version?.ToString(3) ?? "dev";
     internal bool IsDrawingRoom => ConnectionReady && newRecovery.Length == 0 && !ShowDebug && screen == "game" && room is not null;
 
@@ -21,15 +21,10 @@ public sealed partial class MainWindow
     {
         var display = ImGui.GetIO().DisplaySize;
         Flags = ImGuiWindowFlags.NoScrollbar | ImGuiWindowFlags.NoScrollWithMouse;
-        if (!plugin.Config.UseStandardFrame)
-            Flags |= ImGuiWindowFlags.NoTitleBar | ImGuiWindowFlags.NoBackground;
         ForceMainWindow = true;
-        AllowBackgroundBlur = plugin.Config.UseStandardFrame;
-        AllowClickthrough = plugin.Config.UseStandardFrame;
-        DisableFadeInFadeOut = !plugin.Config.UseStandardFrame;
-        if (plugin.Config.PaperPinned is null) { plugin.Config.PaperPinned = IsPinned; plugin.Save(); }
-        if (!plugin.Config.UseStandardFrame) IsPinned = plugin.Config.PaperPinned.Value;
-        else if (plugin.Config.PaperPinned != IsPinned) { plugin.Config.PaperPinned = IsPinned; plugin.Save(); }
+        AllowBackgroundBlur = true;
+        AllowClickthrough = true;
+        DisableFadeInFadeOut = false;
         // Native movement owns the entire window tree and viewport. Never fight
         // it with a second, per-frame SetNextWindowPos controller.
         Position = null;
@@ -43,11 +38,8 @@ public sealed partial class MainWindow
     {
         var position = ImGui.GetWindowPos();
         pom.Step(position.X + position.Y * 0.35f, ImGui.GetIO().DeltaTime, !plugin.Config.ReduceMotion);
-        UiStationery.Book(position, position + ImGui.GetWindowSize(), plugin.Config.UseStandardFrame ? ImGui.GetFrameHeight() : 0);
+        UiStationery.Book(position, position + ImGui.GetWindowSize(), ImGui.GetFrameHeight());
         DrawHeader();
-        UiChrome.EmptyHeaderDrag(position + UiTheme.V(18, 5),
-            new Vector2(position.X + ImGui.GetWindowSize().X - UiTheme.S(18), ImGui.GetCursorScreenPos().Y),
-            ref topDragActive, IsPinned, !plugin.Config.UseStandardFrame);
         UiTheme.Rule();
         using (var transparent = ImRaii.PushColor(ImGuiCol.ChildBg, Vector4.Zero))
         using (var body = ImRaii.Child("page-content", new Vector2(0, Math.Max(UiTheme.S(100), ImGui.GetContentRegionAvail().Y - UiTheme.S(28))), false,
@@ -74,17 +66,16 @@ public sealed partial class MainWindow
 
     private void DrawHeader()
     {
-        bool framed = plugin.Config.UseStandardFrame;
         if (!ImGui.BeginTable("brand-paper-controls", 4, ImGuiTableFlags.NoPadOuterX)) return;
         try
         {
             ImGui.TableSetupColumn("Brand", ImGuiTableColumnFlags.WidthFixed, UiTheme.S(215));
             ImGui.TableSetupColumn("Navigation", ImGuiTableColumnFlags.WidthStretch);
             ImGui.TableSetupColumn("Service status", ImGuiTableColumnFlags.WidthFixed, UiTheme.S(114));
-            ImGui.TableSetupColumn("Paper controls", ImGuiTableColumnFlags.WidthFixed, UiTheme.S(framed ? 32 : 100));
+            ImGui.TableSetupColumn("Paper controls", ImGuiTableColumnFlags.WidthFixed, UiTheme.S(32));
             ImGui.TableNextColumn();
             var face = ImGui.GetCursorScreenPos();
-            UiChrome.DragHandle(UiTheme.V(211, 34), IsPinned, !framed);
+            ImGui.Dummy(UiTheme.V(211, 34));
             var afterBrand = ImGui.GetCursorScreenPos();
             UiStationery.Moogle(face + UiTheme.V(20, 23), UiTheme.S(14), pom.Angle);
             ImGui.SetCursorScreenPos(face + UiTheme.V(49, 0));
@@ -106,14 +97,6 @@ public sealed partial class MainWindow
             if (ToolAction(plugin.Config.DarkMode ? FontAwesomeIcon.Sun : FontAwesomeIcon.Moon,
                 plugin.Config.DarkMode ? "Use light paper" : "Use dark paper"))
             { plugin.Config.DarkMode = !plugin.Config.DarkMode; plugin.Save(); }
-            if (!framed)
-            {
-                ImGui.SameLine();
-                if (ToolAction(FontAwesomeIcon.Thumbtack, IsPinned ? "Unpin book" : "Pin book", IsPinned))
-                { IsPinned = !IsPinned; plugin.Config.PaperPinned = IsPinned; plugin.Save(); }
-                ImGui.SameLine();
-                if (ToolAction(FontAwesomeIcon.Times, "Close book")) { IsOpen = false; SynchronizeVisibility(); }
-            }
         }
         finally { ImGui.EndTable(); }
     }
@@ -161,10 +144,13 @@ public sealed partial class MainWindow
         using (ImRaii.Disabled(busy || client is null))
         {
             UiTheme.Field("Display name", "##new-name", ref displayName, 40, "Your character or artist name");
-            ImGui.Checkbox("Share my profile with friends and room partners", ref shareNewProfile);
-            UiTheme.Wrapped("Shared profiles reveal that you use this plugin. Uncheck to keep yours private; you can change this later. Lifetime statistics are a separate opt-in setting.", UiTheme.Muted);
+
+            UiTheme.Wrapped("Recommended: record lifetime stats, share your profile with room partners and friends, and check for invitations once a minute while closed. Sharing reveals plugin use. You can hide or disable each feature later.", UiTheme.Muted);
             using (ImRaii.Disabled(!Protocol.ValidName(displayName)))
-                if (UiTheme.Button(busy ? "Creating your profile..." : "Create my profile", ImGui.GetContentRegionAvail().X, primary: true)) CreateAccount(false);
+            {
+                if (UiTheme.Button(busy ? "Creating your profile..." : "Create & enable all three", ImGui.GetContentRegionAvail().X, primary: true)) CreateAccount(false, enableAll: true);
+                if (UiTheme.Button("Create a private profile", ImGui.GetContentRegionAvail().X, quiet: true)) CreateAccount(false);
+            }
             UiTheme.Gap(3);
             UiTheme.Wrapped("Your name is unverified. Players see your chosen name and avatar when you share a room.", UiTheme.Muted);
             UiTheme.Rule();
@@ -734,10 +720,7 @@ public sealed partial class MainWindow
         if (ImGui.Checkbox("Dark paper", ref darkMode)) { plugin.Config.DarkMode = darkMode; plugin.Save(); }
         if (ImGui.Checkbox("Reduce decorative motion", ref reduceMotion)) { plugin.Config.ReduceMotion = reduceMotion; plugin.Save(); }
         UiTheme.Caption("Keep the moogle pom still while moving the book.");
-        bool standardFrame = plugin.Config.UseStandardFrame;
-        if (ImGui.Checkbox("Use the standard window frame", ref standardFrame))
-        { plugin.Config.UseStandardFrame = standardFrame; plugin.Save(); }
-        UiTheme.Wrapped("Paper mode: drag near the top of the page, use the pin and close buttons, and resize from the edges. The standard frame restores Dalamud's window menu.", UiTheme.Muted);
+        UiTheme.Wrapped("Move and resize this window using the standard title bar and frame.", UiTheme.Muted);
         UiTheme.Rule();
         UiTheme.Caption("DIAGNOSTICS");
         ImGui.TextUnformatted($"Connection: {(client?.Connected == true ? "online" : "offline")}   /   Events received: {received}   /   Drawing messages: {draws}");

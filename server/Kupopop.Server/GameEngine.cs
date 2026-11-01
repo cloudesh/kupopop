@@ -262,7 +262,7 @@ public sealed partial class GameEngine(AccountStore accounts, ILogger<GameEngine
                         break;
                     case "cursor":
                         if (room?.Phase != "drawing" || room.Drawer != peer.Id || command.TurnId != room.TurnId || Now >= room.Deadline)
-                            throw new ArgumentException("Only the current drawer can share a canvas cursor.");
+                            break; // A cursor already in flight may arrive after the turn changes.
                         var cursor = command.Cursor;
                         if (cursor is null || cursor.X is < 0 or >= Protocol.CanvasWidth || cursor.Y is < 0 or >= Protocol.CanvasHeight ||
                             !DrawingTools.Valid(cursor.Tool) || !Palette.Valid(cursor.Color, false) || cursor.Size is < 1 or > 20)
@@ -468,6 +468,7 @@ public sealed partial class GameEngine(AccountStore accounts, ILogger<GameEngine
     {
         if (!room.Members.TryGetValue(room.Host, out var host) || !host.Connected)
             room.Host = room.Members.Values.FirstOrDefault(m => m.Connected)?.Id ?? room.Members.Keys.First();
+        if (room.Vote?.Target == room.Host) room.Vote = null;
     }
 
     private Room? FindRoom(IGamePeer peer) => peer.RoomCode is { } code ? rooms.GetValueOrDefault(code) : null;
@@ -499,7 +500,7 @@ public sealed partial class GameEngine(AccountStore accounts, ILogger<GameEngine
             room.Phase is "intermission" or "results" ? room.Solvers.Take(3).ToArray() : null,
             room.SkipVote is { } skip ? new(skip.Target, skip.Votes.Count, skip.Required, skip.Votes.Contains(peer.Id), skip.Expires) : null,
             room.Phase == "drawing" && Now - room.CursorAt < TimeSpan.FromSeconds(2) ? room.Cursor : null,
-            room.Options.VoteKickEnabled && (!room.VoteUsed || room.Vote is not null),
+            room.Options.VoteKickEnabled && room.Drawer != room.Host && (!room.VoteUsed || room.Vote is not null),
             room.Options.VoteSkipEnabled && (!room.SkipVoteUsed || room.SkipVote is not null),
             room.Phase == "choosing" && room.Drawer == peer.Id && room.CustomWordAvailable,
             room.Phase == "results" ? room.Results : null)));
@@ -540,6 +541,7 @@ public sealed partial class GameEngine(AccountStore accounts, ILogger<GameEngine
             room.Drawer is not { } target || target == peer.Id || !room.Members[peer.Id].Connected)
             throw new ArgumentException("You may only vote on the current drawer.");
         var activeVote = skip ? room.SkipVote : room.Vote;
+        if (!skip && target == room.Host) throw new ArgumentException("The room leader cannot be vote-kicked.");
         if (activeVote is null)
         {
             if (skip ? room.SkipVoteUsed : room.VoteUsed) throw new ArgumentException("A vote has already ended this turn.");

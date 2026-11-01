@@ -129,7 +129,7 @@ public sealed partial class MainWindow
     private void DrawCanvasVotes(RoomView state)
     {
         var saved = ImGui.GetCursorScreenPos();
-        bool showKick = state.Options.VoteKickEnabled, showSkip = state.Options.VoteSkipEnabled;
+        bool showKick = state.Options.VoteKickEnabled && state.DrawerId != state.HostId, showSkip = state.Options.VoteSkipEnabled;
         if (!showKick && !showSkip) return;
         string kick = state.KickVote is { } k ? $"Kick {k.Votes}/{k.Required}" : "Vote kick";
         string skip = state.SkipVote is { } s ? $"Skip {s.Votes}/{s.Required}" : "Vote skip";

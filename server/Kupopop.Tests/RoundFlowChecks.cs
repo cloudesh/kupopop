@@ -102,8 +102,9 @@ static class RoundFlowChecks
 
         var cursor = Room(3); Choose(cursor.game, cursor.peers[0]); var cursorTurn = cursor.peers[0].State.TurnId;
         var brush = new BrushCursor(20, 30, "circle", 32, 8);
+        int cursorEvents = cursor.peers.Sum(p => p.Events.Count);
         cursor.game.Handle(cursor.peers[1], new("cursor", Cursor: brush, TurnId: cursorTurn));
-        check(cursor.peers[1].Events.Last().Type == "error", "spectators cannot impersonate the drawer cursor");
+        check(cursor.peers.Sum(p => p.Events.Count) == cursorEvents, "unauthorized cursor packets are silently discarded without broadcasts");
         cursor.game.Handle(cursor.peers[0], new("cursor", Cursor: brush, TurnId: cursorTurn));
         check(cursor.peers[2].Events.Last().Cursor == brush && cursor.peers[2].Events.Last().ActorId == cursor.peers[0].Id,
             "authorized cursor broadcasts carry canvas coordinates, tool, color and size");
@@ -111,6 +112,11 @@ static class RoundFlowChecks
         check(cursor.peers[0].Events.Last().Type == "error", "cursor coordinates outside the canvas are rejected");
         cursor.clock.Advance(2.1); cursor.game.Handle(cursor.peers[2], new("sync"));
         check(cursor.peers[2].State.Cursor is null, "stale brush cursors expire from reconnection snapshots");
+        cursor.clock.Advance(100); cursor.game.Tick();
+        int endedEvents = cursor.peers.Sum(p => p.Events.Count);
+        cursor.game.Handle(cursor.peers[0], new("cursor", Cursor: brush, TurnId: cursorTurn));
+        check(cursor.peers.Sum(p => p.Events.Count) == endedEvents,
+            "in-flight cursor packets after the turn ends are silently discarded");
 
         check(Palette.Opaque.Length == 32 && Palette.Transparent == 16 && Palette.Colors[0] == 0xFFFFFFFF && Palette.Colors[1] == 0xFF222222,
             "32-color palette preserves legacy colors and transparent index");

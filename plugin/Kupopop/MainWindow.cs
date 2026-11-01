@@ -38,7 +38,7 @@ public sealed partial class MainWindow : Window, IDisposable
     private RoomSummary[] publicRooms = [];
     private Uri? endpoint;
     private string displayName = "";
-    private bool shareNewProfile = true;
+
     private string recoveryInput = "";
     private string newRecovery = "";
     private string joinCode = "";
@@ -51,7 +51,7 @@ public sealed partial class MainWindow : Window, IDisposable
     private string connectionStatus = "Finding the drawing room...";
     private long sessionDeadline;
     private int seconds = 90, rounds = 2, hints = 30, capacity = 16;
-    private int wordChoiceCount = 4;
+    private int wordChoiceCount = 6;
     private int roomSetupPage;
     private bool voteKickEnabled = true, voteSkipEnabled = true, customWordsEnabled = true;
     private readonly HashSet<string> collapsedWordCategories = [];
@@ -278,14 +278,14 @@ public sealed partial class MainWindow : Window, IDisposable
 
     }
 
-    private void CreateAccount(bool recovering)
+    private void CreateAccount(bool recovering, bool enableAll = false)
     {
         if (client is null) return;
         string name = displayName, code = recoveryInput;
-        bool share = shareNewProfile;
+        bool share = enableAll;
         Work(async (activeClient, complete) =>
         {
-            var result = recovering ? await activeClient.RecoverAsync(code) : await activeClient.CreateAsync(name, share);
+            var result = recovering ? await activeClient.RecoverAsync(code) : await activeClient.CreateAsync(name, share, enableAll, enableAll);
             await AcceptCredentials(activeClient, complete, result);
         }, recovering ? "Recovering account" : "Creating account");
     }

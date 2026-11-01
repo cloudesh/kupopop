@@ -11,12 +11,15 @@ static class SocialChecks
     public static void Run(string working, Action<bool, string> check)
     {
         using var accounts = new AccountStore(Path.Combine(working, "social"));
+        var consented = accounts.Create("Recommended setup", shareProfile: true, trackStats: true, backgroundInvitations: true);
+        check(accounts.Preferences(consented.AccountId) is { TrackStats: true, ShareProfile: true, BackgroundInvitations: true },
+            "explicit recommended setup atomically saves all three consent choices");
         var a = accounts.Create("Mog Artist");
         var b = accounts.Create("Another Artist");
         var c = accounts.Create("Unknown Artist");
         bool rejected = false;
         try { accounts.Create("  MOG   ARTIST  "); } catch (DisplayNameTakenException) { rejected = true; }
-        check(rejected && accounts.Count() == 3, "normalized names are unique without partially creating accounts");
+        check(rejected && accounts.Count() == 4, "normalized names are unique without partially creating accounts");
         rejected = false;
         try { accounts.Update(b.AccountId, "Ｍｏｇ Artist", null, false); } catch (DisplayNameTakenException) { rejected = true; }
         check(rejected && accounts.Get(b.AccountId)!.DisplayName == b.Profile.DisplayName, "compatibility-normalized rename conflicts preserve the prior profile");
