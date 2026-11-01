@@ -164,9 +164,10 @@ public sealed partial class GameEngine(AccountStore accounts, ILogger<GameEngine
                 {
                     case "social": SendSocial(peer); break;
                     case "suggest":
-                        if (command.Kind == "word" && !words.Catalog.Any(l => l.Category == command.Category))
-                            throw new ArgumentException("Choose a word category.");
-                        accounts.SubmitSuggestion(peer.Id, command.Kind, command.Kind == "word" ? command.Category : null, command.Text, Now);
+                        string? category = command.Kind == "word" ? command.Category?.Trim() : null;
+                        if (command.Kind == "word" && !Protocol.ValidName(category))
+                            throw new ArgumentException("Choose or enter a category of 2–40 characters.");
+                        accounts.SubmitSuggestion(peer.Id, command.Kind, category, command.Text, Now);
                         peer.Send(new("suggestion-sent"));
                         break;
                     case "leaderboard":

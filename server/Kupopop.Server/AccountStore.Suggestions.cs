@@ -26,7 +26,7 @@ public sealed partial class AccountStore
         if (kind is not ("word" or "suggestion") || text.Length > 1000 || text.Length < (kind == "word" ? 2 : 5) ||
             text.Any(c => char.IsControl(c) && c != '\n') || kind == "word" && !CustomWordLists.ValidWord(text))
             throw new ArgumentException("Check your suggestion: words use 2–48 characters; general suggestions use 5–1,000 characters.");
-        if (category is not null && !Protocol.ValidName(category)) throw new ArgumentException("Choose a valid category.");
+        if ((kind == "word" || category is not null) && !Protocol.ValidName(category)) throw new ArgumentException("Choose or enter a category of 2–40 characters.");
         lock (gate)
         {
             using var transaction = database.BeginTransaction();

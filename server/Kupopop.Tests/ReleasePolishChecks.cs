@@ -56,11 +56,17 @@ static class ReleasePolishChecks
         clock.Advance(61); game.Handle(host, new("suggest", Kind: "suggestion", Text: "Quota overflow check"));
         check(host.Events[^1].Type == "error" && accounts.ReadSuggestions().Length == 5, "the five-per-day suggestion quota cannot be bypassed with new sessions");
         game.Handle(viewer, new("suggest", Kind: "word", Category: "Unknown category", Text: "Another flower"));
-        check(viewer.Events[^1].Type == "error", "word suggestions cannot inject arbitrary categories");
+        check(viewer.Events[^1].Type == "suggestion-sent" && accounts.ReadSuggestions().Any(s => s.Category == "Unknown category"),
+            "word suggestions can propose a new category without changing the live word catalog");
+        foreach (string? category in new string?[] { null, "x", new string('a', 41), "Bad\ncategory" })
+        {
+            game.Handle(viewer, new("suggest", Kind: "word", Category: category, Text: "Another flower"));
+            check(viewer.Events[^1].Type == "error", "proposed categories still enforce bounded non-control names");
+        }
         game.Handle(viewer, new("suggest", Kind: "suggestion", Text: "Bad terminal \u001b[31m escape"));
         check(viewer.Events[^1].Type == "error", "terminal escape/control characters are rejected from stored submissions");
         using var reopened = new AccountStore(Path.Combine(working, "release-polish"));
-        check(reopened.ReadSuggestions().Length == 5 && reopened.ReadSuggestions()[0].Number > reopened.ReadSuggestions()[^1].Number,
+        check(reopened.ReadSuggestions().Length == 6 && reopened.ReadSuggestions()[0].Number > reopened.ReadSuggestions()[^1].Number,
             "the private suggestion inbox survives restart and reads newest first");
         var limits = new InputRateLimiter(clock);
         check(Enumerable.Range(0, 3).All(_ => limits.Allow("sync")) && !limits.Allow("sync"), "canvas snapshot bursts have a dedicated bounded budget");

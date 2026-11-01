@@ -285,7 +285,7 @@ public sealed partial class MainWindow
         ImGui.SameLine();
         float suggestionWidth = ImGui.CalcTextSize("Suggestions").X + UiTheme.S(36);
         ImGui.SetCursorPosX(Math.Max(ImGui.GetCursorPosX(), ImGui.GetWindowContentRegionMax().X - suggestionWidth));
-        if (UiTheme.Button("Suggestions", suggestionWidth, quiet: true)) { ShowDebug = false; screen = "suggestions"; }
+        if (UiTheme.Button("Suggestions", suggestionWidth, primary: true)) { ShowDebug = false; screen = "suggestions"; }
     }
 
     private void CreateRoomScreen()
@@ -692,7 +692,7 @@ public sealed partial class MainWindow
             ImGui.TableNextColumn();
             using var card = new UiTheme.PaperPanel("profile-details", Vector2.Zero, note: UiTheme.StickyRose);
             if (!card.Success) return;
-            float backWidth = ImGui.CalcTextSize(room is null ? "Back to home" : "Back to room").X + UiTheme.S(16);
+            float backWidth = ImGui.CalcTextSize(room is null ? "Back to home" : "Back to room").X + UiTheme.S(36);
             ImGui.SetCursorPosX(ImGui.GetCursorPosX() + Math.Max(0, ImGui.GetContentRegionAvail().X - backWidth));
             if (BackButton()) return;
             UiTheme.Gap(4);
