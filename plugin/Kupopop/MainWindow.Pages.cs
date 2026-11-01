@@ -467,10 +467,10 @@ public sealed partial class MainWindow
                 ImGui.TableSetupColumn("Join", ImGuiTableColumnFlags.WidthFixed, UiTheme.S(100));
                 ImGui.TableNextColumn();
                 UiTheme.Ellipsis(listed.Title, ImGui.GetContentRegionAvail().X);
-                UiTheme.Caption(listed.Phase is "drawing" or "intermission" or "choosing" ? "A match is in progress" : "Ready for company");
+                UiTheme.Caption(listed.Phase is "drawing" or "intermission" or "choosing" ? "In progress · join and guess now" : "Ready for company");
                 ImGui.TableNextColumn(); ImGui.TextUnformatted($"{listed.Players} / {listed.MaxPlayers} artists");
                 ImGui.TableNextColumn();
-                using (ImRaii.Disabled(client?.Connected != true || listed.Phase is not ("waiting" or "results") || listed.Players >= listed.MaxPlayers))
+                using (ImRaii.Disabled(client?.Connected != true || listed.Players >= listed.MaxPlayers))
                     if (UiTheme.Button("Join", UiTheme.S(80))) Send(new("join", Text: listed.Code));
             }
             finally { ImGui.EndTable(); }

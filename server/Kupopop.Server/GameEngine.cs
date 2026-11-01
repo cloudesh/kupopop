@@ -20,6 +20,7 @@ public sealed partial class GameEngine(AccountStore accounts, ILogger<GameEngine
         public long MonitorId;
         public HashSet<Guid> StatsParticipants = [];
         public HashSet<Guid> DrawingLikes = [];
+        public HashSet<Guid> WordViewers = [];
         public string[] HostWords = [];
         public bool StatsRecorded;
         public string Code = code;
@@ -44,7 +45,7 @@ public sealed partial class GameEngine(AccountStore accounts, ILogger<GameEngine
         public string Phase = "waiting";
         public List<Guid> Deck = [];
         public int Position = -1;
-        public int RotationSize;
+        public int Round;
         public Guid? Drawer;
         public Guid TurnId;
         public string Word = "";
@@ -75,7 +76,7 @@ public sealed partial class GameEngine(AccountStore accounts, ILogger<GameEngine
             return new(Now, running, (long)uptime.TotalSeconds, peers.Count,
                 peers.Values.Count(p => p.RoomCode is null), rooms.Values.Select(r => new RoomStatus(
                     r.MonitorId, r.Options.IsPublic, r.Phase, r.Members.Values.Count(m => m.Connected),
-                    r.Members.Count, r.Options.MaxPlayers, r.RotationSize > 0 ? Math.Min(r.Options.Rounds, r.Position / r.RotationSize + 1) : 0,
+                    r.Members.Count, r.Options.MaxPlayers, r.Round,
                     r.Options.Rounds)).ToArray());
     }
 
@@ -199,7 +200,7 @@ public sealed partial class GameEngine(AccountStore accounts, ILogger<GameEngine
                     case "list":
                         peer.Send(new("rooms", Rooms: rooms.Values.Where(r => r.Options.IsPublic)
                             .Select(r => new RoomSummary(r.Code, r.Options.Title,
-                                r.Members.Values.Count(m => m.Connected), r.Options.MaxPlayers, r.Phase)).ToArray()));
+                                r.Members.Count, r.Options.MaxPlayers, r.Phase)).ToArray()));
                         break;
                     case "create":
                         if (room is not null) throw new ArgumentException("Leave your current room first.");
@@ -221,12 +222,23 @@ public sealed partial class GameEngine(AccountStore accounts, ILogger<GameEngine
                         if (room is not null) throw new ArgumentException("Leave your current room first.");
                         string requested = command.Text?.Trim() ?? "";
                         if (!rooms.TryGetValue(requested, out room)) throw new ArgumentException("Room not found.");
-                        if (room.Phase is not ("waiting" or "results")) throw new ArgumentException("This match has started. Join after it finishes.");
                         if (room.Members.Count >= room.Options.MaxPlayers) throw new ArgumentException("Room is full.");
-                        room.Members[peer.Id] = new(peer.Id);
+                        bool inProgress = room.Phase is "choosing" or "drawing" or "intermission";
+                        bool returning = room.MatchScores.ContainsKey(peer.Id);
+                        if (inProgress && !returning && room.MatchScores.Count >= Protocol.MaximumPlayers)
+                            throw new ArgumentException("This match already has 16 participants. Join when the next match starts.");
+                        room.Members[peer.Id] = new(peer.Id)
+                        {
+                            Score = inProgress ? room.MatchScores.GetValueOrDefault(peer.Id)?.Points ?? 0 : 0,
+                            Solved = room.Phase == "drawing" && room.WordViewers.Contains(peer.Id)
+                        };
+                        if (inProgress) room.MatchScores.TryAdd(peer.Id, new(peer.Id, accounts.Get(peer.Id)!.DisplayName, 0));
                         peer.RoomCode = room.Code;
                         RememberRoom(room);
                         State(room, peer, snapshot: true);
+                        if (inProgress && !returning) peer.Send(new("notice", Error: room.Round < room.Options.Rounds
+                            ? "Match in progress. Guess now; drawing turns for new players begin next round."
+                            : "Final round in progress. Guess now; new players draw in the next match."));
                         SystemMessage(room, "A player joined the room.");
                         BroadcastState(room, except: peer.Id);
                         break;
@@ -246,8 +258,7 @@ public sealed partial class GameEngine(AccountStore accounts, ILogger<GameEngine
                         room.StatsRecorded = false;
                         room.Results = [];
                         room.Deck = [];
-                        for (int i = 0; i < room.Options.Rounds; i++) room.Deck.AddRange(participants);
-                        room.RotationSize = participants.Length;
+                        room.Round = 0;
                         room.Position = -1;
                         NextTurn(room);
                         break;
@@ -394,6 +405,7 @@ public sealed partial class GameEngine(AccountStore accounts, ILogger<GameEngine
             {
                 int rank = room.Solvers.Count + 1;
                 member.Solved = true;
+                room.WordViewers.Add(peer.Id);
                 int award = Math.Max(100, 1000 - (rank - 1) * 60);
                 member.Score += award;
                 room.Solvers.Add(new(peer.Id, accounts.Get(peer.Id)!.DisplayName, award));
@@ -422,8 +434,17 @@ public sealed partial class GameEngine(AccountStore accounts, ILogger<GameEngine
     private void NextTurn(Room room)
     {
         room.Vote = room.SkipVote = null; room.VoteUsed = room.SkipVoteUsed = false; room.History.Clear(); room.Cursor = null;
-        do room.Position++; while (room.Position < room.Deck.Count &&
-            (!room.Members.TryGetValue(room.Deck[room.Position], out var member) || !member.Connected));
+        // Freeze only the current round's roster. New players can guess now
+        // and enter the next round without shifting or extending this one.
+        while (true)
+        {
+            do room.Position++; while (room.Position < room.Deck.Count &&
+                (!room.Members.TryGetValue(room.Deck[room.Position], out var member) || !member.Connected));
+            if (room.Position < room.Deck.Count || room.Round >= room.Options.Rounds) break;
+            room.Round++;
+            room.Deck = room.Members.Values.Where(m => m.Connected).Select(m => m.Id).ToList();
+            room.Position = -1;
+        }
         if (room.Position >= room.Deck.Count || room.Members.Values.Count(m => m.Connected) < 2)
         {
             room.Phase = "results";
@@ -445,6 +466,7 @@ public sealed partial class GameEngine(AccountStore accounts, ILogger<GameEngine
         room.Drawer = room.Deck[room.Position];
         room.TurnId = Guid.NewGuid();
         room.DrawingLikes.Clear();
+        room.WordViewers.Clear();
         room.Deadline = Now.AddSeconds(15);
         room.Revealed = 0;
         room.Word = "";
@@ -456,7 +478,7 @@ public sealed partial class GameEngine(AccountStore accounts, ILogger<GameEngine
         foreach (var member in room.Members.Values) member.Solved = false;
         BroadcastState(room, reset: true);
         SystemMessage(room, $"{accounts.Get(room.Drawer.Value)!.DisplayName} is choosing the next word.");
-        log.LogInformation("Word selection started. Round={Round} Players={Players}", room.Position / room.RotationSize + 1, room.Members.Count);
+        log.LogInformation("Word selection started. Round={Round} Players={Players}", room.Round, room.Members.Count);
     }
 
     private void BeginDrawing(Room room, string word, bool custom = false)
@@ -467,6 +489,7 @@ public sealed partial class GameEngine(AccountStore accounts, ILogger<GameEngine
         room.HintOrder = Enumerable.Range(0, word.Length).Where(i => char.IsLetterOrDigit(word[i])).ToArray();
         RandomNumberGenerator.Shuffle(room.HintOrder.AsSpan());
         room.Phase = "drawing"; room.Deadline = Now.AddSeconds(room.Options.TurnSeconds); room.Revealed = 0;
+        room.WordViewers.Add(room.Drawer!.Value);
         BroadcastState(room);
         log.LogInformation("Drawing turn started. Players={Players}", room.Members.Count);
     }
@@ -517,7 +540,7 @@ public sealed partial class GameEngine(AccountStore accounts, ILogger<GameEngine
         var letters = room.HintOrder.Take(room.Revealed).ToHashSet();
         string hint = string.Concat(room.Word.Select((c, i) => !char.IsLetterOrDigit(c) || letters.Contains(i) ? c : '_'));
         peer.Send(new("state", Room: new(room.Code, room.Options, room.Phase, room.Host, room.Drawer,
-            room.TurnId, room.RotationSize == 0 ? 0 : Math.Min(room.Options.Rounds, room.Position / room.RotationSize + 1),
+            room.TurnId, room.Round,
             room.Deadline, hint, showWord ? room.Word : null, done,
             players ?? PlayerViews(room), Now,
             snapshot ? (byte[])room.Canvas.Pixels.Clone() : null, reset,

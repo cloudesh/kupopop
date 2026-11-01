@@ -148,7 +148,7 @@ public sealed partial class MainWindow
             ImGui.SameLine(0, UiTheme.S(4));
             string action = person.Relationship switch { "incoming" => "Accept", "friend" => "Invite", "recent" => "Add", _ => "Cancel" };
             bool invite = person.Relationship == "friend";
-            using (ImRaii.Disabled(invite && ((!person.Online && !person.AcceptsOfflineInvites) || room is null || room.HostId != device?.AccountId || room.Phase is not ("waiting" or "results"))))
+            using (ImRaii.Disabled(invite && ((!person.Online && !person.AcceptsOfflineInvites) || room is null || room.HostId != device?.AccountId || room.Players.Length >= room.Options.MaxPlayers)))
                 if (UiTheme.Button(action, UiTheme.S(62), primary: person.Relationship is "incoming" or "recent"))
                     Send(new(person.Relationship switch { "incoming" => "friend-accept", "friend" => "invite", "recent" => "friend-request", _ => "friend-remove" }, TargetId: person.Profile.Id));
             ImGui.SameLine(0, UiTheme.S(2));

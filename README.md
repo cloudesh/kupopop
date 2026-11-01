@@ -50,6 +50,8 @@ Create your profile, save its private recovery code, and invite a friend. Everyo
 3. **Guess in room chat.** Earlier correct guesses earn more points. The drawer earns points when others solve it.
 4. **Enjoy the reveal.** See the answer, celebrate the quickest guessers, and pass the pencil along. After the final round, the highest score wins.
 
+You can join a match already in progress. Guess immediately; new players enter the drawing order next round, or next match when joining the final round.
+
 Right-click an artist to add a friend or view their shared profile. Manage requests and invitations in **Friends**. Use **Suggestions** on the home page to send feedback or suggest a drawable word or category.
 
 ## Your profile, your choices

@@ -107,6 +107,7 @@ Check(await RejectHealthResponse("{\"service\":\"not the game\"}"), "connection 
 var accounts = new AccountStore(Path.Combine(working, "accounts"));
 FeatureChecks.Run(working, Check);
 RoundFlowChecks.Run(working, Check);
+LateJoinChecks.Run(working, Check);
 RoomRulesChecks.Run(working, Check);
 PolishChecks.Run(working, Check);
 RateLimitChecks.Run(Check);

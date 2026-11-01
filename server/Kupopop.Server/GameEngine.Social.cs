@@ -66,7 +66,7 @@ public sealed partial class GameEngine
     {
         if (!invitations.TryGetValue(id, out var inbox)) return [];
         inbox.RemoveAll(i => i.View.ExpiresAt <= Now || !rooms.TryGetValue(i.RoomCode, out var room)
-            || room.Phase is not ("waiting" or "results") || !room.Members.ContainsKey(i.View.From.Id)
+            || !room.Members.ContainsKey(i.View.From.Id)
             || !accounts.Friends(id, i.View.From.Id));
         return inbox.Select(i => i.View).ToArray();
     }
@@ -105,7 +105,7 @@ public sealed partial class GameEngine
         RequireHost(peer, room);
         CleanInvitationInboxes();
         peers.TryGetValue(target, out var receiver);
-        if (room!.Phase is not ("waiting" or "results") || !accounts.Friends(peer.Id, target) ||
+        if (room!.Members.Count >= room.Options.MaxPlayers || !accounts.Friends(peer.Id, target) ||
             (receiver is null && !accounts.Preferences(target).BackgroundInvitations) || receiver?.RoomCode is not null)
             throw new ArgumentException("Invite a friend who is outside a room and accepts invitations.");
         if (nextInvitation.GetValueOrDefault(peer.Id) > Now) throw new ArgumentException("Wait a moment before sending another invitation.");
