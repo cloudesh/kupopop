@@ -77,20 +77,9 @@ public sealed class UiAssets : IDisposable
                 return false;
             }
             if (!paperReady) { paperReady = true; paperLog?.Write($"ui.paper_ready size={texture.Width}x{texture.Height}"); }
-            var draw = ImGui.GetWindowDrawList();
-            var material = tint ?? Vector4.One; material.W = tint.HasValue ? 0.48f : 0.68f;
-            uint color = UiTheme.C(material);
-            float tile = UiTheme.S(144);
-            // Sample the flat notebook interior, excluding rules, binding, and
-            // the radial shading on the separate small paper decoration.
-            for (float y = min.Y; y < max.Y; y += tile)
-                for (float x = min.X; x < max.X; x += tile)
-                {
-                    var end = Vector2.Min(new Vector2(x + tile, y + tile), max);
-                    var uvStart = new Vector2(0.40f, 0.44f);
-                    var uvEnd = uvStart + (end - new Vector2(x, y)) / tile * 0.18f;
-                    draw.AddImage(texture.Handle, new Vector2(x, y), end, uvStart, uvEnd, color);
-                }
+            // Use one continuous, flat interior below the game's divider.
+            // Repeating a shaded patch produced visible horizontal color bands.
+            UiStationery.PaperMaterial(texture.Handle, min, max, tint);
             return true;
         }
         catch (Exception ex) { paperUnavailable = true; paperLog?.Write("ui.paper_unavailable", ex); return false; }

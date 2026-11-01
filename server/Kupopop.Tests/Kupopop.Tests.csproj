@@ -3,4 +3,5 @@
   <ItemGroup><ProjectReference Include="../Kupopop.Server/Kupopop.Server.csproj" /></ItemGroup>
   <ItemGroup><Compile Include="../../plugin/Kupopop/CredentialVault.cs" Link="CredentialVault.cs" /></ItemGroup>
   <ItemGroup><Compile Include="../../plugin/Kupopop/PomMotion.cs" Link="PomMotion.cs" /></ItemGroup>
+  <ItemGroup><Compile Include="../../plugin/Kupopop/UiGameLayout.cs" Link="UiGameLayout.cs" /></ItemGroup>
 </Project>

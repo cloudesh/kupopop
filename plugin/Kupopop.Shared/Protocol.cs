@@ -5,9 +5,9 @@ namespace Kupopop.Shared;
 
 public static class Protocol
 {
-    public const int Version = 3;
+    public const int Version = 4;
     public const int CanvasWidth = 384;
-    public const int CanvasHeight = 288;
+    public const int CanvasHeight = 384;
     public const int AvatarSize = 64;
     public const int MaximumPlayers = 16;
     public static readonly JsonSerializerOptions Json = new(JsonSerializerDefaults.Web)
@@ -46,7 +46,8 @@ public sealed record AccountCredentials(Guid AccountId, string AccessToken, stri
 public sealed record PlayerProfile(Guid Id, string DisplayName, int AvatarSeed, byte[]? AvatarPixels = null, string? AvatarPreset = null);
 
 public sealed record RoomOptions(string Title, bool IsPublic = false, int TurnSeconds = 90,
-    int Rounds = 2, int HintSeconds = 30, int MaxPlayers = 16, string[]? WordLists = null);
+    int Rounds = 2, int HintSeconds = 30, int MaxPlayers = 16, string[]? WordLists = null,
+    int WordChoiceCount = 4, bool VoteKickEnabled = true, bool VoteSkipEnabled = true);
 
 public sealed record WordListInfo(string Id, string Name, int Count, bool DefaultEnabled, bool Complex);
 public sealed record KickVoteView(Guid Target, int Votes, int Required, bool YouVoted, DateTimeOffset ExpiresAt);

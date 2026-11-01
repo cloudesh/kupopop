@@ -1,9 +1,11 @@
-Kupo Skribbl 0.5.2 fixes canvas vote input and makes drawing rooms more compact.
+Kupo Skribbl 0.6.0 simplifies room setup and adds configurable game rules.
 
-- Read-only canvases no longer intercept clicks meant for Vote kick / Vote skip. Accepted votes produce the existing server chat announcements with the tally and remaining votes.
-- The countdown is translucent text inside the canvas at top right. Spectators see a blank canvas and selection countdown while the drawer chooses, with the choosing status in chat; the four choices remain private to the drawer.
-- Drawing rooms have a shorter header, tighter top and bottom spacing, and only a small version number in the footer. Round and hint share a compact row.
-- Chat removes the Room chat / Done mode heading, separator and thin adhesive-band line. Message backgrounds are slightly stronger while retaining the blue note tint. Done-mode privacy is still explained on the input and message icons.
+- A continuous, lighter paper texture removes repeating shaded bands.
+- Home cards have no small icons and read Join via code, Host Room and Browse Lobbies, with updated descriptions. Numbered page marks are removed and secondary pages have a clear Back to home/room action.
+- Host Room opens Basic settings for name, duration, rounds, maximum players, word lists and public/private visibility. Advanced holds hint interval, one to eight private word offers (default four), and separate vote-kick/vote-skip switches. The decorative right-hand note is removed.
+- Room rules are enforced on the server. Disabled votes cannot be bypassed by sending commands directly; the leader can still moderate through artist-row actions.
+- A guess one insertion/deletion/substitution/adjacent swap away receives private So close! feedback instead of appearing in room chat. It earns no points and reveals neither the answer nor the near-miss text to others. Ordinary and done-mode chat retain their existing behavior.
+- The game uses a true square 384 x 384 canvas. Artists, canvas and chat share their visible height; draggable column separators are removed, and hint/tool controls sit above the whole row.
 
-Protocol 3 is unchanged and compatible with 0.5.0/0.5.1. Accounts, private word banks and server-authoritative voting/scoring are unchanged. Server upgrades preserve profiles and restart active rooms.
+Protocol 4 requires both plugin and server updates; older clients must update. Existing profiles, credentials and private word banks are preserved. Restarting the server ends active rooms.
 

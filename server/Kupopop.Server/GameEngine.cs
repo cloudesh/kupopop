@@ -1,5 +1,4 @@
 using System.Security.Cryptography;
-using System.Text;
 using Kupopop.Shared;
 
 namespace Kupopop.Server;
@@ -274,7 +273,8 @@ public sealed class GameEngine(AccountStore accounts, ILogger<GameEngine> log, T
         if (room.Phase == "drawing" && !done)
         {
             if (Now >= room.Deadline) { EndTurn(room); return; }
-            if (Normalize(text) == Normalize(room.Word))
+            string guess = GuessMatching.Normalize(text), answer = GuessMatching.Normalize(room.Word);
+            if (guess == answer)
             {
                 int rank = room.Solvers.Count + 1;
                 member.Solved = true;
@@ -286,6 +286,11 @@ public sealed class GameEngine(AccountStore accounts, ILogger<GameEngine> log, T
                 log.LogInformation("Correct guess accepted. Rank={Rank}", rank);
                 if (room.Members.Values.Where(m => m.Connected && m.Id != room.Drawer).All(m => m.Solved)) EndTurn(room);
                 else BroadcastState(room);
+                return;
+            }
+            if (GuessMatching.IsNear(guess, answer))
+            {
+                peer.Send(new("chat", Chat: new(null, "Kupo Skribbl", "So close! Try again.", System: true)));
                 return;
             }
         }
@@ -317,7 +322,7 @@ public sealed class GameEngine(AccountStore accounts, ILogger<GameEngine> log, T
         room.Deadline = Now.AddSeconds(15);
         room.Revealed = 0;
         room.Word = "";
-        room.Choices = words.Choices(room.Options.WordLists, room.LastWord);
+        room.Choices = words.Choices(room.Options.WordLists, room.LastWord, room.Options.WordChoiceCount);
         room.Solvers.Clear(); room.HintOrder = [];
         room.Canvas.Clear();
         foreach (var member in room.Members.Values) member.Solved = false;
@@ -389,7 +394,8 @@ public sealed class GameEngine(AccountStore accounts, ILogger<GameEngine> log, T
             room.Phase is "intermission" or "results" ? room.Solvers.Take(3).ToArray() : null,
             room.SkipVote is { } skip ? new(skip.Target, skip.Votes.Count, skip.Required, skip.Votes.Contains(peer.Id), skip.Expires) : null,
             room.Phase == "drawing" && Now - room.CursorAt < TimeSpan.FromSeconds(2) ? room.Cursor : null,
-            !room.VoteUsed || room.Vote is not null, !room.SkipVoteUsed || room.SkipVote is not null)));
+            room.Options.VoteKickEnabled && (!room.VoteUsed || room.Vote is not null),
+            room.Options.VoteSkipEnabled && (!room.SkipVoteUsed || room.SkipVote is not null))));
     }
 
     private void BroadcastState(Room room, bool reset = false, Guid? except = null)
@@ -411,15 +417,17 @@ public sealed class GameEngine(AccountStore accounts, ILogger<GameEngine> log, T
         string title = options.Title?.Trim() ?? "";
         if (!Protocol.ValidName(title)) throw new ArgumentException("Room title must be 2–40 characters.");
         if (options.TurnSeconds is < 15 or > 300 || options.Rounds is < 1 or > 5 ||
-            options.MaxPlayers is < 2 or > 16 || options.HintSeconds is < 0 or > 300)
+            options.MaxPlayers is < 2 or > 16 || options.HintSeconds is < 0 or > 300 || options.WordChoiceCount is < 1 or > 8)
             throw new ArgumentException("Room settings are outside supported limits.");
         string[] selection = words.Selection(options.WordLists);
-        words.Choices(selection, "");
+        words.Choices(selection, "", options.WordChoiceCount);
         return options with { Title = title, WordLists = selection };
     }
 
     private void VoteKick(IGamePeer peer, Room? room, Guid turn, bool skip)
     {
+        if (room is not null && !(skip ? room.Options.VoteSkipEnabled : room.Options.VoteKickEnabled))
+            throw new ArgumentException("This room has disabled that vote option.");
         if (room?.Phase != "drawing" || turn != room.TurnId || Now >= room.Deadline ||
             room.Drawer is not { } target || target == peer.Id || !room.Members[peer.Id].Connected)
             throw new ArgumentException("You may only vote on the current drawer.");
@@ -455,11 +463,4 @@ public sealed class GameEngine(AccountStore accounts, ILogger<GameEngine> log, T
         else BroadcastState(room);
     }
 
-    private static string Normalize(string value)
-    {
-        var result = new StringBuilder();
-        foreach (char c in value.Normalize(NormalizationForm.FormD))
-            if (char.IsLetterOrDigit(c)) result.Append(char.ToUpperInvariant(c));
-        return result.ToString();
-    }
 }

@@ -43,15 +43,16 @@ public sealed class WordBank
             .Where(w => !w.Equals(previous, StringComparison.OrdinalIgnoreCase)).Distinct(StringComparer.OrdinalIgnoreCase).ToArray();
         return pool[RandomNumberGenerator.GetInt32(pool.Length)];
     }
-    public string[] Choices(string[]? selected, string previous)
+    public string[] Choices(string[]? selected, string previous, int count = 4)
     {
+        if (count is < 1 or > 8) throw new ArgumentException("Choose between one and eight word offers.");
         string[] ids = Selection(selected);
         var pool = lists.Where(l => ids.Contains(l.Id)).SelectMany(l => l.Words).Distinct(StringComparer.OrdinalIgnoreCase).ToArray();
-        if (pool.Length < 4) throw new ArgumentException("Select lists with at least four distinct words.");
+        if (pool.Length < count) throw new ArgumentException($"Select lists with at least {count} distinct words.");
         RandomNumberGenerator.Shuffle(pool.AsSpan());
         // Avoid the previous answer when there are enough alternatives.
         var alternatives = pool.Where(w => !w.Equals(previous, StringComparison.OrdinalIgnoreCase)).ToArray();
-        return (alternatives.Length >= 4 ? alternatives : pool).Take(4).ToArray();
+        return (alternatives.Length >= count ? alternatives : pool).Take(count).ToArray();
     }
     public static WordBank Starter() => new([new("starter", "FFXIV Starter", true, false, ["Moogle", "Chocobo", "Cactuar", "Spriggan"])]);
     public static WordBank Open(string directory)

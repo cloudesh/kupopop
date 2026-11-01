@@ -100,6 +100,7 @@ Check(await RejectHealthResponse("{\"service\":\"not the game\"}"), "connection 
 var accounts = new AccountStore(Path.Combine(working, "accounts"));
 FeatureChecks.Run(working, Check);
 RoundFlowChecks.Run(working, Check);
+RoomRulesChecks.Run(working, Check);
 var credentials = Enumerable.Range(0, 18).Select(i => accounts.Create("Artist " + i)).ToArray();
 string accountFile = File.ReadAllText(Path.Combine(working, "accounts", "accounts.json"));
 Check(!accountFile.Contains(credentials[0].AccessToken) && !accountFile.Contains(credentials[0].RecoveryCode), "account persistence contains credential verifiers, not bearer secrets");

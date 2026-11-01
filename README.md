@@ -3,7 +3,7 @@
 A native Dalamud drawing-and-guessing game for Final Fantasy XIV. Draw with
 friends, race to solve the word, and make a little avatar of your own.
 
-**Experimental 0.5.2 — compiled and automatically tested; in-game testing required.**
+**Experimental 0.6.0 — compiled and automatically tested; in-game testing required.**
 
 ## Try it
 
@@ -21,7 +21,7 @@ The installation ID stays `Kupopop` so existing installations update normally.
 This custom release is not an
 official Dalamud repository submission.
 
-Self-hosting/development: [Windows/Linux server packages](https://github.com/cloudesh/kupopop/releases/tag/v0.5.2)
+Self-hosting/development: [Windows/Linux server packages](https://github.com/cloudesh/kupopop/releases/tag/v0.6.0)
 and [unattended Linux deployment](server/deploy/README.md) remain available. The
 stable PC launcher is **[Start-My-Server.cmd](Start-My-Server.cmd)**; its data stays
 in `server/local/`. A development plugin can target localhost by changing
@@ -38,7 +38,8 @@ credential and server data remain intact.
 
 - Welcome/account setup with private recovery codes and protected device login.
 - Generated avatars and a skippable editor for hand-drawn profile avatars.
-- Join Room, Make Room, and opt-in Public Rooms.
+- Join via code, Host Room, and Browse Lobbies with opt-in public listings.
+- Basic/Advanced room setup with configurable word offers and separate voting switches.
 - Up to 16 players; default 90-second drawing turns and two complete rounds.
 - Pencil, palette, flood fill, and eraser; user list left, canvas center, chat right.
 - Server-owned timing, hints, solve-order scores, and drawer rewards.
@@ -55,15 +56,18 @@ server source; see [word-list hosting](server/WORD_LISTS.md).
 Both canvases have stroke undo. Portraits support transparency, seven moogle
 presets and 22 game-provided job emblems. Mute is removed; a server-authoritative
 drawer vote requires unanimity below five players or 70% of others for five or
-more, with a thirty-second ballot. Protocol 3 requires matching updated clients.
+more, with a thirty-second ballot. Protocol 4 requires matching updated clients
+and server for the square 384 x 384 canvas; existing profiles are preserved.
 
-Drawers choose privately from four words; a 15-second selection timeout is
+Drawers choose privately from one to eight words (four by default); a 15-second selection timeout is
 separate from drawing time. Random-position hints and six-second answer/top-three
 recaps pace turns. The toolkit includes shape previews and a 32-color popup.
 Live canvas cursors show the drawer's tool; chat uses compact message cards.
 Leader kicks are on artist-row right-click; Kick/Skip votes sit on the canvas.
 Dismissible update notices stay inside the plugin, with manual updates through
-Dalamud. Cursor positions and unused word choices never go in diagnostic logs.
+Dalamud. One-letter near misses receive private “So close!” feedback without
+echoing the guess to the room. Cursor positions, guesses and unused word choices
+never go in diagnostic logs.
 
 No Kupo-Points, shop,
 Lodestone verification, or Homeworld Rooms yet. The shared Kupopop profile is

@@ -28,11 +28,12 @@ characters. Total file limit is 2 MiB. At least one list must default on. Set
 complex lists to `complex: true, defaultEnabled: false`. Invalid files fail
 startup rather than silently changing the word pool. Each room's selections
 are validated; duplicates, empty selections and unknown IDs are rejected. A room
-selection must combine at least four distinct answers for four-choice turns. Untouched
+selection must contain at least as many distinct answers as the configured
+one-to-eight word offers (four by default). Untouched
 legacy three-word starter files upgrade automatically; custom files remain intact.
 
 The network catalog exposes only ID, name, count, complexity and default flag.
-It never includes word arrays or a word-download endpoint. Four candidate words
+It never includes word arrays or a word-download endpoint. The configured candidate words
 reach only the current drawer during selection. The chosen answer then reaches
 its drawer, correct guessers and normal end-of-turn reveal; players
 can collect words they encounter in play. This does not promise unlearnable words.

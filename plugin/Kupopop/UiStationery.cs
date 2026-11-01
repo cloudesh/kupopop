@@ -6,6 +6,13 @@ namespace Kupopop;
 /// <summary>Native notebook materials and little ink drawings. No raster art is generated.</summary>
 public static class UiStationery
 {
+    public static void PaperMaterial(ImTextureID texture, Vector2 min, Vector2 max, Vector4? tint = null)
+    {
+        var material = tint ?? Vector4.One; material.W = tint.HasValue ? 0.18f : 0.32f;
+        // One flat interior below the game's divider, without repeated shading.
+        ImGui.GetWindowDrawList().AddImage(texture, min, max, new Vector2(0.08f, 0.39f), new Vector2(0.94f, 0.83f), UiTheme.C(material));
+    }
+
     public static void Book(Vector2 min, Vector2 max, float titleHeight)
     {
         var draw = ImGui.GetWindowDrawList();

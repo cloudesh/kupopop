@@ -49,6 +49,8 @@ public sealed partial class MainWindow : Window, IDisposable
     private string connectionStatus = "Finding the drawing room...";
     private long sessionDeadline;
     private int seconds = 90, rounds = 2, hints = 30, capacity = 16;
+    private int wordChoiceCount = 4;
+    private bool roomAdvanced, voteKickEnabled = true, voteSkipEnabled = true;
     private long heartbeatAt, statsAt, lastSync;
     private int received, draws;
     private TimeSpan serverOffset;

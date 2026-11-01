@@ -177,7 +177,7 @@ public static class UiTheme
     {
         private ImRaii.ChildDisposable child;
         public bool Success { get; }
-        public PaperPanel(string id, Vector2 size, bool inset = false, bool compact = false, bool taped = false, Vector4? note = null, bool scrollable = true, bool plainTop = false)
+        public PaperPanel(string id, Vector2 size, bool inset = false, bool compact = false, bool taped = false, Vector4? note = null, bool scrollable = true, bool plainTop = false, bool flush = false)
         {
             using var color = ImRaii.PushColor(ImGuiCol.ChildBg, Vector4.Zero);
             using var border = ImRaii.PushColor(ImGuiCol.Border, Vector4.Zero);
@@ -188,8 +188,8 @@ public static class UiTheme
             Success = scope.Success;
             if (Success)
             {
-                var min = ImGui.GetWindowPos() + V(6, 6);
-                var max = ImGui.GetWindowPos() + ImGui.GetWindowSize() - V(6, 6);
+                var min = ImGui.GetWindowPos() + (flush ? Vector2.Zero : V(6, 6));
+                var max = ImGui.GetWindowPos() + ImGui.GetWindowSize() - (flush ? Vector2.Zero : V(6, 6));
                 var draw = ImGui.GetWindowDrawList();
                 draw.PushClipRect(ImGui.GetWindowPos() + V(1, 1), ImGui.GetWindowPos() + ImGui.GetWindowSize() - V(1, 1), false);
                 var surface = note ?? (inset ? Inset : Panel);

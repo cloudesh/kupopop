@@ -8,7 +8,8 @@ The maintained service is **https://play.kupopop.com**. Regular players connect
 automatically; they do not need these self-hosting tools. For unattended Linux
 hosting, see [the Docker Compose deployment](deploy/README.md).
 
-Version 0.5.1 uses protocol 3: update both plugin and server. Existing accounts
+Version 0.6.0 uses protocol 4: update both plugin and server for square canvases
+and configurable word offers/voting. Existing accounts
 and certificates are preserved, but a restart ends active rooms. Private word
 banks live in `data/word-lists.json`; see [WORD_LISTS.md](WORD_LISTS.md). The
 maintained service's full bank is not bundled; fresh hosts generate a starter

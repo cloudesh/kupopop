@@ -55,7 +55,8 @@ public sealed partial class MainWindow
         UiTheme.Rule();
         if (ConnectionReady) DrawNotice();
         using (var transparent = ImRaii.PushColor(ImGuiCol.ChildBg, Vector4.Zero))
-        using (var body = ImRaii.Child("page-content", new Vector2(0, Math.Max(UiTheme.S(100), ImGui.GetContentRegionAvail().Y - (IsDrawingRoom ? UiTheme.S(12) : ImGui.GetTextLineHeightWithSpacing() + UiTheme.S(2)))), false))
+        using (var body = ImRaii.Child("page-content", new Vector2(0, Math.Max(UiTheme.S(100), ImGui.GetContentRegionAvail().Y - (IsDrawingRoom ? UiTheme.S(12) : ImGui.GetTextLineHeightWithSpacing() + UiTheme.S(2)))), false,
+            IsDrawingRoom ? ImGuiWindowFlags.NoScrollbar | ImGuiWindowFlags.NoScrollWithMouse : ImGuiWindowFlags.None))
         {
             if (body.Success)
             {
@@ -250,7 +251,6 @@ public sealed partial class MainWindow
 
     private void Menu()
     {
-        UiStationery.PageMark("01 / the drawing room");
         art.Heading("Open a page. Make a little magic.");
         UiTheme.Wrapped("Join a friend, open your own room, or find some company.", UiTheme.Muted);
         UiTheme.Gap(6);
@@ -262,14 +262,13 @@ public sealed partial class MainWindow
             {
                 if (card.Success)
                 {
-                    UiAssets.Glyph(FontAwesomeIcon.Key, UiTheme.Brass);
-                    art.Heading("Join Room");
-                    UiTheme.Wrapped("Have an invitation? There is a seat waiting for you.", UiTheme.Muted);
+                    art.Heading("Join via code");
+                    UiTheme.Wrapped("Enter a code from your friend below to play.", UiTheme.Muted);
                     UiTheme.Gap(10);
                     UiTheme.Field("Room code", "##room-code", ref joinCode, 12, "Enter your room code");
                     CardActionPosition();
                     using (ImRaii.Disabled(client?.Connected != true || string.IsNullOrWhiteSpace(joinCode)))
-                        if (UiTheme.NoteButton("Take a seat", ImGui.GetContentRegionAvail().X, UiTheme.StickyYellow, primary: true)) Send(new("join", Text: joinCode));
+                        if (UiTheme.NoteButton("Join room", ImGui.GetContentRegionAvail().X, UiTheme.StickyYellow, primary: true)) Send(new("join", Text: joinCode));
                 }
             }
             ImGui.TableNextColumn();
@@ -277,16 +276,15 @@ public sealed partial class MainWindow
             {
                 if (card.Success)
                 {
-                    UiAssets.Glyph(FontAwesomeIcon.PaintBrush, UiTheme.Brass);
-                    art.Heading("Make Room");
-                    UiTheme.Wrapped("Set the pace, send an invitation, and make a little art together.", UiTheme.Muted);
+                    art.Heading("Host Room");
+                    UiTheme.Wrapped("Host your own room with default or custom rulesets", UiTheme.Muted);
                     UiTheme.Gap(10);
                     UiTheme.Caption("90 seconds  /  2 rounds");
                     UiTheme.Caption("Your room. Your rules.");
                     UiTheme.Gap(5);
                     CardActionPosition();
                     using (ImRaii.Disabled(client?.Connected != true))
-                        if (UiTheme.NoteButton("Set up a room", ImGui.GetContentRegionAvail().X, UiTheme.StickyRose)) screen = "create";
+                        if (UiTheme.NoteButton("Set up a room", ImGui.GetContentRegionAvail().X, UiTheme.StickyRose)) OpenRoomSetup();
                 }
             }
             ImGui.TableNextColumn();
@@ -294,9 +292,8 @@ public sealed partial class MainWindow
             {
                 if (card.Success)
                 {
-                    UiAssets.Glyph(FontAwesomeIcon.Users, UiTheme.Brass);
-                    art.Heading("Public Rooms");
-                    UiTheme.Wrapped("A fresh page is better with company. Find a room and say hello.", UiTheme.Muted);
+                    art.Heading("Browse Lobbies");
+                    UiTheme.Wrapped("Find publicly hosted rooms across all Data Centers", UiTheme.Muted);
                     UiTheme.Gap(10);
                     UiTheme.Caption("Browse open invitations");
                     UiTheme.Caption("Meet the other artists.");
@@ -322,46 +319,43 @@ public sealed partial class MainWindow
 
     private void CreateRoomScreen()
     {
-        UiStationery.PageMark("02 / an open invitation"); art.Heading("Make a little room");
+        if (BackButton()) return;
+        ImGui.SameLine(); art.Heading("Host Room");
         UiTheme.Gap(4);
-        if (!ImGui.BeginTable("room-setup-pages", 2, ImGuiTableFlags.NoPadOuterX)) return;
-        try
+        if (UiTheme.Tab("Basic", !roomAdvanced)) roomAdvanced = false;
+        ImGui.SameLine(); if (UiTheme.Tab("Advanced", roomAdvanced)) roomAdvanced = true;
+        UiTheme.Gap(6);
+        using var card = new UiTheme.PaperPanel("room-settings", Vector2.Zero);
+        if (!card.Success) return;
+        if (roomAdvanced)
         {
-            ImGui.TableSetupColumn("Form", ImGuiTableColumnFlags.WidthStretch, 2.3f);
-            ImGui.TableSetupColumn("Note", ImGuiTableColumnFlags.WidthStretch, 1);
-            ImGui.TableNextColumn();
-            using (var card = new UiTheme.PaperPanel("room-settings", Vector2.Zero))
-            {
-                if (card.Success)
-                {
-                    UiTheme.Field("Name your drawing room", "##room-name", ref roomTitle, 40, "A name for your little gathering");
-                    UiTheme.Gap(5);
-                    UiRoomSettings.Draw(ref seconds, ref rounds, ref hints, ref capacity);
-                    WordListSelector();
-                    UiTheme.Gap(5); UiTheme.Rule();
-                    ImGui.Checkbox("List this room in Public Rooms", ref publicRoom);
-                    UiTheme.Wrapped(publicRoom
-                        ? "Anyone on this server sees the room name and artist count. Your profile is visible after they join."
-                        : "By invitation. Share the code with your friends.", UiTheme.Muted);
-                    UiTheme.Gap(6);
-                    using (ImRaii.Disabled(client?.Connected != true || !Protocol.ValidName(roomTitle) || selectedWordLists.Count == 0))
-                        if (UiTheme.Button("Open the room", UiTheme.S(170), primary: true))
-                            Send(new("create", Options: new(roomTitle, publicRoom, Math.Clamp(seconds, 15, 300), Math.Clamp(rounds, 1, 5), Math.Clamp(hints, 0, 300), Math.Clamp(capacity, 2, 16), selectedWordLists.ToArray())));
-                    ImGui.SameLine(); if (UiTheme.Button("Back", 0, quiet: true)) screen = "menu";
-                }
-            }
-            ImGui.TableNextColumn();
-            using var note = new UiTheme.PaperPanel("room-invitation-note", new Vector2(0, UiTheme.S(275)), note: UiTheme.StickyYellow);
-            if (!note.Success) return;
-            UiStationery.PageMark("a note from Mog");
-            var spot = ImGui.GetCursorScreenPos();
-            ImGui.Dummy(UiTheme.V(70, 74));
-            UiStationery.Moogle(spot + UiTheme.V(35, 46), UiTheme.S(23));
-            UiTheme.Wrapped("Bring a friend. Leave room for a little silliness.");
-            UiTheme.Gap(5);
-            UiTheme.Wrapped("Everyone gets a turn at the page. A round ends when every artist has drawn once.", UiTheme.Muted);
+            UiRoomSettings.Advanced(ref hints, ref wordChoiceCount, ref voteKickEnabled, ref voteSkipEnabled);
         }
-        finally { ImGui.EndTable(); }
+        else
+        {
+            UiTheme.Field("Room name", "##room-name", ref roomTitle, 40, "Name your drawing room");
+            UiTheme.Gap(5);
+            UiRoomSettings.Basic(ref seconds, ref rounds, ref capacity);
+            UiTheme.Gap(5); WordListSelector(); UiTheme.Gap(8);
+            ImGui.Checkbox("Public lobby", ref publicRoom);
+            UiTheme.Wrapped(publicRoom
+                ? "Anyone can see the room name and player count. Your profile is visible after they join."
+                : "Private room. Only people with your code can join.", UiTheme.Muted);
+        }
+        UiTheme.Gap(12);
+        using (ImRaii.Disabled(client?.Connected != true || !Protocol.ValidName(roomTitle) || selectedWordLists.Count == 0))
+            if (UiTheme.Button("Host Room", UiTheme.S(170), primary: true))
+                Send(new("create", Options: new(roomTitle, publicRoom, Math.Clamp(seconds, 15, 300), Math.Clamp(rounds, 1, 5),
+                    Math.Clamp(hints, 0, 300), Math.Clamp(capacity, 2, 16), selectedWordLists.ToArray(),
+                    Math.Clamp(wordChoiceCount, 1, 8), voteKickEnabled, voteSkipEnabled)));
+    }
+
+    private void OpenRoomSetup() { roomAdvanced = false; screen = "create"; }
+
+    private bool BackButton()
+    {
+        if (!UiTheme.Button(room is null ? "< Back to home" : "< Back to room", 0, quiet: true)) return false;
+        ShowDebug = false; screen = room is null ? "menu" : "game"; return true;
     }
 
     private static void CardActionPosition()
@@ -396,7 +390,8 @@ public sealed partial class MainWindow
 
     private void PublicRooms()
     {
-        art.Heading("Public Rooms");
+        if (BackButton()) return;
+        ImGui.SameLine(); art.Heading("Browse Lobbies");
         ImGui.SameLine();
         if (UiTheme.Button("Refresh", 0, quiet: true)) Send(new("list"));
         using var panel = new UiTheme.PaperPanel("public-list", Vector2.Zero);
@@ -406,7 +401,7 @@ public sealed partial class MainWindow
             UiTheme.Gap(10); art.Mascot(56); UiTheme.Gap(6);
             art.Heading("The next room could be yours.");
             UiTheme.Wrapped("No public invitations just yet. Open a room and welcome the next artist.", UiTheme.Muted);
-            if (UiTheme.Button("Make a room", 0, primary: true)) screen = "create";
+            if (UiTheme.Button("Host Room", 0, primary: true)) OpenRoomSetup();
             return;
         }
         foreach (var listed in publicRooms)
@@ -460,19 +455,21 @@ public sealed partial class MainWindow
             }
             else UiTheme.Caption("The host will start the match when everyone is ready.");
         }
-        float width = ImGui.GetContentRegionAvail().X;
-        float height = Math.Max(UiTheme.S(120), ImGui.GetContentRegionAvail().Y);
-        if (!ImGui.BeginTable("play-layout-canvas-sheet", 3, ImGuiTableFlags.Resizable | ImGuiTableFlags.SizingFixedFit | ImGuiTableFlags.NoPadOuterX, new Vector2(0, height))) return;
-        try
-        {
-            ImGui.TableSetupColumn("Artists", ImGuiTableColumnFlags.WidthFixed, UiTheme.S(width < UiTheme.S(1050) ? 172 : 192));
-            ImGui.TableSetupColumn("The page", ImGuiTableColumnFlags.WidthStretch);
-            ImGui.TableSetupColumn("Conversation", ImGuiTableColumnFlags.WidthFixed, UiTheme.S(width < UiTheme.S(1050) ? 200 : 220));
-            ImGui.TableNextColumn(); DrawPlayers(state, height);
-            ImGui.TableNextColumn(); DrawBoard(state, height);
-            ImGui.TableNextColumn(); ChatScreen(state, height);
-        }
-        finally { ImGui.EndTable(); }
+        if (state.Phase is "drawing" or "intermission") DrawTurnHeader(state);
+        bool canDraw = client?.Connected == true && state.Phase == "drawing" && state.DrawerId == device?.AccountId;
+        if (canDraw) painting.Toolbar("game-tools", undo: () => { if (Send(new("undo", TurnId: state.TurnId))) undoPending = true; }, canUndo: canUndoDrawing && !undoPending);
+
+        var available = ImGui.GetContentRegionAvail();
+        var layout = UiGameLayout.Fit(available, UiTheme.Scale);
+        var origin = ImGui.GetCursorScreenPos() + new Vector2(layout.Inset, 0);
+        ImGui.SetCursorScreenPos(origin);
+        DrawPlayers(state, new Vector2(layout.Artists, layout.Canvas));
+        ImGui.SetCursorScreenPos(origin + new Vector2(layout.Artists + layout.Gap, 0));
+        DrawBoard(state, new Vector2(layout.Canvas + UiTheme.S(9), layout.Canvas + UiTheme.S(10)));
+        ImGui.SetCursorScreenPos(origin + new Vector2(layout.Artists + layout.Gap * 2 + layout.Canvas + UiTheme.S(9), 0));
+        ChatScreen(state, new Vector2(layout.Chat, layout.Canvas));
+        ImGui.SetCursorScreenPos(origin);
+        ImGui.Dummy(new Vector2(layout.Width, layout.Canvas + UiTheme.S(10)));
     }
 
     private void DrawTurnHeader(RoomView state)
@@ -491,9 +488,9 @@ public sealed partial class MainWindow
         finally { ImGui.EndTable(); }
     }
 
-    private void DrawPlayers(RoomView state, float height)
+    private void DrawPlayers(RoomView state, Vector2 size)
     {
-        using var panel = new UiTheme.PaperPanel("artists", new Vector2(0, height), compact: true, note: UiTheme.StickyYellow);
+        using var panel = new UiTheme.PaperPanel("artists", size, compact: true, note: UiTheme.StickyYellow, flush: true);
         if (!panel.Success) return;
         UiTheme.Caption($"ARTISTS / {state.Players.Length}");
         foreach (var player in state.Players.OrderByDescending(p => p.Score))
@@ -525,31 +522,27 @@ public sealed partial class MainWindow
         }
     }
 
-    private void DrawBoard(RoomView state, float height)
+    private void DrawBoard(RoomView state, Vector2 size)
     {
         bool canDraw = client?.Connected == true && state.Phase == "drawing" && state.DrawerId == device?.AccountId;
-        float top = ImGui.GetCursorScreenPos().Y;
-        if (state.Phase is "drawing" or "intermission") DrawTurnHeader(state);
-        if (canDraw) painting.Toolbar("game-tools", undo: () => { if (Send(new("undo", TurnId: state.TurnId))) undoPending = true; }, canUndo: canUndoDrawing && !undoPending);
-        float toolsHeight = ImGui.GetCursorScreenPos().Y - top;
-        painting.Draw("game-canvas", canvas, new Vector2(ImGui.GetContentRegionAvail().X, Math.Max(UiTheme.S(8), height - toolsHeight)), canDraw && !undoPending, operation =>
+        painting.Draw("game-canvas", canvas, size, canDraw && !undoPending, operation =>
         {
             if (Send(new("draw", Draw: operation, TurnId: state.TurnId))) { canvas.Apply(operation); draws++; canUndoDrawing = true; }
         }, canDraw ? pointer => Send(new("cursor", TurnId: state.TurnId, Cursor: pointer)) : null);
         if (state.Phase == "choosing" && state.DrawerId == device?.AccountId) DrawWordChoices(state);
         if (state.Phase is "choosing" or "drawing" or "intermission") DrawCanvasTimer(state);
         if (state.Phase == "drawing" && state.DrawerId != device?.AccountId) DrawCanvasVotes(state);
-        var size = new Vector2(MathF.Round(painting.RenderSize.X), MathF.Round(painting.RenderSize.Y));
-        if (size != lastCanvasSize && Environment.TickCount64 >= nextLayoutLog)
+        var rendered = new Vector2(MathF.Round(painting.RenderSize.X), MathF.Round(painting.RenderSize.Y));
+        if (rendered != lastCanvasSize && Environment.TickCount64 >= nextLayoutLog)
         {
-            log.Write($"ui.canvas size={size.X}x{size.Y} scale={UiTheme.Scale:F2}");
-            lastCanvasSize = size; nextLayoutLog = Environment.TickCount64 + 1000;
+            log.Write($"ui.canvas size={rendered.X}x{rendered.Y} scale={UiTheme.Scale:F2}");
+            lastCanvasSize = rendered; nextLayoutLog = Environment.TickCount64 + 1000;
         }
     }
 
-    private void ChatScreen(RoomView state, float height)
+    private void ChatScreen(RoomView state, Vector2 size)
     {
-        using var panel = new UiTheme.PaperPanel("chat-panel", new Vector2(0, height), compact: true, note: UiTheme.StickyBlue, scrollable: false, plainTop: true);
+        using var panel = new UiTheme.PaperPanel("chat-panel", size, compact: true, note: UiTheme.StickyBlue, scrollable: false, plainTop: true, flush: true);
         if (!panel.Success) return;
         using var messageBackground = ImRaii.PushColor(ImGuiCol.ChildBg, Vector4.Zero);
         using var messageBorder = ImRaii.PushColor(ImGuiCol.Border, Vector4.Zero);
@@ -605,7 +598,8 @@ public sealed partial class MainWindow
 
     private void ProfileScreen()
     {
-        UiStationery.PageMark("03 / your signature"); art.Heading("A little face. Entirely yours.");
+        if (BackButton()) return;
+        ImGui.SameLine(); art.Heading("A little face. Entirely yours.");
         UiTheme.Wrapped("Draw your own signature character, or keep the face we made for you.", UiTheme.Muted);
         UiTheme.Gap(10);
         if (!ImGui.BeginTable("profile-layout", 2)) return;
@@ -665,7 +659,8 @@ public sealed partial class MainWindow
 
     private void Preferences()
     {
-        UiStationery.PageMark("the back cover"); art.Heading("Your sketchbook");
+        if (BackButton()) return;
+        ImGui.SameLine(); art.Heading("Your sketchbook");
         UiTheme.Gap(10);
         using var card = new UiTheme.PaperPanel("sketchbook-preferences", Vector2.Zero);
         if (!card.Success) return;
