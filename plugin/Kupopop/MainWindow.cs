@@ -104,6 +104,7 @@ public sealed partial class MainWindow : Window, IDisposable
 
     public void PollNetwork()
     {
+        if (!IsOpen) return;
         while (actions.TryDequeue(out var action)) if (!disposed) action();
         int budget = 256;
         while (budget-- > 0 && client?.TryRead(out var message) == true)

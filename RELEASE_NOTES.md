@@ -1,8 +1,5 @@
-Kupo Skribbl 0.8.2 tidies up our plugin listing and welcome page.
+Kupo Skribbl 0.8.3 fixes the plugin opening automatically when the game starts.
 
-- Added our moogle mark to the plugin installer.
-- Refreshed the game description and listed both /kupopop and /kuposkribbl.
-- Made the project page easier to follow, with installation steps, download badges, and a quick guide to playing.
-- Public downloads now contain the plugin only. Players connect automatically to the shared Kupo Skribbl service.
+The window now starts closed. Open it with /kupopop or /kuposkribbl, or through the plugin installer. Background game connection polling does not start while the window remains closed.
 
-Gameplay and existing profiles are unchanged. This remains an experimental custom-repository release.
+Other room, connection-on-close, and monitoring changes are deferred to a later update.

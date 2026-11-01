@@ -24,7 +24,7 @@ public sealed class Plugin : IDalamudPlugin
         string directory = PluginInterface.GetPluginConfigDirectory();
         diagnostic = new(directory);
         diagnostic.Write($"plugin.start version={typeof(Plugin).Assembly.GetName().Version} api=15 runtime={Environment.Version}");
-        main = new(this, directory, diagnostic) { IsOpen = true };
+        main = new(this, directory, diagnostic) { IsOpen = false };
         windows.AddWindow(main);
         var openCommand = new CommandInfo((_, args) =>
         {
