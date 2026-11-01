@@ -92,6 +92,10 @@ The JSON file remains unchanged as a private pre-migration rollback copy; the
 running service reads/writes SQLite exclusively. Corrupt/unsupported data fails
 startup instead of creating replacement accounts. Back up the complete data
 folder before upgrading and verify the migration before retiring that backup.
+After migration, the JSON copy becomes stale. Restore a current SQLite backup
+with a compatible server; do not simply downgrade to a JSON-era executable.
+Such a downgrade requires converting the latest SQLite records first, otherwise
+post-migration accounts/profile changes would be absent.
 
 SQLite uses WAL, so do not copy only `accounts.db` from a running server. Create
 an online snapshot with the server executable and a new destination filename:
