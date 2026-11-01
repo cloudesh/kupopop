@@ -41,19 +41,19 @@ public sealed class WordBank
     public string[] Answers(string word, string[]? selection) => lists.Where(l => selection is not null && selection.Contains(l.Id))
         .Where(l => l.Aliases is not null && l.Aliases.ContainsKey(word)).SelectMany(l => l.Aliases![word])
         .Append(word).Select(GuessMatching.Normalize).Distinct(StringComparer.Ordinal).ToArray();
-    public string[] Selection(string[]? requested)
+    public string[] Selection(string[]? requested, bool allowEmpty = false)
     {
         var selected = requested ?? lists.Where(l => l.DefaultEnabled).Select(l => l.Id).ToArray();
-        if (selected.Length is < 1 or > 64 || selected.Any(id => !lists.Any(l => l.Id == id)) ||
+        if (selected.Length > 64 || (!allowEmpty && selected.Length == 0) || selected.Any(id => !lists.Any(l => l.Id == id)) ||
             selected.Distinct(StringComparer.Ordinal).Count() != selected.Length)
             throw new ArgumentException("Choose at least one valid word list.");
         return (string[])selected.Clone();
     }
-    public string[] Choices(string[]? selected, string previous, int count = 4)
+    public string[] Choices(string[]? selected, string previous, int count = 4, string[]? custom = null)
     {
         if (count is < 1 or > 8) throw new ArgumentException("Choose between one and eight word offers.");
-        string[] ids = Selection(selected);
-        var pool = lists.Where(l => ids.Contains(l.Id)).SelectMany(l => l.Words).Distinct(StringComparer.OrdinalIgnoreCase).ToArray();
+        string[] ids = Selection(selected, allowEmpty: custom is { Length: > 0 });
+        var pool = lists.Where(l => ids.Contains(l.Id)).SelectMany(l => l.Words).Concat(custom ?? []).Distinct(StringComparer.OrdinalIgnoreCase).ToArray();
         if (pool.Length < count) throw new ArgumentException($"Select lists with at least {count} distinct words.");
         RandomNumberGenerator.Shuffle(pool.AsSpan());
         // Avoid the previous answer when there are enough alternatives.

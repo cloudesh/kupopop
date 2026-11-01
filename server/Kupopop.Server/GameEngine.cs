@@ -20,6 +20,7 @@ public sealed partial class GameEngine(AccountStore accounts, ILogger<GameEngine
         public long MonitorId;
         public HashSet<Guid> StatsParticipants = [];
         public HashSet<Guid> DrawingLikes = [];
+        public string[] HostWords = [];
         public bool StatsRecorded;
         public string Code = code;
         public Guid Host = host;
@@ -150,8 +151,11 @@ public sealed partial class GameEngine(AccountStore accounts, ILogger<GameEngine
         lock (gate)
         {
             if (!peers.TryGetValue(peer.Id, out var active) || !ReferenceEquals(active, peer)) return;
+            if (command.Type is not { Length: > 0 and <= 40 } || command.Type.Any(c => !char.IsAsciiLetterLower(c) && c != '-'))
+            { Error(peer, "Command rejected."); return; }
             string rateKind = command.Type == "draw" && command.Draw is { } drawingOp
                 ? drawingOp.Tool == "fill" ? "fill" : DrawingTools.Shape(drawingOp.Tool) ? "shape" : "draw" : command.Type;
+            if (command.Type.StartsWith("leaderboard", StringComparison.Ordinal)) rateKind = "leaderboard";
             if (!peer.Allow(rateKind)) { Error(peer, "Slow down; message limit reached.", command.Type); return; }
             var room = FindRoom(peer);
             try
@@ -159,6 +163,12 @@ public sealed partial class GameEngine(AccountStore accounts, ILogger<GameEngine
                 switch (command.Type)
                 {
                     case "social": SendSocial(peer); break;
+                    case "suggest":
+                        if (command.Kind == "word" && !words.Catalog.Any(l => l.Category == command.Category))
+                            throw new ArgumentException("Choose a word category.");
+                        accounts.SubmitSuggestion(peer.Id, command.Kind, command.Kind == "word" ? command.Category : null, command.Text, Now);
+                        peer.Send(new("suggestion-sent"));
+                        break;
                     case "leaderboard":
                         peer.Send(new("leaderboard", Leaderboard: accounts.Leaderboard(peer.Id, command.Text ?? "best", command.Page)));
                         break;
@@ -193,10 +203,12 @@ public sealed partial class GameEngine(AccountStore accounts, ILogger<GameEngine
                     case "create":
                         if (room is not null) throw new ArgumentException("Leave your current room first.");
                         if (rooms.Count >= 100) throw new ArgumentException("Server room capacity reached.");
-                        var options = Validate(command.Options ?? new("A kupo drawing room"));
+                        var hostWords = CustomWordLists.Parse(command.CustomWords);
+                        var options = Validate(command.Options ?? new("A kupo drawing room"), hostWords);
                         string code;
                         do code = Convert.ToHexString(RandomNumberGenerator.GetBytes(4)); while (rooms.ContainsKey(code));
                         room = new(code, peer.Id, options);
+                        room.HostWords = hostWords;
                         room.MonitorId = ++nextMonitorId;
                         room.Members[peer.Id] = new(peer.Id);
                         rooms[code] = room;
@@ -265,9 +277,11 @@ public sealed partial class GameEngine(AccountStore accounts, ILogger<GameEngine
                     case "configure":
                         RequireHost(peer, room);
                         if (room!.Phase is not ("waiting" or "results")) throw new ArgumentException("Change room settings between matches.");
-                        var updated = Validate(command.Options ?? room.Options);
+                        var updatedWords = command.CustomWords is null ? room.HostWords : CustomWordLists.Parse(command.CustomWords);
+                        var updated = Validate(command.Options ?? room.Options, updatedWords);
                         if (updated.MaxPlayers < room.Members.Count) throw new ArgumentException("Capacity cannot be smaller than the current room.");
                         room.Options = updated;
+                        room.HostWords = updatedWords;
                         BroadcastState(room);
                         peer.Send(new("room-configured"));
                         break;
@@ -418,7 +432,7 @@ public sealed partial class GameEngine(AccountStore accounts, ILogger<GameEngine
             room.Results = room.MatchScores.Values.OrderByDescending(s => s.Points).ThenBy(s => s.Name, StringComparer.Ordinal).ToArray();
             if (!room.StatsRecorded && room.Position >= room.Deck.Count && room.Results.Length >= 2)
             {
-                accounts.RecordMatch(room.Results, room.StatsParticipants);
+                if (room.HostWords.Length == 0) accounts.RecordMatch(room.Results, room.StatsParticipants);
                 room.StatsRecorded = true;
             }
             SystemMessage(room, "Match finished! The host can start another match.");
@@ -433,7 +447,7 @@ public sealed partial class GameEngine(AccountStore accounts, ILogger<GameEngine
         room.Deadline = Now.AddSeconds(15);
         room.Revealed = 0;
         room.Word = "";
-        room.Choices = words.Choices(room.Options.WordLists, room.LastWord, room.Options.WordChoiceCount);
+        room.Choices = words.Choices(room.Options.WordLists, room.LastWord, room.Options.WordChoiceCount, room.HostWords);
         room.CustomWordAvailable = room.Options.CustomWordsEnabled && (customWordRoll?.Invoke() ?? RandomNumberGenerator.GetInt32(100)) < 10;
         room.Answers = [];
         room.Solvers.Clear(); room.HintOrder = [];
@@ -516,7 +530,8 @@ public sealed partial class GameEngine(AccountStore accounts, ILogger<GameEngine
             room.Options.VoteSkipEnabled && (!room.SkipVoteUsed || room.SkipVote is not null),
             room.Phase == "choosing" && room.Drawer == peer.Id && room.CustomWordAvailable,
             room.Phase == "results" ? room.Results : null,
-            room.DrawingLikes.Count, room.DrawingLikes.Contains(peer.Id))));
+            room.DrawingLikes.Count, room.DrawingLikes.Contains(peer.Id)),
+            HostWords: room.Host == peer.Id && room.Phase is "waiting" or "results" ? (string[])room.HostWords.Clone() : null));
     }
 
     private void BroadcastState(Room room, bool reset = false, Guid? except = null)
@@ -534,16 +549,16 @@ public sealed partial class GameEngine(AccountStore accounts, ILogger<GameEngine
 
     private void SystemMessage(Room room, string text) => Broadcast(room, new("chat", Chat: new(null, "Kupopop", text, System: true)));
 
-    private RoomOptions Validate(RoomOptions options)
+    private RoomOptions Validate(RoomOptions options, string[]? custom = null)
     {
         string title = options.Title?.Trim() ?? "";
         if (!Protocol.ValidName(title)) throw new ArgumentException("Room title must be 2–40 characters.");
         if (options.TurnSeconds is < 15 or > 300 || options.Rounds is < 1 or > 5 ||
             options.MaxPlayers is < 2 or > 16 || options.HintSeconds is < 0 or > 300 || options.WordChoiceCount is < 1 or > 8)
             throw new ArgumentException("Room settings are outside supported limits.");
-        string[] selection = words.Selection(options.WordLists);
-        words.Choices(selection, "", options.WordChoiceCount);
-        return options with { Title = title, WordLists = selection };
+        string[] selection = words.Selection(options.WordLists, allowEmpty: custom is { Length: > 0 });
+        words.Choices(selection, "", options.WordChoiceCount, custom);
+        return options with { Title = title, WordLists = selection, CustomWordCount = custom?.Length ?? 0 };
     }
 
     private void VoteKick(IGamePeer peer, Room? room, Guid turn, bool skip)

@@ -66,8 +66,9 @@ public static class Protocol
         if (message.WordLists is { } lists && (lists.Length > 64 || lists.Any(l => l is null ||
             !Text(l.Id, 40) || !ValidName(l.Name) || !ValidName(l.Category) || l.Count is < 2 or > 2000))) return false;
         if (!SocialValidation.Valid(message)) return false;
+        if (message.HostWords is { } hostWords && (hostWords.Length > CustomWordLists.MaximumWords || hostWords.Any(w => !CustomWordLists.ValidWord(w)))) return false;
         if (message.Room is not { } room) return true;
-        return room.Options is not null && ValidName(room.Options.Title) && Text(room.Code, 8) &&
+        return room.Options is not null && room.Options.CustomWordCount is >= 0 and <= CustomWordLists.MaximumWords && ValidName(room.Options.Title) && Text(room.Code, 8) &&
             room.Phase is "waiting" or "choosing" or "drawing" or "intermission" or "results" &&
             room.Players is { Length: >= 1 and <= MaximumPlayers } && room.Players.All(p => p is not null &&
                 ValidProfile(p.Profile) && p.Score is >= 0 and <= 1_000_000) &&
@@ -85,7 +86,7 @@ public sealed record PlayerProfile(Guid Id, string DisplayName, int AvatarSeed, 
 public sealed record RoomOptions(string Title, bool IsPublic = false, int TurnSeconds = 90,
     int Rounds = 2, int HintSeconds = 30, int MaxPlayers = 16, string[]? WordLists = null,
     int WordChoiceCount = 4, bool VoteKickEnabled = true, bool VoteSkipEnabled = true,
-    bool CustomWordsEnabled = true);
+    bool CustomWordsEnabled = true, int CustomWordCount = 0);
 
 public sealed record WordListInfo(string Id, string Name, int Count, bool DefaultEnabled, bool Complex, string Category = "FFXIV");
 public sealed record KickVoteView(Guid Target, int Votes, int Required, bool YouVoted, DateTimeOffset ExpiresAt);
@@ -109,10 +110,10 @@ public sealed record DrawOperation(string Tool, int X1, int Y1, int X2, int Y2, 
 public sealed record ClientCommand(string Type, string? Text = null, RoomOptions? Options = null,
     DrawOperation? Draw = null, Guid TurnId = default, byte[]? Avatar = null, bool ResetAvatar = false, string? AvatarPreset = null,
     BrushCursor? Cursor = null, Guid TargetId = default, bool Enabled = false, bool Shared = false, bool? BackgroundInvitations = null,
-    int Page = 0);
+    int Page = 0, string? CustomWords = null, string? Kind = null, string? Category = null);
 public sealed record ServerEvent(string Type, RoomView? Room = null, RoomSummary[]? Rooms = null,
     ChatLine? Chat = null, DrawOperation? Draw = null, Guid? ActorId = null,
     string? Error = null, PlayerProfile? Profile = null, Guid TurnId = default, string? RejectedCommand = null,
     WordListInfo[]? WordLists = null, byte[]? Canvas = null, bool CanUndo = false, BrushCursor? Cursor = null,
     SocialView? Social = null, SharedProfile? SharedProfile = null, GameInvitation? Invitation = null, bool Online = false,
-    LeaderboardView? Leaderboard = null);
+    LeaderboardView? Leaderboard = null, string[]? HostWords = null);

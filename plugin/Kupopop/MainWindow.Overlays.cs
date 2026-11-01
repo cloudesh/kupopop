@@ -132,14 +132,12 @@ public sealed partial class MainWindow
         bool showKick = state.Options.VoteKickEnabled && state.DrawerId != state.HostId, showSkip = state.Options.VoteSkipEnabled;
         string kick = state.KickVote is { } k ? $"Kick {k.Votes}/{k.Required}" : "Vote kick";
         string skip = state.SkipVote is { } s ? $"Skip {s.Votes}/{s.Required}" : "Vote skip";
-        float width = UiTheme.S(66) + (showKick ? ImGui.CalcTextSize(kick).X + UiTheme.S(16) : 0) +
+        float width = UiTheme.S(34) + (showKick ? ImGui.CalcTextSize(kick).X + UiTheme.S(16) : 0) +
             (showSkip ? ImGui.CalcTextSize(skip).X + UiTheme.S(16) : 0) + (showKick && showSkip ? UiTheme.S(6) : 0);
         ImGui.SetCursorScreenPos(painting.RenderOrigin + new Vector2(Math.Max(UiTheme.S(4), painting.RenderSize.X - width - UiTheme.S(4)), painting.RenderSize.Y - UiTheme.S(32)));
         using (ImRaii.Disabled(state.YouLikedDrawing))
             if (ToolAction(FontAwesomeIcon.ThumbsUp, "Good drawing! One like per drawing; does not change match scores.", state.YouLikedDrawing))
                 Send(new("like-drawing", TurnId: state.TurnId));
-        ImGui.SameLine(0, UiTheme.S(4));
-        ImGui.TextColored(UiTheme.CanvasInk, state.DrawingLikes.ToString());
         if (showKick || showSkip) ImGui.SameLine();
         if (showKick)
         {

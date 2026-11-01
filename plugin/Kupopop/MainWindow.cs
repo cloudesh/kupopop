@@ -53,6 +53,7 @@ public sealed partial class MainWindow : Window, IDisposable
     private int seconds = 90, rounds = 2, hints = 30, capacity = 16;
     private int wordChoiceCount = 6;
     private int roomSetupPage;
+    private string customWordsText = "", roomCustomWords = "";
     private bool voteKickEnabled = true, voteSkipEnabled = true, customWordsEnabled = true;
     private readonly HashSet<string> collapsedWordCategories = [];
     private string customWordInput = "";
@@ -93,6 +94,8 @@ public sealed partial class MainWindow : Window, IDisposable
         chat.Clear(); publicRooms = [];
         social = null; sharedProfile = null; showSharedProfile = false;
         leaderboard = null;
+        customWordsText = roomCustomWords = "";
+        suggestionText = "";
         serviceAvailable = sessionReady = busy = savingProfile = savingRoomSettings = false;
         painting.RemoteCursor = null;
         undoPending = canUndoDrawing = false;

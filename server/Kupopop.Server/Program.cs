@@ -19,6 +19,12 @@ if (args.Contains("--monitor") || args.Contains("--status"))
     await ServerMonitor.WatchAsync(monitorPath, once: args.Contains("--status"));
     return;
 }
+if (args.Contains("--suggestions"))
+{
+    using var store = new AccountStore(data);
+    Console.WriteLine(JsonSerializer.Serialize(store.ReadSuggestions(), Protocol.Json));
+    return;
+}
 if (args.Contains("--database-check") || args.Contains("--backup-database"))
 {
     using var store = new AccountStore(data);

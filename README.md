@@ -34,10 +34,11 @@ This is an experimental plugin distributed through a custom repository. It is no
 ## Make it your own
 
 - Choose from FFXIV, everyday things, internet memes, and video games.
-- Set your room's timer, rounds, and word lists.
+- Set your room's timer, rounds, and word lists, or add comma-separated custom words for an unranked room game.
 - Draw your own profile picture or choose a moogle face.
 - Use pencils, shapes, fill, a colour palette, and undo to rescue your masterpiece.
 - Pick light or dark paper to suit your setup.
+- Use Suggestions on the home page to share feedback or suggest a drawable word for review.
 - Give a good drawing a thumbs-up: one like per drawing, with no change to match points.
 - Compare best game scores, overall points, games played and drawing likes in Leaderboards.
 - Add artists as friends, accept requests, and invite online friends to your room.

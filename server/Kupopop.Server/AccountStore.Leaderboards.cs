@@ -7,7 +7,7 @@ public sealed partial class AccountStore
     private void InitializeLeaderboards()
     {
         using var version = Command("PRAGMA user_version");
-        if (Convert.ToInt32(version.ExecuteScalar()) == SchemaVersion) return;
+        if (Convert.ToInt32(version.ExecuteScalar()) >= 5) return;
         using var transaction = database.BeginTransaction();
         Execute("""
             CREATE TABLE IF NOT EXISTS leaderboard_preferences (id TEXT PRIMARY KEY, named INTEGER NOT NULL DEFAULT 0,

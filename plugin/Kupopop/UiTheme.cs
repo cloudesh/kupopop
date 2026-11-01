@@ -14,21 +14,21 @@ public static class UiTheme
     public static Vector4 Panel => Hex(DarkMode ? 0x2B303B : 0xFBF6E8);
     public static Vector4 Inset => Hex(DarkMode ? 0x39414F : 0xDED0B4);
     public static Vector4 Cover => Hex(DarkMode ? 0x414858 : 0xB89A91);
-    public static Vector4 Tape => Hex(DarkMode ? 0x8E744B : 0xE3C990);
-    public static Vector4 StickyYellow => Hex(DarkMode ? 0x3A3540 : 0xF5E7AD);
+    public static Vector4 Tape => Hex(DarkMode ? 0x7C7371 : 0xE3C990);
+    public static Vector4 StickyYellow => Hex(DarkMode ? 0x34333B : 0xF5E7AD);
     public static Vector4 StickyRose => Hex(DarkMode ? 0x453441 : 0xEECFD3);
-    public static Vector4 StickySage => Hex(DarkMode ? 0x30423B : 0xDCE7C9);
+    public static Vector4 StickySage => Hex(DarkMode ? 0x323A3B : 0xDCE7C9);
     public static Vector4 StickyBlue => Hex(DarkMode ? 0x303844 : 0xD7E6EC);
     public static Vector4 InvitationPaper => Hex(DarkMode ? 0x513949 : 0xF3CCD9);
     public static Vector4 Ink => Hex(DarkMode ? 0xF2EEE7 : 0x372E39);
     public static Vector4 Muted => Hex(DarkMode ? 0xB9C1CF : 0x70626B);
     public static Vector4 Line => Hex(DarkMode ? 0x556171 : 0xCFBEA1);
-    public static Vector4 Brass => Hex(DarkMode ? 0xDFC794 : 0x876339);
+    public static Vector4 Brass => Hex(DarkMode ? 0xBEB5A8 : 0x876339);
     public static Vector4 Rose => Hex(DarkMode ? 0xEDADC4 : 0x824459);
     public static Vector4 RoseHover => Hex(DarkMode ? 0xF5C5D7 : 0x9B536B);
     public static Vector4 RoseTint => Hex(DarkMode ? 0x503A4B : 0xEAD6D8);
-    public static Vector4 Green => Hex(DarkMode ? 0x9BD9C3 : 0x3C6D61);
-    public static Vector4 GreenTint => Hex(DarkMode ? 0x2E483C : 0xDDE8DE);
+    public static Vector4 Green => Hex(DarkMode ? 0xA7C7BD : 0x3C6D61);
+    public static Vector4 GreenTint => Hex(DarkMode ? 0x343F40 : 0xDDE8DE);
     public static readonly Vector4 White = Hex(0xFFF9F1);
     public static readonly Vector4 CanvasInk = Hex(0x372E39);
     public static readonly Vector4 CanvasAccent = Hex(0x824459);
@@ -185,6 +185,37 @@ public static class UiTheme
         using var text = ImRaii.PushColor(ImGuiCol.Text, selected ? Rose : Muted);
         bool clicked = ImGui.Button(label, new Vector2(ImGui.CalcTextSize(label).X + (padding ?? S(26)), S(30)));
         if (selected) ImGui.GetWindowDrawList().AddRect(ImGui.GetItemRectMin(), ImGui.GetItemRectMax(), C(UiPresentation.Alpha(Line, 0.55f)), S(5));
+        return clicked;
+    }
+
+    public static bool BackButton(string label)
+    {
+        var min = ImGui.GetCursorScreenPos();
+        var size = new Vector2(ImGui.CalcTextSize(label).X + S(36), S(28));
+        bool clicked = ImGui.InvisibleButton(label, size);
+        var draw = ImGui.GetWindowDrawList();
+        draw.AddRectFilled(min, min + size, C(ImGui.IsItemHovered() ? RoseTint : UiPresentation.Alpha(Inset, 0.55f)), S(14));
+        var arrow = min + V(12, 14);
+        draw.AddLine(arrow + V(7, 0), arrow, C(Ink), S(1.5f));
+        draw.AddLine(arrow, arrow + V(4, -4), C(Ink), S(1.5f));
+        draw.AddLine(arrow, arrow + V(4, 4), C(Ink), S(1.5f));
+        draw.AddText(min + new Vector2(S(26), (size.Y - ImGui.GetTextLineHeight()) / 2), C(Ink), label);
+        return clicked;
+    }
+
+    public static bool CategoryHeader(string label, string detail, bool expanded)
+    {
+        var min = ImGui.GetCursorScreenPos();
+        var size = new Vector2(ImGui.GetContentRegionAvail().X, S(34));
+        bool clicked = ImGui.InvisibleButton("category-header", size);
+        var draw = ImGui.GetWindowDrawList();
+        draw.AddRectFilled(min, min + size, C(ImGui.IsItemHovered() ? RoseTint : UiPresentation.Alpha(Inset, 0.55f)), S(5));
+        draw.AddText(min + V(10, 8), C(Ink), label);
+        draw.AddText(min + new Vector2(Math.Max(S(110), size.X - ImGui.CalcTextSize(detail).X - S(40)), S(8)), C(Muted), detail);
+        var toggle = min + new Vector2(size.X - S(17), S(17));
+        draw.AddCircleFilled(toggle, S(9), C(Panel));
+        draw.AddLine(toggle - V(4, 0), toggle + V(4, 0), C(Ink), S(1.5f));
+        if (!expanded) draw.AddLine(toggle - V(0, 4), toggle + V(0, 4), C(Ink), S(1.5f));
         return clicked;
     }
 

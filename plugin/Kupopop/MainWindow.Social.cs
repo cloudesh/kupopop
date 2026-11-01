@@ -16,8 +16,10 @@ public sealed partial class MainWindow
 
     private bool HandleSocialEvent(ServerEvent message)
     {
+        if (message.HostWords is { } hostWords) roomCustomWords = string.Join(", ", hostWords);
         switch (message.Type)
         {
+            case "suggestion-sent": suggestionText = ""; NotifyStatus("Thank you! Your suggestion was sent."); return true;
             case "social":
                 social = message.Social;
                 if (social is not null && plugin.Config.BackgroundInvitations != social.Preferences.BackgroundInvitations)

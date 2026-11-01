@@ -38,18 +38,12 @@ public sealed class CanvasWidget : IDisposable
             foreach (string tool in new[] { "pencil", "fill", "eraser" })
             {
                 if (tool != "pencil") ImGui.SameLine();
-                using var background = ImRaii.PushColor(ImGuiCol.Button, Tool == tool ? UiTheme.RoseTint : UiTheme.Inset);
-                using var text = ImRaii.PushColor(ImGuiCol.Text, Tool == tool ? UiTheme.Rose : UiTheme.Ink);
-                var icon = tool == "pencil" ? FontAwesomeIcon.PencilAlt : tool == "fill" ? FontAwesomeIcon.FillDrip : FontAwesomeIcon.Eraser;
-                using (Plugin.PluginInterface.UiBuilder.IconFontFixedWidthHandle.Push())
-                    if (UiTheme.GlyphButton(tool, icon.ToIconString(), UiTheme.V(28, 28))) Tool = tool;
+                if (UiToolArt.Button(tool, Tool == tool)) Tool = tool;
                 if (ImGui.IsItemHovered() || ImGui.IsItemFocused())
                     UiTheme.Tooltip(tool == "pencil" ? "Pencil" : tool == "fill" ? "Fill bucket" : transparency ? "Erase to transparent" : "Eraser");
             }
             ImGui.SameLine();
-            using (Plugin.PluginInterface.UiBuilder.IconFontFixedWidthHandle.Push())
-            using (ImRaii.PushColor(ImGuiCol.Button, DrawingTools.Shape(Tool) ? UiTheme.RoseTint : UiTheme.Inset))
-                if (UiTheme.GlyphButton("shapes", FontAwesomeIcon.Circle.ToIconString(), UiTheme.V(28, 28))) ImGui.OpenPopup("shape-menu");
+            if (UiToolArt.Button("shapes", DrawingTools.Shape(Tool))) ImGui.OpenPopup("shape-menu");
             if (ImGui.IsItemHovered()) UiTheme.Tooltip("Shapes");
             if (ImGui.BeginPopup("shape-menu"))
             {

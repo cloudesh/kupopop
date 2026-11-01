@@ -56,6 +56,7 @@ public sealed partial class MainWindow
                 else if (screen == "profile") ProfileScreen();
                 else if (screen == "friends") FriendsScreen();
                 else if (screen == "leaderboards") LeaderboardsScreen();
+                else if (screen == "suggestions") SuggestionsScreen();
                 else if (screen == "game" && room is not null) Game();
                 else if (screen == "public") PublicRooms();
                 else if (screen == "create") CreateRoomScreen();
@@ -281,6 +282,10 @@ public sealed partial class MainWindow
             ImGui.EndGroup();
         }
         else UiTheme.Wrapped("Your profile will appear here when it has loaded.", UiTheme.Muted);
+        ImGui.SameLine();
+        float suggestionWidth = ImGui.CalcTextSize("Suggestions").X + UiTheme.S(36);
+        ImGui.SetCursorPosX(Math.Max(ImGui.GetCursorPosX(), ImGui.GetWindowContentRegionMax().X - suggestionWidth));
+        if (UiTheme.Button("Suggestions", suggestionWidth, quiet: true)) { ShowDebug = false; screen = "suggestions"; }
     }
 
     private void CreateRoomScreen()
@@ -293,6 +298,7 @@ public sealed partial class MainWindow
         if (UiTheme.PanelTab("Basic", roomSetupPage == 0)) roomSetupPage = 0;
         ImGui.SameLine(0, UiTheme.S(3)); if (UiTheme.PanelTab("Advanced", roomSetupPage == 1)) roomSetupPage = 1;
         ImGui.SameLine(0, UiTheme.S(3)); if (UiTheme.PanelTab("Word Lists", roomSetupPage == 2)) roomSetupPage = 2;
+        ImGui.SameLine(0, UiTheme.S(3)); if (UiTheme.PanelTab("Custom Words", roomSetupPage == 3)) roomSetupPage = 3;
         ImGui.SetCursorScreenPos(tabs + new Vector2(0, tabHeight));
         using var card = new UiTheme.PaperPanel("room-settings", Vector2.Zero, scrollable: false, flush: true, attachedTabs: true);
         if (!card.Success) return;
@@ -303,6 +309,7 @@ public sealed partial class MainWindow
             {
                 if (roomSetupPage == 1) UiRoomSettings.Advanced(ref hints, ref wordChoiceCount, ref voteKickEnabled, ref voteSkipEnabled, ref customWordsEnabled);
                 else if (roomSetupPage == 2) WordListPage();
+                else if (roomSetupPage == 3) CustomWordsPage();
                 else
                 {
                     UiTheme.Field("Room name", "##room-name", ref roomTitle, 40, "Name your drawing room");
@@ -318,18 +325,19 @@ public sealed partial class MainWindow
             }
         }
         UiTheme.Gap(4);
-        using (ImRaii.Disabled(savingRoomSettings || client?.Connected != true || !Protocol.ValidName(roomTitle) || selectedWordLists.Count == 0))
+        bool validCustom = TryCustomWords(out int customCount);
+        using (ImRaii.Disabled(savingRoomSettings || client?.Connected != true || !Protocol.ValidName(roomTitle) || !validCustom || selectedWordLists.Count == 0 && customCount < wordChoiceCount))
             if (UiTheme.Button(editing ? "Save settings" : "Host Room", UiTheme.S(170), primary: true))
             {
                 bool sent = Send(new(editing ? "configure" : "create", Options: new(roomTitle, publicRoom, Math.Clamp(seconds, 15, 300), Math.Clamp(rounds, 1, 5),
                     Math.Clamp(hints, 0, 300), Math.Clamp(capacity, 2, 16), selectedWordLists.ToArray(),
-                    Math.Clamp(wordChoiceCount, 1, 8), voteKickEnabled, voteSkipEnabled, customWordsEnabled)));
+                    Math.Clamp(wordChoiceCount, 1, 8), voteKickEnabled, voteSkipEnabled, customWordsEnabled), CustomWords: customWordsText));
                 savingRoomSettings = editing && sent;
             }
         ImGui.SameLine(); ImGui.AlignTextToFramePadding(); UiTheme.Caption($"{selectedWordLists.Count} word lists selected");
     }
 
-    private void OpenRoomSetup(bool publicByDefault = false) { roomSetupPage = 0; publicRoom = publicByDefault; screen = "create"; }
+    private void OpenRoomSetup(bool publicByDefault = false) { roomSetupPage = 0; customWordsText = ""; publicRoom = publicByDefault; screen = "create"; }
 
     private bool PageHeading(string title, bool refresh = false)
     {
@@ -338,7 +346,7 @@ public sealed partial class MainWindow
         {
             try
             {
-                float actions = ImGui.CalcTextSize(room is null ? "< Back to home" : "< Back to room").X + UiTheme.S(20);
+                float actions = ImGui.CalcTextSize(room is null ? "Back to home" : "Back to room").X + UiTheme.S(36);
                 if (refresh) actions += ImGui.CalcTextSize("Refresh").X + UiTheme.S(24);
                 ImGui.TableSetupColumn("Title", ImGuiTableColumnFlags.WidthStretch);
                 ImGui.TableSetupColumn("Actions", ImGuiTableColumnFlags.WidthFixed, actions);
@@ -357,7 +365,7 @@ public sealed partial class MainWindow
 
     private bool BackButton()
     {
-        if (!UiTheme.Button(room is null ? "< Back to home" : "< Back to room", 0, quiet: true)) return false;
+        if (!UiTheme.BackButton(room is null ? "Back to home" : "Back to room")) return false;
         ShowDebug = false; screen = room is null ? "menu" : "game"; return true;
     }
 
@@ -369,6 +377,7 @@ public sealed partial class MainWindow
         rounds = options.Rounds; hints = options.HintSeconds; capacity = options.MaxPlayers;
         wordChoiceCount = options.WordChoiceCount; voteKickEnabled = options.VoteKickEnabled;
         voteSkipEnabled = options.VoteSkipEnabled; customWordsEnabled = options.CustomWordsEnabled;
+        customWordsText = roomCustomWords;
         selectedWordLists.Clear();
         foreach (var id in options.WordLists ?? []) selectedWordLists.Add(id);
         wordListsChosen = true; roomSetupPage = 0; screen = "create";
@@ -409,7 +418,7 @@ public sealed partial class MainWindow
             if (ImGui.IsItemHovered()) UiTheme.Tooltip("Include or exclude this category. Enabling it selects its normal lists; advanced lists stay optional.");
             ImGui.SameLine();
             bool collapsed = collapsedWordCategories.Contains(group.Key);
-            if (UiTheme.Button($"{(collapsed ? ">" : "v")} {group.Key}   {selected}/{members.Length} lists · {members.Sum(l => l.Count):N0} words", 0, quiet: true))
+            if (UiTheme.CategoryHeader(group.Key, $"{selected}/{members.Length} lists · {members.Sum(l => l.Count):N0} words", !collapsed))
             { if (collapsed) collapsedWordCategories.Remove(group.Key); else collapsedWordCategories.Add(group.Key); }
             if (collapsed) continue;
             int columns = ImGui.GetContentRegionAvail().X >= UiTheme.S(760) ? 3 : 2;
@@ -683,7 +692,7 @@ public sealed partial class MainWindow
             ImGui.TableNextColumn();
             using var card = new UiTheme.PaperPanel("profile-details", Vector2.Zero, note: UiTheme.StickyRose);
             if (!card.Success) return;
-            float backWidth = ImGui.CalcTextSize(room is null ? "< Back to home" : "< Back to room").X + UiTheme.S(16);
+            float backWidth = ImGui.CalcTextSize(room is null ? "Back to home" : "Back to room").X + UiTheme.S(16);
             ImGui.SetCursorPosX(ImGui.GetCursorPosX() + Math.Max(0, ImGui.GetContentRegionAvail().X - backWidth));
             if (BackButton()) return;
             UiTheme.Gap(4);

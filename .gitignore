@@ -37,3 +37,6 @@ server/deploy/
 
 Monitor-Kupo-Skribbl.cmd
 Monitor-Kupo-Skribbl.ps1
+
+View-Kupo-Suggestions.cmd
+View-Kupo-Suggestions.ps1

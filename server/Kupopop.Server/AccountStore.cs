@@ -12,7 +12,7 @@ public sealed record StoredAccount(PlayerProfile Profile, string AccessHash, str
 /// <summary>Transactional accounts and opted-in statistics. Live room state remains ephemeral.</summary>
 public sealed partial class AccountStore : IDisposable
 {
-    private const int SchemaVersion = 5;
+    private const int SchemaVersion = 6;
     private const int MaximumAccounts = 10_000;
     private const string ProfileColumns = "id, display_name, avatar_seed, avatar_pixels, avatar_preset";
     private readonly object gate = new();
@@ -39,6 +39,7 @@ public sealed partial class AccountStore : IDisposable
             InitializeSocial();
             InitializeInvitationPreferences();
             InitializeLeaderboards();
+            InitializeSuggestions();
             VerifyIntegrity();
         }
         catch { database.Dispose(); throw; }
@@ -191,7 +192,7 @@ public sealed partial class AccountStore : IDisposable
     {
         using var versionQuery = Command("PRAGMA user_version");
         int version = Convert.ToInt32(versionQuery.ExecuteScalar());
-        if (version is 2 or 3 or 4 or SchemaVersion) return;
+        if (version is 2 or 3 or 4 or 5 or SchemaVersion) return;
         if (version == 1)
         {
             // SQLite counts Unicode scalars; .NET string limits count UTF-16

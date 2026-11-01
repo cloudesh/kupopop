@@ -10,7 +10,7 @@ public sealed partial class GameEngine
         // Kept for the entire turn, including disconnect/rejoin. Never trust a
         // client count or store which player liked a drawing in the database.
         if (room.DrawingLikes.Contains(peer.Id)) return;
-        accounts.RecordDrawingLike(drawer);
+        if (room.HostWords.Length == 0) accounts.RecordDrawingLike(drawer);
         room.DrawingLikes.Add(peer.Id);
         BroadcastState(room);
     }

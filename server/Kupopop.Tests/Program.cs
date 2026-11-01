@@ -106,6 +106,7 @@ RateLimitChecks.Run(Check);
 StorageChecks.Run(working, Check);
 SocialChecks.Run(working, Check);
 LeaderboardChecks.Run(working, Check);
+ReleasePolishChecks.Run(working, Check);
 var credentials = Enumerable.Range(0, 18).Select(i => accounts.Create("Artist " + i)).ToArray();
 string accountFile = ReadShared(Path.Combine(working, "accounts", "accounts.db")) +
     ReadShared(Path.Combine(working, "accounts", "accounts.db-wal"));
