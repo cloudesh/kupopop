@@ -3,8 +3,8 @@
     "Author": "cloudesh",
     "Name": "Kupo Skribbl",
     "InternalName": "Kupopop",
-    "AssemblyVersion": "0.13.0.0",
-    "Description": "Kupo Skribbl is a drawing and guessing pictionary game. Each player takes turns to draw their chosen word and others have to guess it to gain points! The person with the most points is the winner!\r\n\r\nOpen with /kupopop or /kuposkribbl.",
+    "AssemblyVersion": "0.14.0.0",
+    "Description": "Kupo Skribbl is a drawing and guessing pictionary game. Each player takes turns to draw their chosen word and others have to guess it to gain points! The person with the most points is the winner!\r\n\r\nOpen with /kupo, /kupopop or /kuposkribbl.",
     "ApplicableVersion": "any",
     "RepoUrl": "https://github.com/cloudesh/kupopop",
     "Tags": [
@@ -18,14 +18,14 @@
     "LoadSync": false,
     "CanUnloadAsync": false,
     "LoadPriority": 0,
-    "IconUrl": "https://raw.githubusercontent.com/cloudesh/kupopop/main/plugin/images/icon.png?v=0.13.0.0",
+    "IconUrl": "https://raw.githubusercontent.com/cloudesh/kupopop/main/plugin/images/icon.png?v=0.14.0.0",
     "Punchline": "A drawing and guessing party game, right inside FFXIV.",
     "AcceptsFeedback": true,
-    "DownloadLinkInstall": "https://github.com/cloudesh/kupopop/releases/download/v0.13.0/testing.zip",
-    "DownloadLinkUpdate": "https://github.com/cloudesh/kupopop/releases/download/v0.13.0/testing.zip",
-    "DownloadLinkTesting": "https://github.com/cloudesh/kupopop/releases/download/v0.13.0/testing.zip",
+    "DownloadLinkInstall": "https://github.com/cloudesh/kupopop/releases/download/v0.14.0/testing.zip",
+    "DownloadLinkUpdate": "https://github.com/cloudesh/kupopop/releases/download/v0.14.0/testing.zip",
+    "DownloadLinkTesting": "https://github.com/cloudesh/kupopop/releases/download/v0.14.0/testing.zip",
     "IsHide": false,
     "IsTestingExclusive": false,
-    "LastUpdate": 1793569876
+    "LastUpdate": 1793571076
   }
 ]
