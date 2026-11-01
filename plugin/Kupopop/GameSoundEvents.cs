@@ -20,15 +20,19 @@ internal static class GameSoundEvents
         if (before.Phase == "choosing" && after.Phase == "drawing") return ["next_turn"];
         if (before.Phase != "drawing") return [];
         bool solved = after.Players.Any(p => p.Profile.Id == player && p.Solved);
-        bool justSolved = !before.YouAreDone && solved && before.DrawerId != player;
+        // Solved flags are public room state. Compare known members, never chat text,
+        // so everyone hears accepted guesses without exposing or parsing answers.
+        int newSolvers = after.Players.Count(p => p.Solved &&
+            before.Players.Any(previous => previous.Profile.Id == p.Profile.Id && !previous.Solved));
+        var cues = Enumerable.Repeat("correct_guess", newSolvers).ToList();
         if (after.Phase == "intermission")
         {
             if ((after.FirstGuessers ?? []).Take(3).Any(p => p.PlayerId == player))
-                return justSolved ? ["correct_guess", "top_3"] : ["top_3"];
-            if (!solved && !before.YouAreDone && before.DrawerId != player && after.ServerTime >= before.Deadline)
-                return ["no_guesses"];
+                cues.Add("top_3");
+            else if (!solved && !before.YouAreDone && before.DrawerId != player && after.ServerTime >= before.Deadline)
+                cues.Add("no_guesses");
         }
-        return justSolved && after.Phase is "drawing" or "intermission" ? ["correct_guess"] : [];
+        return after.Phase is "drawing" or "intermission" ? cues.ToArray() : [];
     }
 }
 

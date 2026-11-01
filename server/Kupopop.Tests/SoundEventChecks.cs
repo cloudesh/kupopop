@@ -29,6 +29,16 @@ internal static class SoundEventChecks
         check(Cues(drawing, solved with { Code = "OTHER" }).Length == 0 &&
             Cues(drawing, solved with { TurnId = Guid.NewGuid() }).Length == 0, "room and turn changes do not invent correct guesses");
         check(Cues(choosing, drawing with { Players = [] }).Length == 0, "spectator without membership receives no game cues");
+        var other = new PlayerView(new(Guid.NewGuid(), "Other artist", 2), 0, true, false, false, false);
+        var withOther = drawing with { Players = [players[0], other] };
+        var otherSolved = withOther with { Players = [players[0], other with { Solved = true }] };
+        check(Cues(withOther, otherSolved).SequenceEqual(["correct_guess"]), "everyone hears another member's confirmed correct guess");
+        check(Cues(withOther with { DrawerId = me }, otherSolved with { DrawerId = me }).SequenceEqual(["correct_guess"]), "drawer also hears accepted guesses");
+        check(Cues(withOther with { Players = [solved.Players[0], other], YouAreDone = true },
+            otherSolved with { Players = [solved.Players[0], otherSolved.Players[1]], YouAreDone = true }).SequenceEqual(["correct_guess"]),
+            "already-solved players hear later correct guesses");
+        check(Cues(otherSolved, otherSolved).Length == 0 && Cues(drawing, otherSolved).Length == 0,
+            "repeated states and newly seen solved members do not replay correct-guess sounds");
         var countdown = new DrawingCountdown();
         check(!countdown.Update(drawing, drawing.Deadline.AddSeconds(-11)), "clock stays quiet above ten seconds");
         check(countdown.Update(drawing, drawing.Deadline.AddSeconds(-10)) &&
