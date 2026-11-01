@@ -21,12 +21,14 @@ public sealed partial class MainWindow
     {
         var display = ImGui.GetIO().DisplaySize;
         Flags = ImGuiWindowFlags.NoScrollbar | ImGuiWindowFlags.NoScrollWithMouse;
+        if (!ShowDebug) Flags |= ImGuiWindowFlags.NoTitleBar | ImGuiWindowFlags.NoBackground;
         ForceMainWindow = true;
-        AllowBackgroundBlur = true;
-        AllowClickthrough = true;
-        DisableFadeInFadeOut = false;
+        AllowBackgroundBlur = ShowDebug;
+        AllowClickthrough = ShowDebug;
+        DisableFadeInFadeOut = !ShowDebug;
         // Native movement owns the entire window tree and viewport. Never fight
-        // it with a second, per-frame SetNextWindowPos controller.
+        // it with custom drag zones or a per-frame position controller. Hiding
+        // the title bar leaves ImGui's normal empty-space dragging intact.
         Position = null;
         // Supply the native callback directly: WindowSystem's optional bounds
         // would otherwise replace it after PreDraw. Scale exactly once here.
@@ -38,7 +40,7 @@ public sealed partial class MainWindow
     {
         var position = ImGui.GetWindowPos();
         pom.Step(position.X + position.Y * 0.35f, ImGui.GetIO().DeltaTime, !plugin.Config.ReduceMotion);
-        UiStationery.Book(position, position + ImGui.GetWindowSize(), ImGui.GetFrameHeight());
+        UiStationery.Book(position, position + ImGui.GetWindowSize(), ShowDebug ? ImGui.GetFrameHeight() : 0);
         DrawHeader();
         UiTheme.Rule();
         using (var transparent = ImRaii.PushColor(ImGuiCol.ChildBg, Vector4.Zero))
@@ -72,7 +74,7 @@ public sealed partial class MainWindow
             ImGui.TableSetupColumn("Brand", ImGuiTableColumnFlags.WidthFixed, UiTheme.S(215));
             ImGui.TableSetupColumn("Navigation", ImGuiTableColumnFlags.WidthStretch);
             ImGui.TableSetupColumn("Service status", ImGuiTableColumnFlags.WidthFixed, UiTheme.S(114));
-            ImGui.TableSetupColumn("Paper controls", ImGuiTableColumnFlags.WidthFixed, UiTheme.S(32));
+            ImGui.TableSetupColumn("Paper controls", ImGuiTableColumnFlags.WidthFixed, UiTheme.S(ShowDebug ? 32 : 100));
             ImGui.TableNextColumn();
             var face = ImGui.GetCursorScreenPos();
             ImGui.Dummy(UiTheme.V(211, 34));
@@ -97,6 +99,14 @@ public sealed partial class MainWindow
             if (ToolAction(plugin.Config.DarkMode ? FontAwesomeIcon.Sun : FontAwesomeIcon.Moon,
                 plugin.Config.DarkMode ? "Use light paper" : "Use dark paper"))
             { plugin.Config.DarkMode = !plugin.Config.DarkMode; plugin.Save(); }
+            if (!ShowDebug)
+            {
+                ImGui.SameLine();
+                if (ToolAction(FontAwesomeIcon.Thumbtack, IsPinned ? "Unpin book" : "Pin book", IsPinned)) IsPinned = !IsPinned;
+                ImGui.SameLine();
+                if (ToolAction(FontAwesomeIcon.Times, "Close book"))
+                { IsOpen = false; SynchronizeVisibility(); }
+            }
         }
         finally { ImGui.EndTable(); }
     }
@@ -720,7 +730,7 @@ public sealed partial class MainWindow
         if (ImGui.Checkbox("Dark paper", ref darkMode)) { plugin.Config.DarkMode = darkMode; plugin.Save(); }
         if (ImGui.Checkbox("Reduce decorative motion", ref reduceMotion)) { plugin.Config.ReduceMotion = reduceMotion; plugin.Save(); }
         UiTheme.Caption("Keep the moogle pom still while moving the book.");
-        UiTheme.Wrapped("Move and resize this window using the standard title bar and frame.", UiTheme.Muted);
+        UiTheme.Wrapped("The standard frame is visible only in this debug view. Otherwise, drag empty paper to move the book and use its corner to resize.", UiTheme.Muted);
         UiTheme.Rule();
         UiTheme.Caption("DIAGNOSTICS");
         ImGui.TextUnformatted($"Connection: {(client?.Connected == true ? "online" : "offline")}   /   Events received: {received}   /   Drawing messages: {draws}");
