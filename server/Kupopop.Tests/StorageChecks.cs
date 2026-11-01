@@ -88,6 +88,18 @@ static class StorageChecks
         rejected = false;
         try { using var ignored = new AccountStore(corruptRoot); } catch (SqliteException) { rejected = true; }
         check(rejected && File.ReadAllBytes(Path.Combine(corruptRoot, "accounts.db")).SequenceEqual(corrupt), "corrupt SQLite files fail startup without being replaced");
+        string unicodeRoot = Path.Combine(working, "unicode-storage");
+        using (var unicode = new AccountStore(unicodeRoot))
+        {
+            var emoji = unicode.Create("🎨");
+            check(unicode.Get(emoji.AccountId)?.DisplayName == "🎨", "valid supplementary Unicode names retain the existing UTF-16 name behavior");
+        }
+        using (var previousSchema = Open(Path.Combine(unicodeRoot, "accounts.db")))
+        {
+            using var schema = previousSchema.CreateCommand(); schema.CommandText = "PRAGMA user_version=1"; schema.ExecuteNonQuery();
+        }
+        using (var upgraded = new AccountStore(unicodeRoot))
+            check(upgraded.Count() == 1 && upgraded.Create("🎭").Profile.DisplayName == "🎭", "schema upgrade preserves existing rows and Unicode-compatible name constraints");
         using var bounded = new HttpResponseMessage { Content = new ByteArrayContent(new byte[4097]) };
         rejected = false;
         try { BoundedHttp.ReadAsync(bounded, 4096, CancellationToken.None).GetAwaiter().GetResult(); } catch (InvalidDataException) { rejected = true; }

@@ -82,7 +82,7 @@ movement owns dragging in the main game viewport. Styles are scoped to the
 plugin. Font/icon assets load from the installed game, and texture caches are
 bounded. Canvas texture refresh is coalesced while pointer previews stay local.
 
-## Review findings addressed in 0.8.0
+## Review findings addressed in 0.8.1
 
 | Finding | Change and regression coverage |
 | --- | --- |

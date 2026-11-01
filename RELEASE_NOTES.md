@@ -1,4 +1,4 @@
-Kupo Skribbl 0.8.0 is a maintenance and storage update. Gameplay rules and protocol 4 remain unchanged.
+Kupo Skribbl 0.8.1 is a maintenance and storage update. Gameplay rules and protocol 4 remain unchanged. Schema 2 also preserves valid supplementary-Unicode display names and upgrades existing SQLite schema 1 transactionally.
 
 - Accounts now use SQLite with transactional writes, unique credential indexes, WAL, integrity checks and an online backup command. The first startup imports legacy accounts.json once, preserving identities, verifiers, names, avatar seeds, pixels and presets. The original JSON remains a private rollback copy.
 - Credential rotation is atomic. WebSocket attachment rechecks credentials under the session lock, preventing recovery/revocation races. Account input limits and profile cooldowns survive reconnects.

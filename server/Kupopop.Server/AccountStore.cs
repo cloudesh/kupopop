@@ -12,7 +12,7 @@ public sealed record StoredAccount(PlayerProfile Profile, string AccessHash, str
 /// <summary>Transactional account persistence. Game rooms and scores remain ephemeral.</summary>
 public sealed class AccountStore : IDisposable
 {
-    private const int SchemaVersion = 1;
+    private const int SchemaVersion = 2;
     private const int MaximumAccounts = 10_000;
     private const string ProfileColumns = "id, display_name, avatar_seed, avatar_pixels, avatar_preset";
     private readonly object gate = new();
@@ -180,13 +180,35 @@ public sealed class AccountStore : IDisposable
         using var versionQuery = Command("PRAGMA user_version");
         int version = Convert.ToInt32(versionQuery.ExecuteScalar());
         if (version == SchemaVersion) return;
+        if (version == 1)
+        {
+            // SQLite counts Unicode scalars; .NET string limits count UTF-16
+            // units. A single emoji is a valid two-unit display name.
+            using var upgrade = database.BeginTransaction();
+            CreateTable("accounts_upgrade", upgrade);
+            Execute("INSERT INTO accounts_upgrade SELECT * FROM accounts; DROP TABLE accounts; ALTER TABLE accounts_upgrade RENAME TO accounts;", upgrade);
+            Execute($"PRAGMA user_version={SchemaVersion}", upgrade);
+            upgrade.Commit();
+            return;
+        }
         if (version != 0) throw new InvalidDataException("Unsupported account database version. Use a compatible server release.");
 
         using var transaction = database.BeginTransaction();
+        CreateTable("accounts", transaction, ifMissing: true);
+        if (Count(transaction) != 0) throw new InvalidDataException("Unversioned account database contains data; automatic import refused.");
+        ImportLegacy(Path.Combine(directory, "accounts.json"), transaction);
+        Execute($"PRAGMA user_version={SchemaVersion}", transaction);
+        transaction.Commit();
+    }
+
+    private void CreateTable(string table, SqliteTransaction transaction, bool ifMissing = false)
+    {
         Execute("""
-            CREATE TABLE IF NOT EXISTS accounts (
+            CREATE TABLE
+            """ + (ifMissing ? " IF NOT EXISTS " : " ") + table + """
+             (
                 id TEXT PRIMARY KEY NOT NULL,
-                display_name TEXT NOT NULL CHECK(length(display_name) BETWEEN 2 AND 40),
+                display_name TEXT NOT NULL CHECK(length(display_name) BETWEEN 1 AND 40),
                 avatar_seed INTEGER NOT NULL,
                 avatar_pixels BLOB CHECK(avatar_pixels IS NULL OR length(avatar_pixels)=4096),
                 avatar_preset TEXT,
@@ -194,10 +216,6 @@ public sealed class AccountStore : IDisposable
                 recovery_hash TEXT NOT NULL UNIQUE CHECK(length(recovery_hash)=64)
             ) STRICT;
             """, transaction);
-        if (Count(transaction) != 0) throw new InvalidDataException("Unversioned account database contains data; automatic import refused.");
-        ImportLegacy(Path.Combine(directory, "accounts.json"), transaction);
-        Execute($"PRAGMA user_version={SchemaVersion}", transaction);
-        transaction.Commit();
     }
 
     private void ImportLegacy(string path, SqliteTransaction transaction)

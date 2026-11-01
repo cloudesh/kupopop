@@ -2,7 +2,7 @@
 
 A native Dalamud drawing-and-guessing game for Final Fantasy XIV.
 
-**Experimental 0.8.0 · Dalamud API 15 · Protocol 4.**
+**Experimental 0.8.1 · Dalamud API 15 · Protocol 4.**
 
 ## Install
 
