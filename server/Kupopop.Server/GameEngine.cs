@@ -37,8 +37,6 @@ public sealed partial class GameEngine(AccountStore accounts, ILogger<GameEngine
         public string[] Choices = [];
         public RoomEffect Effect;
         public byte[]? Crayons;
-        public DateTimeOffset? EncoreUntil;
-        public HashSet<Guid> PomSenders = [];
         public Dictionary<Guid, int> BonusPoints = [];
         public bool CustomWordAvailable;
         public string[] Answers = [];
@@ -240,9 +238,6 @@ public sealed partial class GameEngine(AccountStore accounts, ILogger<GameEngine
                         break;
                     case "like-drawing":
                         LikeDrawing(peer, room, command.TurnId);
-                        break;
-                    case "encore-pom":
-                        TossPom(peer, room, command.TurnId);
                         break;
                     case "friend-request":
                         ChangeFriend(peer, command.TargetId, "request");
@@ -492,9 +487,12 @@ public sealed partial class GameEngine(AccountStore accounts, ILogger<GameEngine
             room.Options.VoteSkipEnabled && (!room.SkipVoteUsed || room.SkipVote is not null),
             room.Phase == "choosing" && room.Drawer == peer.Id && room.CustomWordAvailable,
             room.Phase == "results" ? room.Results : null,
-            room.DrawingLikes.Count, room.DrawingLikes.Contains(peer.Id), room.Effect, room.Crayons,
-            room.EncoreUntil, room.PomSenders.Count, CanTossPom(room, peer.Id)),
+            room.DrawingLikes.Count, room.DrawingLikes.Contains(peer.Id), room.Effect, room.Crayons),
             HostWords: room.Host == peer.Id && room.Phase is "waiting" or "results" ? (string[])room.HostWords.Clone() : null));
+        if (snapshot && room.Phase == "drawing" && room.Effect != RoomEffect.None)
+        {
+            peer.Send(EffectAnnouncement(room));
+        }
     }
 
     private void BroadcastState(Room room, bool reset = false, Guid? except = null)
@@ -533,7 +531,7 @@ public sealed partial class GameEngine(AccountStore accounts, ILogger<GameEngine
             throw new ArgumentException("Room title must be 2–40 characters.");
         }
 
-        if ((options.Effects & ~RoomEffect.All) != 0 || options.TurnSeconds is < 15 or > 300 || options.Rounds is < 1 or > 5 ||
+        if ((options.Effects & ~(RoomEffect.All | RoomEffects.RetiredOptions)) != 0 || options.TurnSeconds is < 15 or > 300 || options.Rounds is < 1 or > 5 ||
             options.MaxPlayers is < 2 or > 16 || options.HintSeconds is < 0 or > 300 || options.WordChoiceCount is < 1 or > 8)
         {
             throw new ArgumentException("Room settings are outside supported limits.");
@@ -544,6 +542,7 @@ public sealed partial class GameEngine(AccountStore accounts, ILogger<GameEngine
         return options with
         {
             Title = title,
+            Effects = options.Effects & RoomEffect.All,
             WordLists = selection,
             CustomWordCount = custom?.Length ?? 0
         };

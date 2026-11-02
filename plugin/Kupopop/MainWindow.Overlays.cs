@@ -212,7 +212,10 @@ public sealed partial class MainWindow
         ImGui.SetCursorScreenPos(saved);
     }
 
-    private static void DrawChatCard(ChatLine line) => UiPresentation.ChatCard(line);
+    private void DrawChatCard(ChatLine line) => UiPresentation.ChatCard(line,
+        activeEffect: line.Effect != RoomEffect.None && room is { Phase: "drawing" } state &&
+            line.TurnId == state.TurnId && line.Effect == state.Effect,
+        reduceMotion: plugin.Config.ReduceMotion);
 
     private void DrawTurnReveal(RoomView state) => DrawVictoryCard(state, match: false);
 

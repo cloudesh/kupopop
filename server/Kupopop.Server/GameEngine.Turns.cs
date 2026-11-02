@@ -51,10 +51,6 @@ public sealed partial class GameEngine
                 log.LogDebug("Correct guess accepted. Rank={Rank}", rank);
                 if (room.Members.Values.Where(m => m.Connected && m.Id != room.Drawer).All(m => m.Solved))
                 {
-                    if (room.Options.Effects.HasFlag(RoomEffect.Encore))
-                    {
-                        room.EncoreUntil = Now.AddSeconds(5);
-                    }
                     EndTurn(room);
                 }
                 else
@@ -88,8 +84,6 @@ public sealed partial class GameEngine
     {
         room.Effect = RoomEffect.None;
         room.Crayons = null;
-        room.EncoreUntil = null;
-        room.PomSenders.Clear();
         room.Vote = room.SkipVote = null;
         room.VoteUsed = room.SkipVoteUsed = false;
         room.History.Clear();
@@ -188,7 +182,7 @@ public sealed partial class GameEngine
         room.Choices = [];
         room.CustomWordAvailable = false;
         room.Phase = "intermission";
-        room.Deadline = (room.EncoreUntil ?? Now).AddSeconds(6);
+        room.Deadline = Now.AddSeconds(6);
         BroadcastState(room);
     }
 

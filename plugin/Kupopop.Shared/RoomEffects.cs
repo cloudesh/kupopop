@@ -3,12 +3,14 @@ namespace Kupopop.Shared;
 [Flags]
 public enum RoomEffect
 {
-    None = 0, MirrorInk = 1, BorrowedCrayons = 2, DoublePoints = 4, StickerStarter = 8, Encore = 16,
-    All = MirrorInk | BorrowedCrayons | DoublePoints | StickerStarter | Encore
+    None = 0, MirrorInk = 1, BorrowedCrayons = 2, DoublePoints = 4, StickerStarter = 8,
+    All = MirrorInk | BorrowedCrayons | DoublePoints | StickerStarter
 }
 
 public static class RoomEffects
 {
+    // Protocol 5 clients may still send the removed option. Accept and discard it.
+    public const RoomEffect RetiredOptions = (RoomEffect)16;
     public const string CapabilityHeader = "X-Kupopop-Room-Effects";
     public static string Name(RoomEffect effect) => effect switch
     {
@@ -16,7 +18,6 @@ public static class RoomEffects
         RoomEffect.BorrowedCrayons => "Borrowed Crayons",
         RoomEffect.DoublePoints => "Double Points",
         RoomEffect.StickerStarter => "Sticker Starter",
-        RoomEffect.Encore => "Encore",
         _ => ""
     };
 

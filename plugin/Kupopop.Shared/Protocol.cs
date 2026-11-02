@@ -68,14 +68,15 @@ public static class Protocol
         static bool Results(SolveResult[]? results) => results is null ||
             (results.Length <= MaximumPlayers && results.All(r => r is not null && ValidName(r.Name) && r.Points is >= 0 and <= 1_000_000));
 
-        if (!Text(message.Type, 40) || message.PomCount is < 0 or >= MaximumPlayers || (message.Error is not null && !Text(message.Error, 300)) ||
+        if (!Text(message.Type, 40) || (message.Error is not null && !Text(message.Error, 300)) ||
             !Board(message.Canvas) || !Cursor(message.Cursor) ||
             (message.Profile is not null && !ValidProfile(message.Profile)))
         {
             return false;
         }
 
-        if (message.Chat is { } chat && (!ValidName(chat.Name) || !Text(chat.Text, 300)))
+        if (message.Chat is { } chat && (!ValidName(chat.Name) || !Text(chat.Text, 300) ||
+            !Enum.IsDefined(chat.Effect) || chat.Effect != RoomEffect.None && (!chat.System || chat.Done || chat.Sender is not null || chat.TurnId == Guid.Empty)))
         {
             return false;
         }
@@ -117,9 +118,8 @@ public static class Protocol
         bool validCrayons = room.Effect == RoomEffect.BorrowedCrayons
             ? room.Crayons is { Length: 3 } colors && colors.All(c => c != 0 && Palette.Valid(c, false)) && colors.Distinct().Count() == 3
             : room.Crayons is null;
-        return room.Options is not null && (room.Options.Effects & ~RoomEffect.All) == 0 && validCrayons &&
+        return room.Options is not null && (room.Options.Effects & ~(RoomEffect.All | RoomEffects.RetiredOptions)) == 0 && validCrayons &&
             room.Effect is RoomEffect.None or RoomEffect.MirrorInk or RoomEffect.DoublePoints or RoomEffect.BorrowedCrayons or RoomEffect.StickerStarter &&
-            room.PomCount is >= 0 and < MaximumPlayers &&
             room.Options.CustomWordCount is >= 0 and <= CustomWordLists.MaximumWords && ValidName(room.Options.Title) && Text(room.Code, 8) &&
             room.Phase is "waiting" or "choosing" or "drawing" or "intermission" or "results" &&
             room.Players is { Length: >= 1 and <= MaximumPlayers } && room.Players.All(p => p is not null &&
@@ -151,7 +151,8 @@ public sealed record BrushCursor(int X, int Y, string Tool, byte Color = 1, int 
 
 public sealed record RoomSummary(string Code, string Title, int Players, int MaxPlayers, string Phase);
 public sealed record PlayerView(PlayerProfile Profile, int Score, bool Connected, bool Solved, bool IsHost, bool IsDrawer);
-public sealed record ChatLine(Guid? Sender, string Name, string Text, bool Done = false, bool System = false);
+public sealed record ChatLine(Guid? Sender, string Name, string Text, bool Done = false, bool System = false,
+    RoomEffect Effect = RoomEffect.None, Guid TurnId = default);
 
 public sealed record RoomView(string Code, RoomOptions Options, string Phase, Guid HostId, Guid? DrawerId,
     Guid TurnId, int Round, DateTimeOffset Deadline, string Hint, string? Word, bool YouAreDone,
@@ -161,7 +162,7 @@ public sealed record RoomView(string Code, RoomOptions Options, string Phase, Gu
     bool KickVoteAvailable = true, bool SkipVoteAvailable = true,
     bool CustomWordAvailable = false, SolveResult[]? MatchResults = null,
     int DrawingLikes = 0, bool YouLikedDrawing = false, RoomEffect Effect = RoomEffect.None,
-    byte[]? Crayons = null, DateTimeOffset? EncoreUntil = null, int PomCount = 0, bool CanTossPom = false);
+    byte[]? Crayons = null);
 
 public sealed record DrawOperation(string Tool, int X1, int Y1, int X2, int Y2, byte Color = 1, int Size = 3, Guid StrokeId = default);
 public sealed record ClientCommand(string Type, string? Text = null, RoomOptions? Options = null,
@@ -173,4 +174,4 @@ public sealed record ServerEvent(string Type, RoomView? Room = null, RoomSummary
     string? Error = null, PlayerProfile? Profile = null, Guid TurnId = default, string? RejectedCommand = null,
     WordListInfo[]? WordLists = null, byte[]? Canvas = null, bool CanUndo = false, BrushCursor? Cursor = null,
     SocialView? Social = null, SharedProfile? SharedProfile = null, GameInvitation? Invitation = null, bool Online = false,
-    LeaderboardView? Leaderboard = null, string[]? HostWords = null, int PomCount = 0);
+    LeaderboardView? Leaderboard = null, string[]? HostWords = null);

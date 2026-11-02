@@ -56,8 +56,12 @@ public sealed partial class GameEngine
                 ApplyAndBroadcastStroke(room, mark, null);
             }
         }
-        SystemMessage(room, $"Room effect: {RoomEffects.Name(room.Effect)}!");
+        Broadcast(room, EffectAnnouncement(room));
     }
+
+    private static ServerEvent EffectAnnouncement(Room room) => new("chat",
+        Chat: new(null, "Kupo Skribbl", $"Room effect: {RoomEffects.Name(room.Effect)}!", System: true,
+            Effect: room.Effect, TurnId: room.TurnId));
 
     private static int AwardPoints(Room room, Member member, int basePoints)
     {
@@ -70,17 +74,4 @@ public sealed partial class GameEngine
         return basePoints + bonus;
     }
 
-    private bool CanTossPom(Room room, Guid id) =>
-        room.Phase == "intermission" && room.EncoreUntil > Now && !room.PomSenders.Contains(id) &&
-        room.Solvers.Any(solver => solver.PlayerId == id);
-
-    private void TossPom(IGamePeer peer, Room? room, Guid turn)
-    {
-        if (room is null || room.TurnId != turn || !CanTossPom(room, peer.Id))
-        {
-            return;
-        }
-        room.PomSenders.Add(peer.Id);
-        Broadcast(room, new("encore-pom", ActorId: peer.Id, TurnId: turn, PomCount: room.PomSenders.Count));
-    }
 }

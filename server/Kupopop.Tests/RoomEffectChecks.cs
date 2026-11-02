@@ -35,7 +35,9 @@ static partial class RoundFlowChecks
             Begin(RoomEffect.All, ticket: 20).Artist.State.Effect == RoomEffect.BorrowedCrayons &&
             Begin(RoomEffect.All, ticket: 50).Artist.State.Effect == RoomEffect.DoublePoints &&
             Begin(RoomEffect.All, ticket: 80).Artist.State.Effect == RoomEffect.StickerStarter,
-            "conditional draws use the four advertised weights without rolling Encore");
+            "conditional draws use the four advertised weights");
+        check(Begin(RoomEffect.All | RoomEffects.RetiredOptions).Artist.State.Options.Effects == RoomEffect.All,
+            "old room settings discard the retired effect without rejecting supported effects");
 
         var mirror = Begin(RoomEffect.MirrorInk);
         var stroke = new DrawOperation("line", 3, 5, 8, 5, 4, 1, Guid.NewGuid());
@@ -70,31 +72,31 @@ static partial class RoundFlowChecks
         sticker.Game.Handle(sticker.Artist, new("undo", TurnId: sticker.Artist.State.TurnId));
         check(observed.Pixels.SequenceEqual(sticker.Guesser.Events.Last().Canvas!), "undo restores the original sticker pixels");
 
-        var party = Begin(RoomEffect.DoublePoints | RoomEffect.Encore);
+        var party = Begin(RoomEffect.DoublePoints);
         turn = party.Artist.State.TurnId;
-        party.Game.Handle(party.Guesser, new("chat", Text: party.Artist.State.Word));
-        var recap = party.Guesser.State;
-        check(recap.Players.Single(p => p.IsDrawer).Score == 200 && recap.FirstGuessers![0].Points == 2000 &&
-            recap.CanTossPom && !party.Artist.State.CanTossPom && recap.EncoreUntil == party.Clock.GetUtcNow().AddSeconds(5),
-            "full solve doubles both awards and opens a five-second guesser encore");
-        party.Game.Handle(party.Artist, new("encore-pom", TurnId: turn));
-        party.Game.Handle(party.Guesser, new("encore-pom", TurnId: Guid.NewGuid()));
-        party.Game.Handle(party.Guesser, new("encore-pom", TurnId: turn));
-        party.Game.Handle(party.Guesser, new("encore-pom", TurnId: turn));
-        check(party.Artist.Events.Count(e => e.Type == "encore-pom") == 1, "pom tosses require an eligible guesser, current turn and unused tap");
+        var announcement = party.Guesser.Events.Single(e => e.Chat?.Effect == RoomEffect.DoublePoints);
+        check(announcement.Chat is { System: true, Sender: null } effectChat && effectChat.TurnId == turn &&
+            Protocol.ValidEvent(announcement), "effect announcements have validated turn metadata for chat styling");
+        check(!Protocol.ValidEvent(new("chat", Chat: new(party.Guesser.Id, "Guesser", "Fake effect",
+            Effect: RoomEffect.DoublePoints, TurnId: turn))), "ordinary chat cannot masquerade as an effect announcement");
         party.Game.Detach(party.Guesser);
         var returning = new Peer(party.Guesser.Id, true);
         party.Game.Attach(returning);
-        check(returning.State.PomCount == 1 && !returning.State.CanTossPom && returning.State.Canvas!.All(p => p == 0),
-            "reconnect preserves poms and tap eligibility separately from the canvas pixels");
-        party.Clock.Advance(11);
+        check(returning.Events.Any(e => e.Chat?.Effect == RoomEffect.DoublePoints && e.Chat.TurnId == turn) && returning.State.Word is null,
+            "reconnecting guessers receive the active effect announcement without exposing the answer");
+        party.Game.Handle(returning, new("chat", Text: party.Artist.State.Word));
+        var recap = returning.State;
+        check(recap.Players.Single(p => p.IsDrawer).Score == 200 && recap.FirstGuessers![0].Points == 2000 &&
+            recap.Deadline == party.Clock.GetUtcNow().AddSeconds(6),
+            "full solve doubles both awards and goes directly to the six-second recap");
+        party.Clock.Advance(6);
         party.Game.Tick();
-        check(returning.State.Phase == "choosing" && returning.State.EncoreUntil is null && returning.State.PomCount == 0,
-            "next turn clears all encore state");
+        check(returning.State.Phase == "choosing" && returning.State.Effect == RoomEffect.None,
+            "next turn clears the active effect");
         party.Game.Handle(returning, new("choose-word", Text: returning.State.WordChoices![0], TurnId: returning.State.TurnId));
         party.Clock.Advance(91);
         party.Game.Tick();
-        check(party.Artist.State is { Phase: "intermission", EncoreUntil: null }, "timeout does not start an encore");
+        check(party.Artist.State.Phase == "intermission", "timeout proceeds directly to recap");
         party.Clock.Advance(6);
         party.Game.Tick();
         check(party.Artist.State.Phase == "results" && accounts.Statistics(b.AccountId)!.Points == 1000 &&

@@ -108,7 +108,7 @@ public static class UiPresentation
         return ImGui.Button(label, new Vector2(0, UiTheme.S(26)));
     }
 
-    public static void ChatCard(ChatLine line)
+    public static void ChatCard(ChatLine line, bool activeEffect = false, bool reduceMotion = false)
     {
         float width = Math.Max(20, ImGui.GetContentRegionAvail().X - UiTheme.S(2)), pad = UiTheme.S(5);
         var start = ImGui.GetCursorScreenPos() + UiTheme.V(1, 0);
@@ -133,7 +133,21 @@ public static class UiPresentation
         }
         var draw = ImGui.GetWindowDrawList();
         var fill = line.Done ? Alpha(UiTheme.Muted, 0.14f) : Alpha(UiTheme.DarkMode ? UiTheme.Panel : UiTheme.White, line.System ? 0.48f : 0.40f);
+        if (activeEffect)
+        {
+            fill = Vector4.Lerp(fill, UiTheme.StickyRose, 0.65f);
+        }
         draw.AddRectFilled(start, start + new Vector2(width, height), UiTheme.C(fill), UiTheme.S(3));
+        if (activeEffect)
+        {
+            float glow = reduceMotion ? 1 : 0.8f + 0.2f * MathF.Sin((float)(ImGui.GetTime() % Math.Tau));
+            // Draw inward so the halo stays inside the chat's clipping region.
+            for (int layer = 3; layer >= 1; layer--)
+            {
+                draw.AddRect(start + UiTheme.V(layer, layer), start + new Vector2(width, height) - UiTheme.V(layer, layer),
+                    UiTheme.C(Alpha(UiTheme.Rose, glow * 0.10f * (4 - layer))), UiTheme.S(3), 0, UiTheme.S(2));
+            }
+        }
         ImGui.SetCursorScreenPos(start + new Vector2(pad, pad));
         ImGui.BeginGroup();
         using (ImRaii.PushColor(ImGuiCol.Text, line.Done ? UiTheme.Muted : UiTheme.Ink))

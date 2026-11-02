@@ -199,8 +199,7 @@ public sealed partial class MainWindow
             DrawWordChoices(state);
         }
 
-        bool encore = state.EncoreUntil > DateTimeOffset.UtcNow + serverOffset;
-        if (!encore && state.Phase is ("choosing" or "drawing" or "intermission"))
+        if (state.Phase is "choosing" or "drawing" or "intermission")
         {
             DrawCanvasTimer(state);
         }
@@ -221,14 +220,7 @@ public sealed partial class MainWindow
 
         if (state.Phase == "intermission")
         {
-            if (encore)
-            {
-                DrawEncore(state);
-            }
-            else
-            {
-                DrawTurnReveal(state);
-            }
+            DrawTurnReveal(state);
         }
 
         if (state.Phase == "results" && resultsDismissed != state.TurnId)

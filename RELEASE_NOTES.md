@@ -1,4 +1,4 @@
-Kupo Skribbl 1.2.0 — Room Effects
+Kupo Skribbl 1.2.1 — Effect announcements
 
-- Choose room effects under Host Room → Effects. Each turn has a 20% chance of Mirror Ink, Borrowed Crayons, Double Points or Sticker Starter. Double Points bonuses count only toward the current match.
-- When everyone guesses correctly, Encore gives each guesser five seconds to toss a pom onto the finished drawing before the recap.
+- Remove Encore and its pom button. Completed turns go directly to the recap.
+- Highlight the active room effect in chat with a soft glow. Reduced motion keeps the highlight still.
