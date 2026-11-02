@@ -34,6 +34,9 @@ public sealed class CanvasWidget : IDisposable
     }
     public BrushCursor? RemoteCursor;
     public Vector4? InputBlock;
+    public bool MirrorInk;
+    public byte[]? Crayons;
+    private byte borrowedColor;
 
     public void Toolbar(string id, bool transparency = false, Action? undo = null, bool canUndo = false, bool compact = false)
     {
@@ -111,7 +114,14 @@ public sealed class CanvasWidget : IDisposable
             }
 
             ImGui.SameLine();
-            UiPalette.Button(ref Color, transparency);
+            if (Crayons is { } colors)
+            {
+                UiPalette.Button(ref borrowedColor, transparency: false, colors);
+            }
+            else
+            {
+                UiPalette.Button(ref Color, transparency);
+            }
         }
         finally { ImGui.PopID(); }
     }
@@ -169,7 +179,12 @@ public sealed class CanvasWidget : IDisposable
         Vector2 mouse = ImGui.GetMousePos() - top;
         int nx = Math.Clamp((int)(mouse.X / size.X * canvas.Width), 0, canvas.Width - 1);
         int ny = Math.Clamp((int)(mouse.Y / size.Y * canvas.Height), 0, canvas.Height - 1);
-        var cursor = new BrushCursor(nx, ny, Tool, Color, Size, writable && !blocked && (ImGui.IsItemHovered() || down));
+        if (Crayons is { } colors && !colors.Contains(borrowedColor))
+        {
+            borrowedColor = colors[0];
+        }
+        byte ink = Crayons is null ? Color : borrowedColor;
+        var cursor = new BrushCursor(nx, ny, Tool, ink, Size, writable && !blocked && (ImGui.IsItemHovered() || down));
         bool pointerChanged = cursor.Visible ? lastPointer != cursor : lastPointer?.Visible == true;
         if (pointer is not null && (pointerChanged && now - pointerAt >= 60 || now - pointerAt >= 1000 && cursor.Visible))
         {
@@ -187,11 +202,16 @@ public sealed class CanvasWidget : IDisposable
             }
             if (DrawingTools.Shape(Tool))
             {
-                Preview(DrawingTools.Constrain(new(Tool, anchorX, anchorY, nx, ny, Color, Size)), top, size, canvas);
+                var shape = DrawingTools.Constrain(new(Tool, anchorX, anchorY, nx, ny, ink, Size));
+                Preview(shape, top, size, canvas);
+                if (MirrorInk)
+                {
+                    Preview(RoomEffects.Reflect(shape), top, size, canvas);
+                }
             }
             else if (!dragging || (Tool != "fill" && now - sentAt >= 33 && (nx != x || ny != y)))
             {
-                submit(new(Tool, dragging ? x : nx, dragging ? y : ny, nx, ny, Color, Size, stroke));
+                submit(new(Tool, dragging ? x : nx, dragging ? y : ny, nx, ny, ink, Size, stroke));
                 x = nx;
                 y = ny;
                 sentAt = now;
@@ -201,16 +221,21 @@ public sealed class CanvasWidget : IDisposable
         {
             if (DrawingTools.Shape(Tool))
             {
-                submit(new(Tool, anchorX, anchorY, nx, ny, Color, Size, stroke));
+                submit(new(Tool, anchorX, anchorY, nx, ny, ink, Size, stroke));
             }
             else if (Tool != "fill" && (nx != x || ny != y))
             {
-                submit(new(Tool, x, y, nx, ny, Color, Size, stroke));
+                submit(new(Tool, x, y, nx, ny, ink, Size, stroke));
             }
         }
         if (RemoteCursor is { Visible: true } remote)
         {
             DrawCursor(remote, top, size, canvas);
+        }
+        var reflectedCursor = writable ? cursor : RemoteCursor;
+        if (MirrorInk && reflectedCursor is { Visible: true })
+        {
+            DrawCursor(reflectedCursor with { X = canvas.Width - 1 - reflectedCursor.X }, top, size, canvas);
         }
 
         dragging = down;

@@ -35,11 +35,11 @@ public sealed partial class GameEngine
                 member.Solved = true;
                 room.WordViewers.Add(peer.Id);
                 int award = Math.Max(100, 1000 - (rank - 1) * 60);
-                member.Score += award;
+                award = AwardPoints(room, member, award);
                 room.Solvers.Add(new(peer.Id, accounts.Get(peer.Id)!.DisplayName, award));
                 if (room.Drawer is { } drawerId && room.Members.TryGetValue(drawerId, out var drawer))
                 {
-                    drawer.Score += 100;
+                    AwardPoints(room, drawer, 100);
                 }
 
                 foreach (var participant in room.Members.Values)
@@ -51,6 +51,10 @@ public sealed partial class GameEngine
                 log.LogDebug("Correct guess accepted. Rank={Rank}", rank);
                 if (room.Members.Values.Where(m => m.Connected && m.Id != room.Drawer).All(m => m.Solved))
                 {
+                    if (room.Options.Effects.HasFlag(RoomEffect.Encore))
+                    {
+                        room.EncoreUntil = Now.AddSeconds(5);
+                    }
                     EndTurn(room);
                 }
                 else
@@ -82,6 +86,10 @@ public sealed partial class GameEngine
 
     private void NextTurn(Room room)
     {
+        room.Effect = RoomEffect.None;
+        room.Crayons = null;
+        room.EncoreUntil = null;
+        room.PomSenders.Clear();
         room.Vote = room.SkipVote = null;
         room.VoteUsed = room.SkipVoteUsed = false;
         room.History.Clear();
@@ -116,7 +124,7 @@ public sealed partial class GameEngine
             {
                 if (room.HostWords.Length == 0)
                 {
-                    accounts.RecordMatch(room.Results, room.StatsParticipants);
+                    accounts.RecordMatch(room.Results, room.StatsParticipants, room.BonusPoints);
                 }
 
                 room.StatsRecorded = true;
@@ -162,6 +170,7 @@ public sealed partial class GameEngine
         room.Deadline = Now.AddSeconds(room.Options.TurnSeconds);
         room.Revealed = 0;
         room.WordViewers.Add(room.Drawer!.Value);
+        StartEffect(room);
         BroadcastState(room);
         log.LogDebug("Drawing turn started. Players={Players}", room.Members.Count);
     }
@@ -179,7 +188,7 @@ public sealed partial class GameEngine
         room.Choices = [];
         room.CustomWordAvailable = false;
         room.Phase = "intermission";
-        room.Deadline = Now.AddSeconds(6);
+        room.Deadline = (room.EncoreUntil ?? Now).AddSeconds(6);
         BroadcastState(room);
     }
 

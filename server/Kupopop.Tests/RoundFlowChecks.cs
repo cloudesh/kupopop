@@ -4,10 +4,11 @@ using Kupopop.Server;
 using Kupopop.Shared;
 using Microsoft.Extensions.Logging.Abstractions;
 
-static class RoundFlowChecks
+static partial class RoundFlowChecks
 {
     public static void Run(string working, Action<bool, string> check)
     {
+        CheckRoomEffects(working, check);
         var accounts = new AccountStore(Path.Combine(working, "round-flow"));
         var identities = Enumerable.Range(0, 6).Select(i => accounts.Create("Round artist " + i)).ToArray();
         var bank = new WordBank([new("test", "Test bank", true, false,
@@ -202,8 +203,9 @@ static class RoundFlowChecks
         public override DateTimeOffset GetUtcNow() => now;
         public void Advance(double seconds) => now = now.AddSeconds(seconds);
     }
-    private sealed class Peer(Guid id) : IGamePeer
+    private sealed class Peer(Guid id, bool supportsRoomEffects = false) : IGamePeer
     {
+        public bool SupportsRoomEffects { get; } = supportsRoomEffects;
         public Guid Id { get; } = id;
         public string? RoomCode
         {

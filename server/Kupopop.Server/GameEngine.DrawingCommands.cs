@@ -21,9 +21,22 @@ public sealed partial class GameEngine
             throw new ArgumentException("Drawing operation rejected.");
         }
 
+        if (room.Crayons is { } colors && command.Draw.Tool != "eraser" && !colors.Contains(command.Draw.Color))
+        {
+            throw new ArgumentException("Choose one of this turn's three crayons.");
+        }
         room.History.Capture(room.Canvas, command.Draw.StrokeId);
-        room.Canvas.Apply(command.Draw);
-        Broadcast(room, new("draw", Draw: command.Draw, ActorId: peer.Id, TurnId: room.TurnId));
+        ApplyAndBroadcastStroke(room, command.Draw, peer.Id);
+        if (room.Effect == RoomEffect.MirrorInk)
+        {
+            ApplyAndBroadcastStroke(room, RoomEffects.Reflect(command.Draw), peer.Id);
+        }
+    }
+
+    private void ApplyAndBroadcastStroke(Room room, DrawOperation stroke, Guid? actor)
+    {
+        room.Canvas.Apply(stroke);
+        Broadcast(room, new("draw", Draw: stroke, ActorId: actor, TurnId: room.TurnId));
     }
 
     private void ChooseWord(IGamePeer peer, Room? room, ClientCommand command)
@@ -68,6 +81,10 @@ public sealed partial class GameEngine
             throw new ArgumentException("Canvas cursor rejected.");
         }
 
+        if (room.Crayons is { } colors && cursor.Tool != "eraser" && !colors.Contains(cursor.Color))
+        {
+            return;
+        }
         room.Cursor = cursor;
         room.CursorAt = Now;
         Broadcast(room, new("cursor", Cursor: cursor, ActorId: peer.Id, TurnId: room.TurnId));

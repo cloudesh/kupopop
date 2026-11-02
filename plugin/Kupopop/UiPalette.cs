@@ -13,7 +13,7 @@ public static class UiPalette
         uint c = Palette.Colors[index];
         return new((c & 255) / 255f, ((c >> 8) & 255) / 255f, ((c >> 16) & 255) / 255f, (c >> 24) / 255f);
     }
-    public static void Button(ref byte selected, bool transparency)
+    public static void Button(ref byte selected, bool transparency, byte[]? colors = null)
     {
         if (ImGui.ColorButton("Color", Colour(selected), ImGuiColorEditFlags.NoTooltip | ImGuiColorEditFlags.NoDragDrop, UiTheme.V(28, 28)))
         {
@@ -32,16 +32,17 @@ public static class UiPalette
 
         if (ImGui.BeginPopup("colour-palette"))
         {
-            Grid(ref selected, transparency);
+            Grid(ref selected, transparency, colors);
             ImGui.EndPopup();
         }
     }
-    public static void Grid(ref byte selected, bool transparency)
+    public static void Grid(ref byte selected, bool transparency, byte[]? colors = null)
     {
-        UiTheme.Caption("32 COLORS");
-        for (int i = 0; i < Palette.Opaque.Length; i++)
+        UiTheme.Caption(colors is null ? "32 COLORS" : "BORROWED CRAYONS");
+        colors ??= Palette.Opaque;
+        for (int i = 0; i < colors.Length; i++)
         {
-            byte index = Palette.Opaque[i];
+            byte index = colors[i];
             if (i % 8 != 0)
             {
                 ImGui.SameLine(0, UiTheme.S(4));

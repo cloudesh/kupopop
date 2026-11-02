@@ -4,7 +4,7 @@ using Kupopop.Shared;
 namespace Kupopop.Server;
 
 public sealed partial class GameEngine(AccountStore accounts, ILogger<GameEngine> log, TimeProvider clock, WordBank? wordBank = null,
-    Func<int>? customWordRoll = null)
+    Func<int>? customWordRoll = null, Func<int, int>? effectRoll = null)
 {
     private sealed class Member(Guid id)
     {
@@ -35,6 +35,11 @@ public sealed partial class GameEngine(AccountStore accounts, ILogger<GameEngine
         public KickBallot? SkipVote;
         public bool SkipVoteUsed;
         public string[] Choices = [];
+        public RoomEffect Effect;
+        public byte[]? Crayons;
+        public DateTimeOffset? EncoreUntil;
+        public HashSet<Guid> PomSenders = [];
+        public Dictionary<Guid, int> BonusPoints = [];
         public bool CustomWordAvailable;
         public string[] Answers = [];
         public Dictionary<Guid, SolveResult> MatchScores = [];
@@ -235,6 +240,9 @@ public sealed partial class GameEngine(AccountStore accounts, ILogger<GameEngine
                         break;
                     case "like-drawing":
                         LikeDrawing(peer, room, command.TurnId);
+                        break;
+                    case "encore-pom":
+                        TossPom(peer, room, command.TurnId);
                         break;
                     case "friend-request":
                         ChangeFriend(peer, command.TargetId, "request");
@@ -484,7 +492,8 @@ public sealed partial class GameEngine(AccountStore accounts, ILogger<GameEngine
             room.Options.VoteSkipEnabled && (!room.SkipVoteUsed || room.SkipVote is not null),
             room.Phase == "choosing" && room.Drawer == peer.Id && room.CustomWordAvailable,
             room.Phase == "results" ? room.Results : null,
-            room.DrawingLikes.Count, room.DrawingLikes.Contains(peer.Id)),
+            room.DrawingLikes.Count, room.DrawingLikes.Contains(peer.Id), room.Effect, room.Crayons,
+            room.EncoreUntil, room.PomSenders.Count, CanTossPom(room, peer.Id)),
             HostWords: room.Host == peer.Id && room.Phase is "waiting" or "results" ? (string[])room.HostWords.Clone() : null));
     }
 
@@ -524,7 +533,7 @@ public sealed partial class GameEngine(AccountStore accounts, ILogger<GameEngine
             throw new ArgumentException("Room title must be 2–40 characters.");
         }
 
-        if (options.TurnSeconds is < 15 or > 300 || options.Rounds is < 1 or > 5 ||
+        if ((options.Effects & ~RoomEffect.All) != 0 || options.TurnSeconds is < 15 or > 300 || options.Rounds is < 1 or > 5 ||
             options.MaxPlayers is < 2 or > 16 || options.HintSeconds is < 0 or > 300 || options.WordChoiceCount is < 1 or > 8)
         {
             throw new ArgumentException("Room settings are outside supported limits.");

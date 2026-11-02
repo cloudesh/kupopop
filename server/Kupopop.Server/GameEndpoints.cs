@@ -113,7 +113,7 @@ public static class GameEndpoints
         }
 
         using var socket = await context.WebSockets.AcceptWebSocketAsync();
-        var peer = new Peer(profile.Id, socket, limits.For(profile.Id));
+        var peer = new Peer(profile.Id, socket, limits.For(profile.Id), context.Request.Headers[RoomEffects.CapabilityHeader] == "1");
         using var stop = CancellationTokenSource.CreateLinkedTokenSource(context.RequestAborted);
         // Recovery can rotate the token during the HTTP upgrade. Recheck it under
         // the engine's session lock before attaching the authenticated identity.

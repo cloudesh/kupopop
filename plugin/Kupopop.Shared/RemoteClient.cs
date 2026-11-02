@@ -143,6 +143,7 @@ public sealed class RemoteClient : IDisposable
         }
         ws.Options.SetRequestHeader("Authorization", "Bearer " + accessToken);
         ws.Options.SetRequestHeader("X-Kupopop-Protocol", Protocol.Version.ToString());
+        ws.Options.SetRequestHeader(RoomEffects.CapabilityHeader, "1");
         ws.Options.KeepAliveInterval = TimeSpan.FromSeconds(20);
         ws.Options.KeepAliveTimeout = TimeSpan.FromSeconds(10);
         ws.Options.CollectHttpResponseDetails = true;

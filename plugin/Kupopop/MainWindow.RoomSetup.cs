@@ -8,6 +8,7 @@ namespace Kupopop;
 
 public sealed partial class MainWindow
 {
+    private RoomEffect selectedEffects = RoomEffect.All;
     private void CreateRoomScreen()
     {
         bool editing = room is not null;
@@ -41,6 +42,11 @@ public sealed partial class MainWindow
         {
             roomSetupPage = 3;
         }
+        ImGui.SameLine(0, UiTheme.S(3));
+        if (UiTheme.PanelTab("Effects", roomSetupPage == 4))
+        {
+            roomSetupPage = 4;
+        }
 
         ImGui.SetCursorScreenPos(tabs + new Vector2(0, tabHeight));
         using var card = new UiTheme.PaperPanel("room-settings", Vector2.Zero, scrollable: false, flush: true, attachedTabs: true);
@@ -65,6 +71,10 @@ public sealed partial class MainWindow
                 else if (roomSetupPage == 3)
                 {
                     CustomWordsPage();
+                }
+                else if (roomSetupPage == 4)
+                {
+                    EffectSettings();
                 }
                 else
                 {
@@ -92,7 +102,7 @@ public sealed partial class MainWindow
             {
                 bool sent = Send(new(editing ? "configure" : "create", Options: new(roomTitle, publicRoom, Math.Clamp(seconds, 15, 300), Math.Clamp(rounds, 1, 5),
                     Math.Clamp(hints, 0, 300), Math.Clamp(capacity, 2, 16), selectedWordLists.ToArray(),
-                    Math.Clamp(wordChoiceCount, 1, 8), voteKickEnabled, voteSkipEnabled, customWordsEnabled), CustomWords: customWordsText));
+                    Math.Clamp(wordChoiceCount, 1, 8), voteKickEnabled, voteSkipEnabled, customWordsEnabled, Effects: selectedEffects), CustomWords: customWordsText));
                 savingRoomSettings = editing && sent;
             }
         }
@@ -128,6 +138,7 @@ public sealed partial class MainWindow
         voteKickEnabled = options.VoteKickEnabled;
         voteSkipEnabled = options.VoteSkipEnabled;
         customWordsEnabled = options.CustomWordsEnabled;
+        selectedEffects = options.Effects;
         customWordsText = roomCustomWords;
         selectedWordLists.Clear();
         foreach (var id in options.WordLists ?? [])

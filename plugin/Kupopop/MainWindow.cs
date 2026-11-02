@@ -340,6 +340,10 @@ public sealed partial class MainWindow : Window, IDisposable
             case "state" when message.Room is { } state:
                 ApplyRoomState(state);
                 break;
+            case "encore-pom" when room is { Phase: "intermission" } recap && recap.TurnId == message.TurnId:
+                room = recap with { PomCount = message.PomCount, CanTossPom = recap.CanTossPom && message.ActorId != device?.AccountId };
+                pomLandedAt[message.PomCount] = Environment.TickCount64;
+                break;
             case "draw" when message.Draw is { } op:
                 if (room?.TurnId == message.TurnId && message.ActorId != device?.AccountId)
                 {
@@ -454,6 +458,7 @@ public sealed partial class MainWindow : Window, IDisposable
         if (state.ResetCanvas || newTurn)
         {
             canvas.Clear();
+            Array.Clear(pomLandedAt);
         }
 
         if (state.Canvas is { } pixels)

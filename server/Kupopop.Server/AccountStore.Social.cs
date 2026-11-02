@@ -159,7 +159,7 @@ public sealed partial class AccountStore
         }
     }
 
-    public void RecordMatch(SolveResult[] results, HashSet<Guid> optedAtStart)
+    public void RecordMatch(SolveResult[] results, HashSet<Guid> optedAtStart, IReadOnlyDictionary<Guid, int>? matchOnlyBonus = null)
     {
         lock (gate)
         {
@@ -173,7 +173,7 @@ public sealed partial class AccountStore
                     """, transaction);
                 command.Parameters.AddWithValue("$id", result.PlayerId.ToString());
                 command.Parameters.AddWithValue("$win", result.Points == winner);
-                command.Parameters.AddWithValue("$points", result.Points);
+                command.Parameters.AddWithValue("$points", result.Points - (matchOnlyBonus?.GetValueOrDefault(result.PlayerId) ?? 0));
                 command.ExecuteNonQuery();
             }
             transaction.Commit();

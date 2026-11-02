@@ -179,11 +179,17 @@ public sealed partial class MainWindow
         bool canDraw = client?.Connected == true && state.Phase == "drawing" && state.DrawerId == device?.AccountId;
         var tools = CanvasToolsRect(ImGui.GetCursorScreenPos(), size - UiTheme.V(9, 10));
         painting.InputBlock = canDraw ? new Vector4(tools.Min.X, tools.Min.Y, tools.Max.X, tools.Max.Y) : null;
+        painting.MirrorInk = state.Phase == "drawing" && state.Effect == RoomEffect.MirrorInk;
+        painting.Crayons = state.Phase == "drawing" ? state.Crayons : null;
         painting.Draw("game-canvas", canvas, size, canDraw && !undoPending, operation =>
         {
             if (Send(new("draw", Draw: operation, TurnId: state.TurnId)))
             {
                 canvas.Apply(operation);
+                if (painting.MirrorInk)
+                {
+                    canvas.Apply(RoomEffects.Reflect(operation));
+                }
                 draws++;
                 canUndoDrawing = true;
             }
@@ -193,9 +199,14 @@ public sealed partial class MainWindow
             DrawWordChoices(state);
         }
 
-        if (state.Phase is "choosing" or "drawing" or "intermission")
+        bool encore = state.EncoreUntil > DateTimeOffset.UtcNow + serverOffset;
+        if (!encore && state.Phase is ("choosing" or "drawing" or "intermission"))
         {
             DrawCanvasTimer(state);
+        }
+        if (state.Phase == "drawing" && state.Effect != RoomEffect.None)
+        {
+            DrawEffectStamp(RoomEffects.Name(state.Effect));
         }
 
         if (canDraw)
@@ -210,7 +221,14 @@ public sealed partial class MainWindow
 
         if (state.Phase == "intermission")
         {
-            DrawTurnReveal(state);
+            if (encore)
+            {
+                DrawEncore(state);
+            }
+            else
+            {
+                DrawTurnReveal(state);
+            }
         }
 
         if (state.Phase == "results" && resultsDismissed != state.TurnId)

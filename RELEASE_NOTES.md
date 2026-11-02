@@ -1,4 +1,4 @@
-Kupo Skribbl 1.1.0 — Word list overhaul
+Kupo Skribbl 1.2.0 — Room Effects
 
-- Room setup shows each list's difficulty beside its word count. New rooms start with Easy and Medium lists selected.
-- The shared server has shorter drawing prompts, a quick-start doodle list, playable FFXIV races, gaming memes and everyday mishaps. Hosts can add Difficult and Extreme packs for harder rounds.
+- Choose room effects under Host Room → Effects. Each turn has a 20% chance of Mirror Ink, Borrowed Crayons, Double Points or Sticker Starter. Double Points bonuses count only toward the current match.
+- When everyone guesses correctly, Encore gives each guesser five seconds to toss a pom onto the finished drawing before the recap.

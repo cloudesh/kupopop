@@ -68,7 +68,7 @@ public static class Protocol
         static bool Results(SolveResult[]? results) => results is null ||
             (results.Length <= MaximumPlayers && results.All(r => r is not null && ValidName(r.Name) && r.Points is >= 0 and <= 1_000_000));
 
-        if (!Text(message.Type, 40) || (message.Error is not null && !Text(message.Error, 300)) ||
+        if (!Text(message.Type, 40) || message.PomCount is < 0 or >= MaximumPlayers || (message.Error is not null && !Text(message.Error, 300)) ||
             !Board(message.Canvas) || !Cursor(message.Cursor) ||
             (message.Profile is not null && !ValidProfile(message.Profile)))
         {
@@ -114,7 +114,13 @@ public static class Protocol
             return true;
         }
 
-        return room.Options is not null && room.Options.CustomWordCount is >= 0 and <= CustomWordLists.MaximumWords && ValidName(room.Options.Title) && Text(room.Code, 8) &&
+        bool validCrayons = room.Effect == RoomEffect.BorrowedCrayons
+            ? room.Crayons is { Length: 3 } colors && colors.All(c => c != 0 && Palette.Valid(c, false)) && colors.Distinct().Count() == 3
+            : room.Crayons is null;
+        return room.Options is not null && (room.Options.Effects & ~RoomEffect.All) == 0 && validCrayons &&
+            room.Effect is RoomEffect.None or RoomEffect.MirrorInk or RoomEffect.DoublePoints or RoomEffect.BorrowedCrayons or RoomEffect.StickerStarter &&
+            room.PomCount is >= 0 and < MaximumPlayers &&
+            room.Options.CustomWordCount is >= 0 and <= CustomWordLists.MaximumWords && ValidName(room.Options.Title) && Text(room.Code, 8) &&
             room.Phase is "waiting" or "choosing" or "drawing" or "intermission" or "results" &&
             room.Players is { Length: >= 1 and <= MaximumPlayers } && room.Players.All(p => p is not null &&
                 ValidProfile(p.Profile) && p.Score is >= 0 and <= 1_000_000) &&
@@ -132,7 +138,7 @@ public sealed record PlayerProfile(Guid Id, string DisplayName, int AvatarSeed, 
 public sealed record RoomOptions(string Title, bool IsPublic = false, int TurnSeconds = 90,
     int Rounds = 2, int HintSeconds = 30, int MaxPlayers = 16, string[]? WordLists = null,
     int WordChoiceCount = 4, bool VoteKickEnabled = true, bool VoteSkipEnabled = true,
-    bool CustomWordsEnabled = true, int CustomWordCount = 0);
+    bool CustomWordsEnabled = true, int CustomWordCount = 0, RoomEffect Effects = RoomEffect.None);
 
 [System.Text.Json.Serialization.JsonConverter(typeof(System.Text.Json.Serialization.JsonStringEnumConverter<WordDifficulty>))]
 public enum WordDifficulty { Easy, Medium, Difficult, Extreme }
@@ -154,7 +160,8 @@ public sealed record RoomView(string Code, RoomOptions Options, string Phase, Gu
     SolveResult[]? FirstGuessers = null, KickVoteView? SkipVote = null, BrushCursor? Cursor = null,
     bool KickVoteAvailable = true, bool SkipVoteAvailable = true,
     bool CustomWordAvailable = false, SolveResult[]? MatchResults = null,
-    int DrawingLikes = 0, bool YouLikedDrawing = false);
+    int DrawingLikes = 0, bool YouLikedDrawing = false, RoomEffect Effect = RoomEffect.None,
+    byte[]? Crayons = null, DateTimeOffset? EncoreUntil = null, int PomCount = 0, bool CanTossPom = false);
 
 public sealed record DrawOperation(string Tool, int X1, int Y1, int X2, int Y2, byte Color = 1, int Size = 3, Guid StrokeId = default);
 public sealed record ClientCommand(string Type, string? Text = null, RoomOptions? Options = null,
@@ -166,4 +173,4 @@ public sealed record ServerEvent(string Type, RoomView? Room = null, RoomSummary
     string? Error = null, PlayerProfile? Profile = null, Guid TurnId = default, string? RejectedCommand = null,
     WordListInfo[]? WordLists = null, byte[]? Canvas = null, bool CanUndo = false, BrushCursor? Cursor = null,
     SocialView? Social = null, SharedProfile? SharedProfile = null, GameInvitation? Invitation = null, bool Online = false,
-    LeaderboardView? Leaderboard = null, string[]? HostWords = null);
+    LeaderboardView? Leaderboard = null, string[]? HostWords = null, int PomCount = 0);

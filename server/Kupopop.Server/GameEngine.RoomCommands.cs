@@ -122,6 +122,7 @@ public sealed partial class GameEngine
         room.MatchScores = participants.ToDictionary(id => id, id => new SolveResult(id, accounts.Get(id)!.DisplayName, 0));
         room.StatsParticipants = participants.Where(id => accounts.Preferences(id).TrackStats).ToHashSet();
         room.StatsRecorded = false;
+        room.BonusPoints.Clear();
         room.Results = [];
         room.TurnOrder = [];
         room.Round = 0;

@@ -6,6 +6,7 @@ namespace Kupopop.Server;
 
 public interface IGamePeer
 {
+    bool SupportsRoomEffects => false;
     Guid Id
     {
         get;
@@ -20,8 +21,9 @@ public interface IGamePeer
     void Close();
 }
 
-public sealed class Peer(Guid id, WebSocket socket, InputRateLimiter? limiter = null) : IGamePeer
+public sealed class Peer(Guid id, WebSocket socket, InputRateLimiter? limiter = null, bool supportsRoomEffects = false) : IGamePeer
 {
+    public bool SupportsRoomEffects { get; } = supportsRoomEffects;
     private readonly Channel<byte[]> queue = Channel.CreateBounded<byte[]>(TransportLimits.QueueMessages);
     private readonly InputRateLimiter limits = limiter ?? new();
     private int queuedBytes;

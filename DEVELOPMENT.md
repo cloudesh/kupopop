@@ -42,6 +42,7 @@ Paths below are relative to the repository root.
 | `server/Kupopop.Server/GameEngine.cs` | Session ownership, command dispatch and room rules |
 | `server/Kupopop.Server/GameEngine.RoomCommands.cs`, `GameEngine.DrawingCommands.cs`, `GameEngine.ProfileCommands.cs` | Named handlers for validated commands |
 | `server/Kupopop.Server/GameEngine.Turns.cs` | Guess scoring and turn transitions |
+| `server/Kupopop.Server/GameEngine.RoomEffects.cs`, `plugin/Kupopop/MainWindow.RoomEffects.cs` | Turn rolls, temporary bonuses, starter drawings and Encore celebrations |
 | `server/Kupopop.Server/GameEngine.Social.cs` | Relationship-based access and private invitations |
 | `server/Kupopop.Server/AccountStore*.cs` | SQLite accounts, preferences, relationships and statistics |
 | `server/Kupopop.Tests/ReviewPreparationChecks.cs` | Queue budgets, session expiry, bans, privacy independence and allocation regressions |
@@ -83,6 +84,13 @@ the normal frame is hidden except in debug mode. Styles stay scoped to the plugi
 Textures and sound buffers have explicit owners and are released on unload.
 
 ## Game invariants
+
+Room effects roll once when drawing starts. Hosts choose the eligible effects.
+Older drawers use ordinary turns. The server sends mirrored strokes as ordinary
+drawing events, takes one undo snapshot per stroke and validates borrowed ink.
+Double Points bonuses stay in the match score. A full solve can earn a separate
+five-second Encore before the recap. Pom tosses are turn-bound, once per solver,
+and never change the drawing pixels.
 
 - Only the active drawer can paint, undo or publish a canvas cursor. Commands
   carry a turn ID and are checked against the server deadline.
