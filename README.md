@@ -4,7 +4,7 @@
 
 <h1 align="center">Kupo Skribbl · FFXIV Pictionary for Dalamud</h1>
 
-<p align="center">A multiplayer Pictionary-style drawing and guessing game inside Final Fantasy XIV.<br />Pick a word, draw something questionable, and let your friends guess — a party for 2–16 players.</p>
+<p align="center">A Pictionary-style drawing and guessing game inside Final Fantasy XIV for 2–16 players.</p>
 
 <p align="center">
   <a href="#install-in-dalamud"><strong>Install in Dalamud</strong></a> ·
@@ -19,11 +19,11 @@
   <a href="LICENSE"><img src="https://img.shields.io/github/license/cloudesh/kupopop?style=flat-square&amp;color=9c7844" alt="MIT license" /></a>
 </p>
 
-| Play together | Make it your own | Pick your challenge |
+| Multiplayer | Profiles | Word lists |
 | --- | --- | --- |
-| Private room codes, public lobbies and friend invitations. Join an ongoing game and start guessing. | Draw your portrait, choose light or dark paper, and give your favourite drawings a thumbs-up. | FFXIV, everyday objects, internet memes and video games. Set the timer and rounds, or use custom words for an unranked match. |
+| Private rooms, public lobbies and friend invitations. | Custom drawn portraits and optional leaderboards. | FFXIV, everyday objects, memes, video games and custom words. |
 
-Runs inside FFXIV through **Dalamud / XIVLauncher**. All players connect to one shared server; no browser or server setup required.
+Requires **Dalamud / XIVLauncher**. Connects automatically to our shared server.
 
 ## Install in Dalamud
 
@@ -35,39 +35,37 @@ Runs inside FFXIV through **Dalamud / XIVLauncher**. All players connect to one 
    ```
 
 3. Find **Kupo Skribbl** in the plugin installer and install it.
-4. Type **`/kupo`** to open your drawing book. **`/kuposkribbl`** and **`/kupopop`** work too.
+4. Open with **`/kupo`**, **`/kuposkribbl`** or **`/kupopop`**.
 
-Create your profile, save its private recovery code, and invite a friend. Everyone connects automatically to our shared server; no server setup is needed. Keep the recovery code somewhere safe and never share it.
+Create a profile and save your recovery code somewhere private. Never share it.
 
-**Unofficial custom repository.** Install through Dalamud's **Experimental** settings using the link above. Kupo Skribbl is not listed in the official Dalamud repository. Each player needs their own copy of the plugin.
+**Unofficial plugin:** not listed in the official Dalamud repository. Each player needs the plugin installed.
 
 ## How to play
 
-1. **Gather your artists.** Join via code, Host Room or Browse Lobbies. Rooms support 2–16 players.
-2. **Choose your word.** On your turn, pick from the offered words and draw it with the pencil, fill, eraser or shapes. Artistic talent is optional.
-3. **Guess in room chat.** Earlier correct guesses earn more points. The drawer earns points when others solve it.
-4. **Enjoy the reveal.** See the answer, celebrate the quickest guessers, and pass the pencil along. After the final round, the highest score wins.
+1. Join via code, host a room or browse public lobbies.
+2. On your turn, choose a word and draw it.
+3. Guess in chat. Earlier correct guesses earn more points; correct guesses also reward the drawer.
+4. The highest score after the final round wins.
 
-You can join a match already in progress. Guess immediately; new players enter the drawing order next round, or next match when joining the final round.
+Hosts choose the timer, rounds and word lists. Custom-word matches are unranked. Join an ongoing match to guess immediately and draw from the next round (or next match if it is the final round).
 
-Right-click an artist to add a friend or view their shared profile. Manage requests and invitations in **Friends**. Use **Suggestions** on the home page to send feedback or suggest a drawable word or category.
+Right-click a player to add a friend or view their shared profile. Send invitations from **Friends**.
 
-## Your profile, your choices
+## Privacy
 
-The book starts closed. Closing it leaves your room and disconnects you. Friends see you online only while it is open; recently played partners clear when you close it.
+Closing the plugin leaves your room and disconnects you. Optional background invitation checks run once a minute and never reopen it automatically.
 
-Setup offers a choice to enable lifetime statistics, profile sharing and closed-window invitations, or create a private profile. Change these separately in **Profile → Privacy & invitations**. Optional closed-window invitations use a short check once a minute; they never open the book automatically.
+Choose whether to record statistics, share your profile and receive background invitations during setup or in **Profile → Privacy & invitations**. Shared profiles are visible to friends and people you played with; there is no player search.
 
-Shared profiles are available to friends and people you played with, without global player search. Recorded lifetime statistics appear on leaderboards with anonymous names and your portrait by default. You can include your name, hide your portrait or leave the leaderboards. A recognisable portrait can identify you. Reset or disable statistics at any time. Game scores are not a currency.
+Recorded statistics appear on leaderboards with your portrait and an anonymous name by default. A recognisable portrait can identify you. You can show your name, hide your portrait, leave leaderboards, or reset/disable statistics.
 
-## Help us make it better
+## Feedback
 
-[Report a bug or suggest an idea](https://github.com/cloudesh/kupopop/issues). Include the plugin version, what happened and what you expected. Keep passwords, recovery codes and private chat out of reports.
-
-Share the [installation guide](https://github.com/cloudesh/kupopop#install-in-dalamud) with your friends or Free Company to organise a game night.
+[Report a bug](https://github.com/cloudesh/kupopop/issues) with your plugin version and steps to reproduce it. Use **Suggestions** in the plugin for ideas or new words. Never include credentials or private chat.
 
 For contributors: [build and architecture guide](DEVELOPMENT.md) · [release notes](https://github.com/cloudesh/kupopop/releases) · [licenses and notices](THIRD_PARTY_NOTICES.md).
 
-Download badges count release-asset downloads, including repeats and older releases; they are not a player count.
+The download badge counts downloads, not unique players.
 
 Not affiliated with Square Enix or skribbl.io.
