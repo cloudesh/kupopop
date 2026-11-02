@@ -6,7 +6,7 @@ using Kupopop.Shared;
 namespace Kupopop.Server;
 
 public sealed record ServerWordList(string Id, string Name, bool DefaultEnabled, bool Complex, string[] Words,
-    string Category = "FFXIV", Dictionary<string, string[]>? Aliases = null);
+    string Category = "FFXIV", Dictionary<string, string[]>? Aliases = null, WordDifficulty? Difficulty = null);
 
 /// <summary>Private host data. Only catalog metadata may cross the protocol boundary.</summary>
 public sealed class WordBank
@@ -42,8 +42,17 @@ public sealed class WordBank
                 throw new InvalidDataException("Invalid private answer aliases.");
             }
 
+            if (list.Difficulty is { } difficulty && !Enum.IsDefined(difficulty))
+            {
+                throw new InvalidDataException("Invalid word-list difficulty.");
+            }
+
+            // Untagged banks retain their previous host-selected defaults.
+            bool? standard = list.Difficulty is null ? null : list.Difficulty is WordDifficulty.Easy or WordDifficulty.Medium;
             return list with
             {
+                DefaultEnabled = standard ?? list.DefaultEnabled,
+                Complex = !standard ?? list.Complex,
                 Words = words,
                 Aliases = list.Aliases?.ToDictionary(p => p.Key,
                 p => (string[])p.Value.Clone(), StringComparer.OrdinalIgnoreCase)
@@ -54,7 +63,7 @@ public sealed class WordBank
             throw new InvalidDataException("Enable at least one default list.");
         }
     }
-    public WordListInfo[] Catalog => lists.Select(l => new WordListInfo(l.Id, l.Name, l.Words.Length, l.DefaultEnabled, l.Complex, l.Category)).ToArray();
+    public WordListInfo[] Catalog => lists.Select(l => new WordListInfo(l.Id, l.Name, l.Words.Length, l.DefaultEnabled, l.Complex, l.Category, l.Difficulty)).ToArray();
     public string[] Answers(string word, string[]? selection) => lists.Where(l => selection is not null && selection.Contains(l.Id))
         .Where(l => l.Aliases is not null && l.Aliases.ContainsKey(word)).SelectMany(l => l.Aliases![word])
         .Append(word).Select(GuessMatching.Normalize).Distinct(StringComparer.Ordinal).ToArray();
@@ -89,7 +98,7 @@ public sealed class WordBank
         return (alternatives.Length >= count ? alternatives : pool).Take(count).ToArray();
     }
     public static WordBank Starter() => new([new("starter", "FFXIV Starter", true, false,
-        ["Moogle", "Chocobo", "Cactuar", "Spriggan", "Tonberry", "Carbuncle", "Mandragora", "Fat Cat"])]);
+        ["Moogle", "Chocobo", "Cactuar", "Spriggan", "Tonberry", "Carbuncle", "Mandragora", "Fat Cat"], Difficulty: WordDifficulty.Easy)]);
     public static WordBank Open(string directory)
     {
         string path = Path.Combine(directory, "word-lists.json");

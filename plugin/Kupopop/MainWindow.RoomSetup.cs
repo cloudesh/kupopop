@@ -142,7 +142,7 @@ public sealed partial class MainWindow
 
     private void WordListPage()
     {
-        if (UiTheme.Button("Normal lists", 0, quiet: true))
+        if (UiTheme.Button("Default lists", 0, quiet: true))
         {
             selectedWordLists.Clear();
             foreach (var list in wordLists.Where(l => l.DefaultEnabled))
@@ -193,7 +193,7 @@ public sealed partial class MainWindow
             }
             if (ImGui.IsItemHovered())
             {
-                UiTheme.Tooltip("Include or exclude this category. Enabling it selects its normal lists; advanced lists stay optional.");
+                UiTheme.Tooltip("Select this category's default lists, or all lists if it has no defaults.");
             }
 
             ImGui.SameLine();
@@ -226,7 +226,7 @@ public sealed partial class MainWindow
                 {
                     ImGui.TableNextColumn();
                     bool enabled = selectedWordLists.Contains(list.Id);
-                    string detail = $"{list.Count} words" + (list.Complex ? " - Advanced" : "");
+                    string detail = $"{list.Count} words · {list.Difficulty?.ToString() ?? (list.Complex ? "Advanced" : "Standard")}";
                     if (UiTheme.ListButton(list.Id, list.Name, detail, enabled))
                     {
                         if (enabled)
@@ -242,7 +242,7 @@ public sealed partial class MainWindow
                     }
                     if (ImGui.IsItemHovered())
                     {
-                        UiTheme.Tooltip(list.Name + "\n" + detail + (list.Complex ? "\nDisabled by default." : ""));
+                        UiTheme.Tooltip(list.Name + "\n" + detail + (list.DefaultEnabled ? "" : "\nDisabled by default."));
                     }
                 }
             }

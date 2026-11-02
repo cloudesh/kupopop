@@ -70,6 +70,15 @@ static class FeatureChecks
             new("complex", "Complex test", false, true, ["Hidden gamma", "Hidden delta", "Hidden epsilon", "Hidden zeta"])]);
         check(bank.Selection(null).SequenceEqual(new[] { "normal" }) && bank.Catalog[1].Complex && !bank.Catalog[1].DefaultEnabled,
             "standard lists default on and complex lists default off");
+        var graded = new WordBank(Enum.GetValues<WordDifficulty>().Select(tier =>
+            new ServerWordList(tier.ToString().ToLowerInvariant(), tier.ToString(), false, false, ["Test A", "Test B"],
+                Difficulty: tier)).ToArray());
+        check(graded.Selection(null).SequenceEqual(["easy", "medium"]) && graded.Catalog.All(list =>
+            list.Complex == (list.Difficulty is WordDifficulty.Difficult or WordDifficulty.Extreme)),
+            "tagged lists derive defaults and legacy advanced flags from the difficulty");
+        var catalogEvent = JsonSerializer.Deserialize<ServerEvent>(Protocol.Encode(new ServerEvent("wordlists", WordLists: graded.Catalog)), Protocol.Json);
+        check(catalogEvent?.WordLists is { } received && received.SequenceEqual(graded.Catalog) &&
+            graded.Selection(["extreme"]).Single() == "extreme", "difficulty labels survive transport and hosts can select an extreme list alone");
         string metadata = Encoding.UTF8.GetString(Protocol.Encode(new ServerEvent("wordlists", WordLists: bank.Catalog)));
         check(!metadata.Contains("Private alpha") && !metadata.Contains("Hidden gamma") && bank.Catalog[0].Count == 2,
             "catalog protocol reveals list metadata/counts without any answer bank");

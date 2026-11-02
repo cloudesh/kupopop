@@ -118,6 +118,8 @@ there is no global player search. Recent partners are session-only. Invitations
 expire after five minutes. Optional closed-window checks use one bounded HTTPS
 request per minute without a game socket or online presence.
 
+Word lists can specify an Easy, Medium, Difficult or Extreme difficulty. New rooms
+select Easy and Medium lists. Untagged banks retain their configured defaults.
 The private word bank is runtime configuration, not a public asset. Send only
 catalog metadata and the words needed for the current turn. Never put credentials,
 private chat, answers, unused choices or drawing payloads in diagnostics.

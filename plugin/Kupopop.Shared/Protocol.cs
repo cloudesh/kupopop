@@ -93,7 +93,8 @@ public static class Protocol
         }
 
         if (message.WordLists is { } lists && (lists.Length > 64 || lists.Any(l => l is null ||
-            !Text(l.Id, 40) || !ValidName(l.Name) || !ValidName(l.Category) || l.Count is < 2 or > 2000)))
+            !Text(l.Id, 40) || !ValidName(l.Name) || !ValidName(l.Category) || l.Count is < 2 or > 2000 ||
+            (l.Difficulty is { } difficulty && !Enum.IsDefined(difficulty)))))
         {
             return false;
         }
@@ -133,7 +134,11 @@ public sealed record RoomOptions(string Title, bool IsPublic = false, int TurnSe
     int WordChoiceCount = 4, bool VoteKickEnabled = true, bool VoteSkipEnabled = true,
     bool CustomWordsEnabled = true, int CustomWordCount = 0);
 
-public sealed record WordListInfo(string Id, string Name, int Count, bool DefaultEnabled, bool Complex, string Category = "FFXIV");
+[System.Text.Json.Serialization.JsonConverter(typeof(System.Text.Json.Serialization.JsonStringEnumConverter<WordDifficulty>))]
+public enum WordDifficulty { Easy, Medium, Difficult, Extreme }
+
+public sealed record WordListInfo(string Id, string Name, int Count, bool DefaultEnabled, bool Complex, string Category = "FFXIV",
+    WordDifficulty? Difficulty = null);
 public sealed record KickVoteView(Guid Target, int Votes, int Required, bool YouVoted, DateTimeOffset ExpiresAt);
 public sealed record SolveResult(Guid PlayerId, string Name, int Points);
 public sealed record BrushCursor(int X, int Y, string Tool, byte Color = 1, int Size = 3, bool Visible = true);
