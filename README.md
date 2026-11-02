@@ -19,13 +19,11 @@
   <a href="LICENSE"><img src="https://img.shields.io/github/license/cloudesh/kupopop?style=flat-square&amp;color=9c7844" alt="MIT license" /></a>
 </p>
 
-**A party game in your game.** Private room codes, public lobbies and friend invitations make it easy to gather a group. Everyone draws in turn; faster guesses earn more points. No browser window needed.
+| Play together | Make it your own | Pick your challenge |
+| --- | --- | --- |
+| Private room codes, public lobbies and friend invitations. Join an ongoing game and start guessing. | Draw your portrait, choose light or dark paper, and give your favourite drawings a thumbs-up. | FFXIV, everyday objects, internet memes and video games. Set the timer and rounds, or use custom words for an unranked match. |
 
-**Your own little art book.** Draw your portrait, pick light or dark paper, rescue a masterpiece with undo, and give a good drawing a thumbs-up. Tap the home-page moogle for a little surprise.
-
-**Something for every group.** Choose FFXIV, everyday things, internet memes or video games. Hosts can set the timer, rounds and word choices, or bring their own custom words for an unranked game.
-
-**Version 1.0 is here.** A Pictionary-style multiplayer game for FFXIV, with drawn portraits, friends and shared profiles. Profile opens with your portrait and game record; choose **Change profile picture** when you want to draw a new one.
+Runs inside FFXIV through **Dalamud / XIVLauncher**. All players connect to one shared server; no browser or server setup required.
 
 ## Install in Dalamud
 
@@ -41,7 +39,7 @@
 
 Create your profile, save its private recovery code, and invite a friend. Everyone connects automatically to our shared server; no server setup is needed. Keep the recovery code somewhere safe and never share it.
 
-**Custom repository:** Version 1.0 is available through the link above, added under Dalamud's **Experimental** settings. It is not currently listed in the official Dalamud repository. All players need Dalamud/XIVLauncher and their own copy of the plugin.
+**Unofficial custom repository.** Install through Dalamud's **Experimental** settings using the link above. Kupo Skribbl is not listed in the official Dalamud repository. Each player needs their own copy of the plugin.
 
 ## How to play
 
@@ -66,7 +64,9 @@ Shared profiles are available to friends and people you played with, without glo
 
 [Report a bug or suggest an idea](https://github.com/cloudesh/kupopop/issues). Include the plugin version, what happened and what you expected. Keep passwords, recovery codes and private chat out of reports.
 
-Enjoyed a game? Share the install link with your group, or star this repository to find it again. A short clip of a terrible drawing says more than a perfect one.
+Share the [installation guide](https://github.com/cloudesh/kupopop#install-in-dalamud) with your friends or Free Company to organise a game night.
+
+For contributors: [build and architecture guide](DEVELOPMENT.md) · [release notes](https://github.com/cloudesh/kupopop/releases) · [licenses and notices](THIRD_PARTY_NOTICES.md).
 
 Download badges count release-asset downloads, including repeats and older releases; they are not a player count.
 

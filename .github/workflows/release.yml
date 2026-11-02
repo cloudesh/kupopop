@@ -46,17 +46,23 @@ jobs:
           $manifest = Get-Content artifacts/repo.json -Raw | ConvertFrom-Json
           $tag = 'v' + (($manifest[0].AssemblyVersion -split '\.')[0..2] -join '.')
           gh release view $tag *> $null
-          if ($LASTEXITCODE -ne 0) {
-            $releaseArgs = @('release','create',$tag,'--target',$env:GITHUB_SHA,'--notes-file','RELEASE_NOTES.md')
-            if (([version]$manifest[0].AssemblyVersion).Major -eq 0) {
-              $releaseArgs += @('--prerelease','--title',"Kupo Skribbl $tag - experimental")
-            } else {
-              $releaseArgs += @('--latest','--title',"Kupo Skribbl $tag")
-            }
-            gh @releaseArgs
-            if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          if ($LASTEXITCODE -eq 0) {
+            throw "Release $tag already exists. Published assets are immutable; increment Directory.Build.props before publishing again."
           }
-          gh release upload $tag artifacts/testing.zip artifacts/repo.json --clobber
+          # Upload into a draft first so incomplete releases are not advertised.
+          $releaseArgs = @('release','create',$tag,'--draft','--target',$env:GITHUB_SHA,'--notes-file','RELEASE_NOTES.md')
+          if (([version]$manifest[0].AssemblyVersion).Major -eq 0) {
+            $releaseArgs += @('--prerelease','--title',"Kupo Skribbl $tag - experimental")
+          } else {
+            $releaseArgs += @('--title',"Kupo Skribbl $tag")
+          }
+          gh @releaseArgs
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          gh release upload $tag artifacts/testing.zip artifacts/repo.json
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          $publishArgs = @('release','edit',$tag,'--draft=false')
+          if (([version]$manifest[0].AssemblyVersion).Major -ge 1) { $publishArgs += '--latest' }
+          gh @publishArgs
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
       - name: Verify download and publish installer feed
         shell: pwsh
@@ -67,6 +73,9 @@ jobs:
           $manifest = (Get-Content artifacts/repo.json -Raw | ConvertFrom-Json)[0]
           $download = Join-Path $env:RUNNER_TEMP 'verified-testing.zip'
           Invoke-WebRequest $manifest.DownloadLinkInstall -OutFile $download
+          if ((Get-FileHash $download -Algorithm SHA256).Hash -ne (Get-FileHash artifacts/testing.zip -Algorithm SHA256).Hash) {
+            throw 'Published ZIP bytes do not match the tested build.'
+          }
           Add-Type -AssemblyName System.IO.Compression.FileSystem
           $archive = [IO.Compression.ZipFile]::OpenRead($download)
           try {

@@ -1,8 +1,10 @@
-Kupo Skribbl 1.0.3
+Kupo Skribbl 1.0.4
 
-- Join rooms while a match is in progress, including public lobbies, room codes and friend invitations.
-- New players can guess immediately and receive drawing turns from the next round. Players joining the final round draw in the next match.
-- Public rooms stay listed throughout the match. Full rooms and reserved reconnect seats still respect the room capacity.
-- Scores and solved-word status survive leaving and rejoining, preventing duplicate solve awards. Active ballots keep their original voters and thresholds.
+Maintenance release; game rules and features are unchanged.
 
-API 15, protocol 5, SQLite schema 6. The maintained server and plugin are updated together. Existing accounts and privacy preferences are preserved. Automated checks run outside FFXIV; in-game verification remains necessary.
+- Clarify server authentication handlers and turn-state ownership.
+- Separate client room-state handling from event dispatch.
+- Replace outdated development notes with a current architecture guide and simplify the README.
+- Protect published release assets from accidental replacement and verify download hashes before updating the installer feed.
+
+Dalamud API 15, protocol 5 and SQLite schema 6. Existing accounts and preferences are unchanged.

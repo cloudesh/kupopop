@@ -228,27 +228,7 @@ public sealed partial class MainWindow : Window, IDisposable
                 if (profile is not null && screen != "profile") displayName = profile.DisplayName;
                 break;
             case "state" when message.Room is { } state:
-                if (state.Players.Length > 16) throw new InvalidDataException("Server player limit exceeded.");
-                bool differentRoom = room?.Code != state.Code;
-                bool newTurn = room?.TurnId != state.TurnId;
-                if (differentRoom) audio.Stop();
-                if (differentRoom) chat.Clear();
-                if (state.ResetCanvas || newTurn) canvas.Clear();
-                if (state.Canvas is { } pixels) canvas.Load(pixels);
-                if (newTurn || state.Canvas is not null) { undoPending = false; canUndoDrawing = state.CanUndo; }
-                if (newTurn || state.Phase != "drawing") painting.RemoteCursor = null;
-                if (state.Cursor is { } brush && state.DrawerId != device?.AccountId)
-                { painting.RemoteCursor = brush; remoteCursorAt = Environment.TickCount64; }
-                if (audioStateReady && plugin.Config.GameSounds)
-                    foreach (var cue in GameSoundEvents.Transition(room, state, device?.AccountId)) audio.Enqueue(cue);
-                audioStateReady = true;
-                room = state;
-                if (differentRoom) Send(new("social"));
-                serverOffset = state.ServerTime - DateTimeOffset.UtcNow;
-                if (screen is not ("profile" or "friends") && !(screen == "create" && !differentRoom && state.Phase is "waiting" or "results")) screen = "game";
-                if (differentRoom && inviteAfterCreate && state.HostId == device?.AccountId)
-                { inviteAfterCreate = false; OpenFriends(inviting: true); }
-                log.Write($"room.state phase={state.Phase} round={state.Round} players={state.Players.Length} canvas_reset={state.ResetCanvas}");
+                ApplyRoomState(state);
                 break;
             case "draw" when message.Draw is { } op:
                 if (room?.TurnId == message.TurnId && message.ActorId != device?.AccountId) canvas.Apply(op);
@@ -296,6 +276,51 @@ public sealed partial class MainWindow : Window, IDisposable
                 break;
         }
 
+    }
+
+    // Snapshots are already protocol-validated. Apply pixels, turn state and cues
+    // together on the UI thread so renderers never observe a half-applied turn.
+    private void ApplyRoomState(RoomView state)
+    {
+        if (state.Players.Length > Protocol.MaximumPlayers)
+            throw new InvalidDataException("Server player limit exceeded.");
+        bool differentRoom = room?.Code != state.Code;
+        bool newTurn = room?.TurnId != state.TurnId;
+        if (differentRoom)
+        {
+            audio.Stop();
+            chat.Clear();
+        }
+        if (state.ResetCanvas || newTurn) canvas.Clear();
+        if (state.Canvas is { } pixels) canvas.Load(pixels);
+        if (newTurn || state.Canvas is not null)
+        {
+            undoPending = false;
+            canUndoDrawing = state.CanUndo;
+        }
+        if (newTurn || state.Phase != "drawing") painting.RemoteCursor = null;
+        if (state.Cursor is { } brush && state.DrawerId != device?.AccountId)
+        {
+            painting.RemoteCursor = brush;
+            remoteCursorAt = Environment.TickCount64;
+        }
+        if (audioStateReady && plugin.Config.GameSounds)
+            foreach (var cue in GameSoundEvents.Transition(room, state, device?.AccountId)) audio.Enqueue(cue);
+        audioStateReady = true;
+        room = state;
+        if (differentRoom) Send(new("social"));
+        serverOffset = state.ServerTime - DateTimeOffset.UtcNow;
+
+        // Keep profile/friend pages open. Preserve room settings only between
+        // matches in the same room; otherwise return to the game view.
+        bool keepSettingsOpen = screen == "create" && !differentRoom && state.Phase is "waiting" or "results";
+        if (screen is not ("profile" or "friends") && !keepSettingsOpen) screen = "game";
+        if (differentRoom && inviteAfterCreate && state.HostId == device?.AccountId)
+        {
+            inviteAfterCreate = false;
+            OpenFriends(inviting: true);
+        }
+        log.Write($"room.state phase={state.Phase} round={state.Round} players={state.Players.Length} canvas_reset={state.ResetCanvas}");
     }
 
     private void CreateAccount(bool recovering, bool enableAll = false)
