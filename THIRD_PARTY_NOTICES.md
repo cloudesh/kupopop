@@ -1,6 +1,7 @@
 # Third-party components
 
-Kupopop's own source is MIT licensed. Dependencies keep their own licenses.
+Kupopop's own source is licensed under AGPL-3.0-only; see LICENSE.
+Dependencies keep their own licenses and notices below.
 
 - The plugin references Dalamud and its ImGui bindings supplied by the user's
   Dalamud installation. These binaries are not included in the plugin ZIP.

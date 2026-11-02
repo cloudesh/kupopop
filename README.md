@@ -16,7 +16,7 @@
 <p align="center">
   <a href="https://github.com/cloudesh/kupopop/releases"><img src="https://img.shields.io/github/downloads/cloudesh/kupopop/total?style=flat-square&amp;color=9a506b&amp;label=downloads" alt="GitHub release downloads" /></a>
   <a href="https://github.com/cloudesh/kupopop/releases/latest"><img src="https://img.shields.io/github/v/release/cloudesh/kupopop?style=flat-square&amp;color=42766b&amp;label=latest" alt="Latest Kupo Skribbl release" /></a>
-  <a href="LICENSE"><img src="https://img.shields.io/github/license/cloudesh/kupopop?style=flat-square&amp;color=9c7844" alt="MIT license" /></a>
+  <a href="LICENSE"><img src="https://img.shields.io/github/license/cloudesh/kupopop?style=flat-square&amp;color=9c7844" alt="AGPLv3 license" /></a>
 </p>
 
 | Multiplayer | Profiles | Word lists |
@@ -65,6 +65,8 @@ Recorded statistics appear on leaderboards with your portrait and an anonymous n
 [Report a bug](https://github.com/cloudesh/kupopop/issues) with your plugin version and steps to reproduce it. Use **Suggestions** in the plugin for ideas or new words. Never include credentials or private chat.
 
 For contributors: [build and architecture guide](DEVELOPMENT.md) · [release notes](https://github.com/cloudesh/kupopop/releases) · [licenses and notices](THIRD_PARTY_NOTICES.md).
+
+Copyright © 2026 cloudesh. Project source is licensed under [AGPL-3.0-only](LICENSE), including the plugin, shared code and server. Third-party components retain their own licenses.
 
 The download badge counts downloads, not unique players.
 

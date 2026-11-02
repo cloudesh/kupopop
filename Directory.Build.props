@@ -4,6 +4,7 @@
     <ImplicitUsings>enable</ImplicitUsings>
     <LangVersion>latest</LangVersion>
     <Version>1.0.4.0</Version>
+    <PackageLicenseExpression>AGPL-3.0-only</PackageLicenseExpression>
     <Deterministic>true</Deterministic>
   </PropertyGroup>
 </Project>
