@@ -31,7 +31,11 @@ if (args.Contains("--database-check") || args.Contains("--backup-database"))
     int backupOption = Array.IndexOf(args, "--backup-database");
     if (backupOption >= 0)
     {
-        if (backupOption + 1 >= args.Length) throw new ArgumentException("Supply a new backup filename.");
+        if (backupOption + 1 >= args.Length)
+        {
+            throw new ArgumentException("Supply a new backup filename.");
+        }
+
         store.Backup(Path.GetFullPath(args[backupOption + 1]));
     }
     store.VerifyIntegrity();
@@ -52,7 +56,10 @@ builder.WebHost.ConfigureKestrel(options =>
     int port = int.TryParse(Environment.GetEnvironmentVariable("KUPOPOP_PORT"), out int configured) ? configured : proxy || testing ? 5080 : 7443;
     options.ListenLocalhost(port, listen =>
     {
-        if (!proxy && !testing) listen.UseHttps(LocalCertificate.Load(data, args.Contains("--trust-local")));
+        if (!proxy && !testing)
+        {
+            listen.UseHttps(LocalCertificate.Load(data, args.Contains("--trust-local")));
+        }
     });
 });
 builder.Services.AddSingleton(_ => new AccountStore(data));
@@ -65,22 +72,44 @@ builder.Services.AddRateLimiter(options =>
     options.RejectionStatusCode = StatusCodes.Status429TooManyRequests;
     options.AddPolicy("invitation-checks", context => RateLimitPartition.GetFixedWindowLimiter(
         context.Connection.RemoteIpAddress?.ToString() ?? "local", _ => new FixedWindowRateLimiterOptions
-        { PermitLimit = 60, Window = TimeSpan.FromMinutes(1), QueueLimit = 0 }));
+        {
+            PermitLimit = 60,
+            Window = TimeSpan.FromMinutes(1),
+            QueueLimit = 0
+        }));
     options.AddPolicy("accounts", context => RateLimitPartition.GetFixedWindowLimiter(
         context.Connection.RemoteIpAddress?.ToString() ?? "local", _ => new FixedWindowRateLimiterOptions
-        { PermitLimit = 10, Window = TimeSpan.FromMinutes(1), QueueLimit = 0 }));
+        {
+            PermitLimit = 10,
+            Window = TimeSpan.FromMinutes(1),
+            QueueLimit = 0
+        }));
     options.AddPolicy("connections", context => RateLimitPartition.GetFixedWindowLimiter(
         context.Connection.RemoteIpAddress?.ToString() ?? "local", _ => new FixedWindowRateLimiterOptions
-        { PermitLimit = 60, Window = TimeSpan.FromMinutes(1), QueueLimit = 0 }));
+        {
+            PermitLimit = 60,
+            Window = TimeSpan.FromMinutes(1),
+            QueueLimit = 0
+        }));
 });
 await using var app = builder.Build();
 app.Use(async (context, next) =>
 {
-    if (context.Request.Path.StartsWithSegments("/api")) context.Response.Headers.CacheControl = "no-store";
+    if (context.Request.Path.StartsWithSegments("/api"))
+    {
+        context.Response.Headers.CacheControl = "no-store";
+    }
+
     await next();
 });
-if (proxy) app.UseForwardedHeaders(new ForwardedHeadersOptions
-{ ForwardedHeaders = ForwardedHeaders.XForwardedFor | ForwardedHeaders.XForwardedProto });
+if (proxy)
+{
+    app.UseForwardedHeaders(new ForwardedHeadersOptions
+    {
+        ForwardedHeaders = ForwardedHeaders.XForwardedFor | ForwardedHeaders.XForwardedProto
+    });
+}
+
 app.UseRateLimiter();
 app.UseWebSockets(new WebSocketOptions { KeepAliveInterval = TimeSpan.FromSeconds(20) });
 app.MapGet("/health", () => Results.Json(new { service = "Kupo Skribbl", version = typeof(GameEngine).Assembly.GetName().Version?.ToString(), protocol = Protocol.Version, storage = "sqlite" }));
@@ -93,14 +122,23 @@ var monitoring = ServerMonitor.PublishAsync(game, monitorPath, app.Logger, tickS
 var ticking = Task.Run(async () =>
 {
     using var timer = new PeriodicTimer(TimeSpan.FromMilliseconds(250));
-    try { while (await timer.WaitForNextTickAsync(tickStop.Token)) game.Tick(); }
+    try
+    {
+        while (await timer.WaitForNextTickAsync(tickStop.Token))
+        {
+            game.Tick();
+        }
+    }
     catch (OperationCanceledException) { }
     catch (Exception ex) { app.Logger.LogCritical(ex, "Game clock failed; server stopping."); app.Lifetime.StopApplication(); }
 });
 app.Lifetime.ApplicationStopping.Register(() => tickStop.Cancel());
 app.Logger.LogInformation("Kupo Skribbl {Version} starting. Protocol={Protocol} Mode={Mode}", typeof(GameEngine).Assembly.GetName().Version, Protocol.Version,
     testing ? "isolated integration test" : proxy ? "TLS reverse proxy (loopback backend)" : "localhost development TLS");
-try { await app.RunAsync(); }
+try
+{
+    await app.RunAsync();
+}
 finally
 {
     tickStop.Cancel();

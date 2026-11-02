@@ -29,7 +29,10 @@ Paths below are relative to the repository root.
 | --- | --- |
 | `plugin/Kupopop/Plugin.cs` | Commands, WindowSystem registration, notifications and unload |
 | `plugin/Kupopop/MainWindow.cs` | Session lifecycle and main-thread event handling |
-| `plugin/Kupopop/MainWindow.*.cs` | Individual pages, navigation and overlays |
+| `plugin/Kupopop/MainWindow.Chrome.cs` | Window layout, header, navigation and back actions |
+| `plugin/Kupopop/MainWindow.Home.cs`, `MainWindow.Onboarding.cs`, `MainWindow.Lobbies.cs` | Entry pages and room discovery |
+| `plugin/Kupopop/MainWindow.RoomSetup.cs`, `MainWindow.Game.cs`, `MainWindow.Profile.cs` | Room settings, game layout and profile preview/editor |
+| `plugin/Kupopop/MainWindow.Social.cs`, `MainWindow.Leaderboards.cs`, `MainWindow.Suggestions.cs` | Friends, rankings and explicit submissions |
 | `plugin/Kupopop/CanvasWidget.cs` | Pointer input, local drawing preview and canvas texture |
 | `plugin/Kupopop/Ui*.cs` | Scoped styling, layout and native artwork |
 | `plugin/Kupopop/CredentialVault.cs` | Service-bound, Windows DPAPI-protected credentials |
@@ -37,9 +40,11 @@ Paths below are relative to the repository root.
 | `plugin/Kupopop.Shared/` | Protocol, bounded transport, pixel operations and shared models |
 | `server/Kupopop.Server/GameEndpoints.cs` | HTTP authentication and WebSocket lifecycle |
 | `server/Kupopop.Server/GameEngine.cs` | Session ownership, command dispatch and room rules |
+| `server/Kupopop.Server/GameEngine.RoomCommands.cs`, `GameEngine.DrawingCommands.cs`, `GameEngine.ProfileCommands.cs` | Named handlers for validated commands |
 | `server/Kupopop.Server/GameEngine.Turns.cs` | Guess scoring and turn transitions |
 | `server/Kupopop.Server/GameEngine.Social.cs` | Relationship-based access and private invitations |
 | `server/Kupopop.Server/AccountStore*.cs` | SQLite accounts, preferences, relationships and statistics |
+| `server/Kupopop.Tests/ReviewPreparationChecks.cs` | Queue budgets, session expiry, bans, privacy independence and allocation regressions |
 | `server/Kupopop.Server/WordBank.cs` | Private word configuration and word selection |
 | `server/Kupopop.Tests/` | Regression checks, grouped by feature |
 
@@ -55,6 +60,23 @@ ImGui state and textures. Async completions carry their originating client so a
 retired session cannot update a newly opened window. Closing cancels HTTP work,
 sends a normal WebSocket close and clears local room state. Unexpected drops
 retain a 30-second reconnect reservation on the server.
+
+Transport limits live in `Kupopop.Shared/TransportLimits.cs`. The server's 2 MiB
+outbound queue accommodates the complete bounded reconnect batch before sending
+starts. Slow consumers still disconnect at the byte/message bounds. Application
+receive deadlines and transport keepalive timeouts detect silent connections.
+Recents expire with disconnected sessions, including users outside rooms. Host
+and vote kicks ban the account for that room's lifetime; other rooms are unaffected.
+
+The UI drains incoming events for at most 2 ms or 256 messages per frame,
+preserving order. Canvas conversion reuses its RGBA buffer. Offscreen chat and
+ranking rows avoid rendering work. Diagnostics write through a bounded background
+queue; ordinary state/layout tracing is available only in the debug view.
+
+Profile reads cache committed portraits without exposing mutable cache arrays;
+SQLite `data_version` invalidates the cache after external commits. Social panels
+batch profile/privacy reads. Identical broadcasts serialize once; personalized
+state, private words and done-mode chat retain recipient-specific filtering.
 
 Native ImGui movement owns window dragging. WindowSystem owns focus and closing;
 the normal frame is hidden except in debug mode. Styles stay scoped to the plugin.

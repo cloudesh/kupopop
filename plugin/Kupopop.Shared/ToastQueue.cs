@@ -9,7 +9,11 @@ public sealed class ToastQueue(TimeProvider? clock = null)
     public void Show(string id, string title, string message, TimeSpan? duration = null)
     {
         items.RemoveAll(t => t.Id == id);
-        if (items.Count >= 3) items.RemoveAt(0);
+        if (items.Count >= 3)
+        {
+            items.RemoveAt(0);
+        }
+
         items.Add(new(id, title, message, duration is { } d ? time.GetUtcNow() + d : null));
     }
     public void Dismiss(string id) => items.RemoveAll(t => t.Id == id);

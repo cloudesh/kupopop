@@ -12,7 +12,10 @@ public sealed record DeviceAccount(Guid AccountId, string AccessToken);
 public sealed class CredentialVault(string directory)
 {
     [StructLayout(LayoutKind.Sequential)]
-    private struct DataBlob { public int Size; public IntPtr Data; }
+    private struct DataBlob
+    {
+        public int Size; public IntPtr Data;
+    }
     [DllImport("crypt32.dll", SetLastError = true, CharSet = CharSet.Unicode)]
     private static extern bool CryptProtectData(ref DataBlob input, string? description, IntPtr entropy, IntPtr reserved,
         IntPtr prompt, int flags, out DataBlob output);
@@ -24,10 +27,21 @@ public sealed class CredentialVault(string directory)
     public DeviceAccount? Load(Uri server)
     {
         string path = PathFor(server);
-        if (!File.Exists(path)) return null;
-        if (new FileInfo(path).Length > 16384) throw new InvalidDataException("Saved credential exceeds its size limit.");
+        if (!File.Exists(path))
+        {
+            return null;
+        }
+
+        if (new FileInfo(path).Length > 16384)
+        {
+            throw new InvalidDataException("Saved credential exceeds its size limit.");
+        }
+
         byte[] clear = Protect(File.ReadAllBytes(path), false);
-        try { return JsonSerializer.Deserialize<DeviceAccount>(clear, Protocol.Json); }
+        try
+        {
+            return JsonSerializer.Deserialize<DeviceAccount>(clear, Protocol.Json);
+        }
         finally { CryptographicOperations.ZeroMemory(clear); }
     }
 
@@ -58,7 +72,11 @@ public sealed class CredentialVault(string directory)
             bool success = encrypt
                 ? CryptProtectData(ref input, "Kupopop device credential", IntPtr.Zero, IntPtr.Zero, IntPtr.Zero, 1, out output)
                 : CryptUnprotectData(ref input, IntPtr.Zero, IntPtr.Zero, IntPtr.Zero, IntPtr.Zero, 1, out output);
-            if (!success) throw new Win32Exception(Marshal.GetLastWin32Error());
+            if (!success)
+            {
+                throw new Win32Exception(Marshal.GetLastWin32Error());
+            }
+
             var result = new byte[output.Size];
             Marshal.Copy(output.Data, result, 0, result.Length);
             return result;
@@ -67,9 +85,15 @@ public sealed class CredentialVault(string directory)
         {
             // Clear plaintext buffers before releasing unmanaged memory.
             if (input.Data != IntPtr.Zero)
-            { Marshal.Copy(new byte[input.Size], 0, input.Data, input.Size); Marshal.FreeHGlobal(input.Data); }
+            {
+                Marshal.Copy(new byte[input.Size], 0, input.Data, input.Size);
+                Marshal.FreeHGlobal(input.Data);
+            }
             if (output.Data != IntPtr.Zero)
-            { Marshal.Copy(new byte[output.Size], 0, output.Data, output.Size); LocalFree(output.Data); }
+            {
+                Marshal.Copy(new byte[output.Size], 0, output.Data, output.Size);
+                LocalFree(output.Data);
+            }
         }
     }
 }

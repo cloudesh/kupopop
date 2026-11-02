@@ -31,11 +31,17 @@ public static class GameEndpoints
         }
         catch (DisplayNameTakenException)
         {
-            return Results.Conflict(new { error = "That display name is unavailable. Please choose another." });
+            return Results.Conflict(new
+            {
+                error = "That display name is unavailable. Please choose another."
+            });
         }
         catch (ArgumentException)
         {
-            return Results.BadRequest(new { error = "Use a display name of 2–40 characters." });
+            return Results.BadRequest(new
+            {
+                error = "Use a display name of 2–40 characters."
+            });
         }
         catch (InvalidOperationException)
         {
@@ -58,9 +64,17 @@ public static class GameEndpoints
 
     private static IResult RecoverAccount(RecoveryRequest request, AccountStore accounts, GameEngine engine)
     {
-        if (request.RecoveryCode is null) return Results.BadRequest();
+        if (request.RecoveryCode is null)
+        {
+            return Results.BadRequest();
+        }
+
         var credentials = accounts.Recover(request.RecoveryCode);
-        if (credentials is null) return Results.Unauthorized();
+        if (credentials is null)
+        {
+            return Results.Unauthorized();
+        }
+
         engine.Revoke(credentials.AccountId);
         return Results.Json(credentials, Protocol.Json);
     }
@@ -68,7 +82,11 @@ public static class GameEndpoints
     private static IResult RotateRecoveryCode(HttpContext context, AccountStore accounts, GameEngine engine)
     {
         var credentials = accounts.RotateAuthenticated(BearerToken(context));
-        if (credentials is null) return Results.Unauthorized();
+        if (credentials is null)
+        {
+            return Results.Unauthorized();
+        }
+
         engine.Revoke(credentials.AccountId);
         return Results.Json(credentials, Protocol.Json);
     }
@@ -111,7 +129,11 @@ public static class GameEndpoints
             while (socket.State == WebSocketState.Open)
             {
                 var bytes = await peer.ReceiveAsync(stop.Token);
-                if (bytes is null) break;
+                if (bytes is null)
+                {
+                    break;
+                }
+
                 var command = JsonSerializer.Deserialize<ClientCommand>(bytes, Protocol.Json)
                     ?? throw new InvalidDataException("Empty command.");
                 engine.Handle(peer, command);
@@ -119,7 +141,7 @@ public static class GameEndpoints
         }
         catch (Exception ex) when (ex is WebSocketException or OperationCanceledException or InvalidDataException or JsonException)
         {
-            log.LogInformation("Connection ended. Category={Category}", ex.GetType().Name);
+            log.LogDebug("Connection ended. Category={Category}", ex.GetType().Name);
         }
         catch (Exception ex)
         {

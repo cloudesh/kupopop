@@ -17,15 +17,26 @@ internal static class UiToolArt
             : UiPresentation.Alpha(UiTheme.Ink, 0.035f);
         draw.AddRectFilled(origin, end, UiTheme.C(wash), UiTheme.S(5));
         if (selected)
+        {
             draw.AddRect(origin + UiTheme.V(0.5f, 0.5f), end - UiTheme.V(0.5f, 0.5f),
                 UiTheme.C(UiPresentation.Alpha(UiTheme.Rose, 0.35f)), UiTheme.S(5), 0, UiTheme.S(1));
+        }
+
         var mark = new Mark(draw, origin);
         switch (tool)
         {
-            case "pencil": mark.Pencil(); break;
-            case "fill": mark.Bucket(); break;
-            case "eraser": mark.Eraser(); break;
-            case "shapes": mark.Shapes(); break;
+            case "pencil":
+                mark.Pencil();
+                break;
+            case "fill":
+                mark.Bucket();
+                break;
+            case "eraser":
+                mark.Eraser();
+                break;
+            case "shapes":
+                mark.Shapes();
+                break;
         }
         return clicked;
     }
@@ -43,7 +54,11 @@ internal static class UiToolArt
         private void Quad(Vector2 a, Vector2 b, Vector2 c, Vector2 d)
         {
             // A narrow outer keyline keeps black edges legible on dark paper.
-            if (UiTheme.DarkMode) draw.AddQuad(a, b, c, d, Halo, Stroke + UiTheme.S(0.8f));
+            if (UiTheme.DarkMode)
+            {
+                draw.AddQuad(a, b, c, d, Halo, Stroke + UiTheme.S(0.8f));
+            }
+
             draw.AddQuad(a, b, c, d, Ink, Stroke);
         }
         private void Line(float x, float y, float a, float b, uint colour, float width = 2) =>
@@ -87,13 +102,25 @@ internal static class UiToolArt
         public void Shapes()
         {
             draw.AddRectFilled(P(4, 5), P(13, 14), Pink, UiTheme.S(1));
-            if (UiTheme.DarkMode) draw.AddRect(P(4, 5), P(13, 14), Halo, UiTheme.S(1), 0, Stroke + UiTheme.S(0.8f));
+            if (UiTheme.DarkMode)
+            {
+                draw.AddRect(P(4, 5), P(13, 14), Halo, UiTheme.S(1), 0, Stroke + UiTheme.S(0.8f));
+            }
+
             draw.AddRect(P(4, 5), P(13, 14), Ink, UiTheme.S(1), 0, Stroke);
             draw.AddTriangleFilled(P(20, 4.5f), P(25.5f, 14.5f), P(14.5f, 14.5f), Yellow);
-            if (UiTheme.DarkMode) draw.AddTriangle(P(20, 4.5f), P(25.5f, 14.5f), P(14.5f, 14.5f), Halo, Stroke + UiTheme.S(0.8f));
+            if (UiTheme.DarkMode)
+            {
+                draw.AddTriangle(P(20, 4.5f), P(25.5f, 14.5f), P(14.5f, 14.5f), Halo, Stroke + UiTheme.S(0.8f));
+            }
+
             draw.AddTriangle(P(20, 4.5f), P(25.5f, 14.5f), P(14.5f, 14.5f), Ink, Stroke);
             draw.AddCircleFilled(P(13.5f, 21), UiTheme.S(5), Blue, 32);
-            if (UiTheme.DarkMode) draw.AddCircle(P(13.5f, 21), UiTheme.S(5), Halo, 32, Stroke + UiTheme.S(0.8f));
+            if (UiTheme.DarkMode)
+            {
+                draw.AddCircle(P(13.5f, 21), UiTheme.S(5), Halo, 32, Stroke + UiTheme.S(0.8f));
+            }
+
             draw.AddCircle(P(13.5f, 21), UiTheme.S(5), Ink, 32, Stroke);
         }
     }

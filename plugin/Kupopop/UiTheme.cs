@@ -15,7 +15,10 @@ public static class UiTheme
     private static int tooltipFrame = -1;
     private static double tooltipStartedAt;
 
-    public static bool DarkMode { get; private set; }
+    public static bool DarkMode
+    {
+        get; private set;
+    }
     public static Vector4 Paper => Hex(DarkMode ? 0x22252D : 0xF1E8D3);
     public static Vector4 Panel => Hex(DarkMode ? 0x2B303B : 0xFBF6E8);
     public static Vector4 Inset => Hex(DarkMode ? 0x39414F : 0xDED0B4);
@@ -55,34 +58,80 @@ public static class UiTheme
         private readonly bool previousMode;
         public ThemeScope(bool compactRoom, bool darkMode)
         {
-            previousMode = DarkMode; DarkMode = darkMode;
-            Color(ImGuiCol.Text, Ink); Color(ImGuiCol.TextDisabled, Muted);
-            Color(ImGuiCol.WindowBg, Cover); Color(ImGuiCol.ChildBg, Panel); Color(ImGuiCol.PopupBg, Panel);
-            Color(ImGuiCol.Border, Line); Color(ImGuiCol.BorderShadow, Vector4.Zero);
-            Color(ImGuiCol.TitleBg, Inset); Color(ImGuiCol.TitleBgActive, Inset); Color(ImGuiCol.TitleBgCollapsed, Inset);
-            Color(ImGuiCol.FrameBg, Hex(DarkMode ? 0x333B48 : 0xE9DFC7)); Color(ImGuiCol.FrameBgHovered, Hex(DarkMode ? 0x414C5C : 0xE0D2B3)); Color(ImGuiCol.FrameBgActive, DarkMode ? Inset : White);
-            Color(ImGuiCol.Button, Inset); Color(ImGuiCol.ButtonHovered, Vector4.Lerp(Inset, Ink, 0.08f)); Color(ImGuiCol.ButtonActive, Vector4.Lerp(Inset, Ink, 0.16f));
-            Color(ImGuiCol.Header, RoseTint); Color(ImGuiCol.HeaderHovered, Vector4.Lerp(RoseTint, Rose, 0.15f)); Color(ImGuiCol.HeaderActive, RoseTint);
-            Color(ImGuiCol.CheckMark, Rose); Color(ImGuiCol.SliderGrab, Rose); Color(ImGuiCol.SliderGrabActive, RoseHover);
-            Color(ImGuiCol.Separator, Line); Color(ImGuiCol.SeparatorHovered, Brass); Color(ImGuiCol.SeparatorActive, Rose);
-            Color(ImGuiCol.ScrollbarBg, Paper); Color(ImGuiCol.ScrollbarGrab, Hex(DarkMode ? 0x65748B : 0xC3B399));
-            Color(ImGuiCol.ScrollbarGrabHovered, Brass); Color(ImGuiCol.ScrollbarGrabActive, Rose);
-            Color(ImGuiCol.TextSelectedBg, RoseTint); Color(ImGuiCol.TableHeaderBg, Inset);
-            Color(ImGuiCol.TableBorderLight, Line); Color(ImGuiCol.TableBorderStrong, Line);
-            Color(ImGuiCol.ResizeGrip, Vector4.Zero); Color(ImGuiCol.ResizeGripHovered, Brass); Color(ImGuiCol.ResizeGripActive, Rose);
-            Style(ImGuiStyleVar.WindowPadding, V(34, 8)); Style(ImGuiStyleVar.FramePadding, V(8, 5));
-            Style(ImGuiStyleVar.ItemSpacing, V(6, 6)); Style(ImGuiStyleVar.ItemInnerSpacing, V(5, 4));
+            previousMode = DarkMode;
+            DarkMode = darkMode;
+            Color(ImGuiCol.Text, Ink);
+            Color(ImGuiCol.TextDisabled, Muted);
+            Color(ImGuiCol.WindowBg, Cover);
+            Color(ImGuiCol.ChildBg, Panel);
+            Color(ImGuiCol.PopupBg, Panel);
+            Color(ImGuiCol.Border, Line);
+            Color(ImGuiCol.BorderShadow, Vector4.Zero);
+            Color(ImGuiCol.TitleBg, Inset);
+            Color(ImGuiCol.TitleBgActive, Inset);
+            Color(ImGuiCol.TitleBgCollapsed, Inset);
+            Color(ImGuiCol.FrameBg, Hex(DarkMode ? 0x333B48 : 0xE9DFC7));
+            Color(ImGuiCol.FrameBgHovered, Hex(DarkMode ? 0x414C5C : 0xE0D2B3));
+            Color(ImGuiCol.FrameBgActive, DarkMode ? Inset : White);
+            Color(ImGuiCol.Button, Inset);
+            Color(ImGuiCol.ButtonHovered, Vector4.Lerp(Inset, Ink, 0.08f));
+            Color(ImGuiCol.ButtonActive, Vector4.Lerp(Inset, Ink, 0.16f));
+            Color(ImGuiCol.Header, RoseTint);
+            Color(ImGuiCol.HeaderHovered, Vector4.Lerp(RoseTint, Rose, 0.15f));
+            Color(ImGuiCol.HeaderActive, RoseTint);
+            Color(ImGuiCol.CheckMark, Rose);
+            Color(ImGuiCol.SliderGrab, Rose);
+            Color(ImGuiCol.SliderGrabActive, RoseHover);
+            Color(ImGuiCol.Separator, Line);
+            Color(ImGuiCol.SeparatorHovered, Brass);
+            Color(ImGuiCol.SeparatorActive, Rose);
+            Color(ImGuiCol.ScrollbarBg, Paper);
+            Color(ImGuiCol.ScrollbarGrab, Hex(DarkMode ? 0x65748B : 0xC3B399));
+            Color(ImGuiCol.ScrollbarGrabHovered, Brass);
+            Color(ImGuiCol.ScrollbarGrabActive, Rose);
+            Color(ImGuiCol.TextSelectedBg, RoseTint);
+            Color(ImGuiCol.TableHeaderBg, Inset);
+            Color(ImGuiCol.TableBorderLight, Line);
+            Color(ImGuiCol.TableBorderStrong, Line);
+            Color(ImGuiCol.ResizeGrip, Vector4.Zero);
+            Color(ImGuiCol.ResizeGripHovered, Brass);
+            Color(ImGuiCol.ResizeGripActive, Rose);
+            Style(ImGuiStyleVar.WindowPadding, V(34, 8));
+            Style(ImGuiStyleVar.FramePadding, V(8, 5));
+            Style(ImGuiStyleVar.ItemSpacing, V(6, 6));
+            Style(ImGuiStyleVar.ItemInnerSpacing, V(5, 4));
             Style(ImGuiStyleVar.CellPadding, V(4, 3));
-            Style(ImGuiStyleVar.WindowRounding, S(6)); Style(ImGuiStyleVar.ChildRounding, S(2));
-            Style(ImGuiStyleVar.FrameRounding, S(3)); Style(ImGuiStyleVar.PopupRounding, S(4));
-            Style(ImGuiStyleVar.WindowBorderSize, S(1)); Style(ImGuiStyleVar.ChildBorderSize, S(1));
-            Style(ImGuiStyleVar.FrameBorderSize, 0); Style(ImGuiStyleVar.ScrollbarSize, S(9));
+            Style(ImGuiStyleVar.WindowRounding, S(6));
+            Style(ImGuiStyleVar.ChildRounding, S(2));
+            Style(ImGuiStyleVar.FrameRounding, S(3));
+            Style(ImGuiStyleVar.PopupRounding, S(4));
+            Style(ImGuiStyleVar.WindowBorderSize, S(1));
+            Style(ImGuiStyleVar.ChildBorderSize, S(1));
+            Style(ImGuiStyleVar.FrameBorderSize, 0);
+            Style(ImGuiStyleVar.ScrollbarSize, S(9));
             Style(ImGuiStyleVar.GrabRounding, S(4));
         }
-        private void Color(ImGuiCol index, Vector4 value) { ImGui.PushStyleColor(index, value); colors++; }
-        private void Style(ImGuiStyleVar index, Vector2 value) { ImGui.PushStyleVar(index, value); styles++; }
-        private void Style(ImGuiStyleVar index, float value) { ImGui.PushStyleVar(index, value); styles++; }
-        public void Dispose() { ImGui.PopStyleVar(styles); ImGui.PopStyleColor(colors); DarkMode = previousMode; }
+        private void Color(ImGuiCol index, Vector4 value)
+        {
+            ImGui.PushStyleColor(index, value);
+            colors++;
+        }
+        private void Style(ImGuiStyleVar index, Vector2 value)
+        {
+            ImGui.PushStyleVar(index, value);
+            styles++;
+        }
+        private void Style(ImGuiStyleVar index, float value)
+        {
+            ImGui.PushStyleVar(index, value);
+            styles++;
+        }
+        public void Dispose()
+        {
+            ImGui.PopStyleVar(styles);
+            ImGui.PopStyleColor(colors);
+            DarkMode = previousMode;
+        }
     }
 
     public static void Caption(string text) => ImGui.TextColored(Muted, text);
@@ -106,34 +155,57 @@ public static class UiTheme
 
     public static void Tooltip(string text)
     {
-        if (!ImGui.IsItemHovered(ImGuiHoveredFlags.NoNavOverride)) return;
+        if (!ImGui.IsItemHovered(ImGuiHoveredFlags.NoNavOverride))
+        {
+            return;
+        }
+
         HoverTooltip(ImGui.GetID(text), ImGui.GetItemRectMin(), ImGui.GetItemRectMax(), text);
     }
 
     public static void RegionTooltip(string id, Vector2 min, Vector2 max, string text)
     {
-        if (!ImGui.IsWindowHovered(ImGuiHoveredFlags.RootAndChildWindows) || !ImGui.IsMouseHoveringRect(min, max, false)) return;
+        if (!ImGui.IsWindowHovered(ImGuiHoveredFlags.RootAndChildWindows) || !ImGui.IsMouseHoveringRect(min, max, false))
+        {
+            return;
+        }
+
         HoverTooltip(ImGui.GetID(id), min, max, text);
     }
 
     private static void HoverTooltip(uint target, Vector2 min, Vector2 max, string text)
     {
         if (ImGui.IsMouseDown(ImGuiMouseButton.Left) || ImGui.IsMouseDown(ImGuiMouseButton.Right) || ImGui.IsMouseDown(ImGuiMouseButton.Middle))
-        { tooltipFrame = -1; return; }
+        {
+            tooltipFrame = -1;
+            return;
+        }
         int frame = ImGui.GetFrameCount();
         double now = ImGui.GetTime();
         // A gap means the pointer left this target, even if it returns to the
         // same control. Changing target, layout or page starts a fresh delay.
         if (target != tooltipTarget || min != tooltipMin || max != tooltipMax ||
             (tooltipFrame != frame && tooltipFrame != frame - 1) || now < tooltipStartedAt)
+        {
             tooltipStartedAt = now;
-        tooltipTarget = target; tooltipMin = min; tooltipMax = max; tooltipFrame = frame;
-        if (now - tooltipStartedAt < TooltipDelaySeconds) return;
+        }
+
+        tooltipTarget = target;
+        tooltipMin = min;
+        tooltipMax = max;
+        tooltipFrame = frame;
+        if (now - tooltipStartedAt < TooltipDelaySeconds)
+        {
+            return;
+        }
+
         using var padding = ImRaii.PushStyle(ImGuiStyleVar.WindowPadding, V(8, 5));
         using var rounding = ImRaii.PushStyle(ImGuiStyleVar.WindowRounding, S(4));
         ImGui.BeginTooltip();
         ImGui.PushTextWrapPos(ImGui.GetCursorPosX() + S(300));
-        ImGui.TextUnformatted(text); ImGui.PopTextWrapPos(); ImGui.EndTooltip();
+        ImGui.TextUnformatted(text);
+        ImGui.PopTextWrapPos();
+        ImGui.EndTooltip();
     }
 
     public static unsafe bool GlyphButton(string id, string glyph, Vector2 size)
@@ -141,9 +213,11 @@ public static class UiTheme
         using var padding = ImRaii.PushStyle(ImGuiStyleVar.FramePadding, Vector2.Zero);
         using var align = ImRaii.PushStyle(ImGuiStyleVar.ButtonTextAlign, new Vector2(0.5f));
         bool clicked = ImGui.Button("##" + id, size);
-        var min = ImGui.GetItemRectMin(); var max = ImGui.GetItemRectMax();
+        var min = ImGui.GetItemRectMin();
+        var max = ImGui.GetItemRectMax();
         var font = ImGui.GetFont();
-        var inkMin = Vector2.Zero; var inkSize = ImGui.CalcTextSize(glyph);
+        var inkMin = Vector2.Zero;
+        var inkSize = ImGui.CalcTextSize(glyph);
         if (glyph.Length == 1)
         {
             var metric = font.FindGlyph(glyph[0]);
@@ -167,18 +241,21 @@ public static class UiTheme
     {
         bool textured = UiAssets.PaperTexture(min, max, tint);
         var draw = ImGui.GetWindowDrawList();
-        var fiber = DarkMode ? Ink : Brass; fiber.W = textured ? 0.045f : DarkMode ? 0.06f : 0.10f;
+        var fiber = DarkMode ? Ink : Brass;
+        fiber.W = textured ? 0.045f : DarkMode ? 0.06f : 0.10f;
         uint color = C(fiber);
         float step = S(28);
         int rows = Math.Min(70, (int)((max.Y - min.Y) / step));
         int columns = Math.Min(90, (int)((max.X - min.X) / step));
         for (int row = 0; row < rows; row++)
+        {
             for (int col = 0; col < columns; col++)
             {
                 uint hash = unchecked((uint)(row * 73856093 ^ col * 19349663)) * 2654435761u;
                 var point = min + new Vector2(col * step + S(2 + hash % 24), row * step + S(2 + (hash >> 8) % 24));
                 draw.AddLine(point, point + V(1 + (hash >> 16) % 3, 0.3f), color, S(0.6f));
             }
+        }
     }
 
     public static void SheetEdges(Vector2 min, Vector2 max)
@@ -198,8 +275,10 @@ public static class UiTheme
         bool clicked = ImGui.Button(label, new Vector2(width, S(28)));
         if (!quiet)
         {
-            var a = ImGui.GetItemRectMin(); var b = ImGui.GetItemRectMax();
-            var stroke = primary ? White : Brass; stroke.W = 0.25f;
+            var a = ImGui.GetItemRectMin();
+            var b = ImGui.GetItemRectMax();
+            var stroke = primary ? White : Brass;
+            stroke.W = 0.25f;
             ImGui.GetWindowDrawList().AddLine(a + V(5, 3), new Vector2(b.X - S(5), a.Y + S(3)), C(stroke));
         }
         return clicked;
@@ -212,7 +291,11 @@ public static class UiTheme
         using var rounding = ImRaii.PushStyle(ImGuiStyleVar.FrameRounding, S(5));
         using var text = ImRaii.PushColor(ImGuiCol.Text, selected ? Rose : Muted);
         bool clicked = ImGui.Button(label, new Vector2(ImGui.CalcTextSize(label).X + (padding ?? S(26)), S(30)));
-        if (selected) ImGui.GetWindowDrawList().AddRect(ImGui.GetItemRectMin(), ImGui.GetItemRectMax(), C(UiPresentation.Alpha(Line, 0.55f)), S(5));
+        if (selected)
+        {
+            ImGui.GetWindowDrawList().AddRect(ImGui.GetItemRectMin(), ImGui.GetItemRectMax(), C(UiPresentation.Alpha(Line, 0.55f)), S(5));
+        }
+
         return clicked;
     }
 
@@ -243,7 +326,11 @@ public static class UiTheme
         var toggle = min + new Vector2(size.X - S(17), S(17));
         draw.AddCircleFilled(toggle, S(9), C(Panel));
         draw.AddLine(toggle - V(4, 0), toggle + V(4, 0), C(Ink), S(1.5f));
-        if (!expanded) draw.AddLine(toggle - V(0, 4), toggle + V(0, 4), C(Ink), S(1.5f));
+        if (!expanded)
+        {
+            draw.AddLine(toggle - V(0, 4), toggle + V(0, 4), C(Ink), S(1.5f));
+        }
+
         return clicked;
     }
 
@@ -285,8 +372,10 @@ public static class UiTheme
         using var text = ImRaii.PushColor(ImGuiCol.Text, primary ? Rose : Ink);
         using var rounding = ImRaii.PushStyle(ImGuiStyleVar.FrameRounding, S(1));
         bool clicked = ImGui.Button(label, new Vector2(width, S(28)));
-        var a = ImGui.GetItemRectMin(); var b = ImGui.GetItemRectMax();
-        var rule = primary ? Rose : Brass; rule.W = primary ? 0.65f : 0.4f;
+        var a = ImGui.GetItemRectMin();
+        var b = ImGui.GetItemRectMax();
+        var rule = primary ? Rose : Brass;
+        rule.W = primary ? 0.65f : 0.4f;
         var draw = ImGui.GetWindowDrawList();
         draw.AddLine(new Vector2(a.X + S(6), b.Y - S(4)), new Vector2(b.X - S(6), b.Y - S(4)), C(rule), S(1));
         return clicked;
@@ -301,23 +390,40 @@ public static class UiTheme
 
     public static void Ellipsis(string text, float width)
     {
-        if (ImGui.CalcTextSize(text).X <= width) { ImGui.TextUnformatted(text); return; }
+        if (ImGui.CalcTextSize(text).X <= width)
+        {
+            ImGui.TextUnformatted(text);
+            return;
+        }
         var elements = StringInfo.ParseCombiningCharacters(text);
         int low = 0, high = elements.Length;
         while (low < high)
         {
             int mid = (low + high + 1) / 2;
             string candidate = text[..(mid == elements.Length ? text.Length : elements[mid])] + "...";
-            if (ImGui.CalcTextSize(candidate).X <= width) low = mid; else high = mid - 1;
+            if (ImGui.CalcTextSize(candidate).X <= width)
+            {
+                low = mid;
+            }
+            else
+            {
+                high = mid - 1;
+            }
         }
         ImGui.TextUnformatted(text[..(low == elements.Length ? text.Length : elements[low])] + "...");
-        if (ImGui.IsItemHovered()) UiTheme.Tooltip(text);
+        if (ImGui.IsItemHovered())
+        {
+            UiTheme.Tooltip(text);
+        }
     }
 
     public ref struct PaperPanel
     {
         private ImRaii.ChildDisposable child;
-        public bool Success { get; }
+        public bool Success
+        {
+            get;
+        }
         public PaperPanel(string id, Vector2 size, bool inset = false, bool compact = false, bool taped = false, Vector4? note = null, bool scrollable = true, bool plainTop = false, bool flush = false, bool attachedTabs = false, float noteAngle = 0)
         {
             using var color = ImRaii.PushColor(ImGuiCol.ChildBg, Vector4.Zero);
@@ -337,11 +443,20 @@ public static class UiTheme
                 var surface = note ?? (inset ? Inset : Panel);
                 if (note.HasValue)
                 {
-                    var shadow = Shadow; shadow.W = 0.12f;
+                    var shadow = Shadow;
+                    shadow.W = 0.12f;
                     draw.AddRectFilled(min + V(1, 3), max + V(1, 3), C(shadow));
                 }
-                else if (!attachedTabs) SheetEdges(min, max);
-                if (!attachedTabs) draw.AddRectFilled(min, max, C(surface), S(1));
+                else if (!attachedTabs)
+                {
+                    SheetEdges(min, max);
+                }
+
+                if (!attachedTabs)
+                {
+                    draw.AddRectFilled(min, max, C(surface), S(1));
+                }
+
                 var outline = note.HasValue ? Vector4.Lerp(surface, Brass, 0.3f) : Line;
                 if (attachedTabs)
                 {
@@ -349,25 +464,51 @@ public static class UiTheme
                     draw.AddLine(new Vector2(min.X, max.Y), max, C(outline));
                     draw.AddLine(max, new Vector2(max.X, min.Y), C(outline));
                 }
-                else draw.AddRect(min, max, C(outline), S(1));
-                if (!attachedTabs) PaperGrain(min, max, note);
-                if (note.HasValue) UiStationery.SketchNote(min, max);
+                else
+                {
+                    draw.AddRect(min, max, C(outline), S(1));
+                }
+
+                if (!attachedTabs)
+                {
+                    PaperGrain(min, max, note);
+                }
+
+                if (note.HasValue)
+                {
+                    UiStationery.SketchNote(min, max);
+                }
+
                 if (note.HasValue && !plainTop)
                 {
-                    var glue = Ink; glue.W = 0.035f;
+                    var glue = Ink;
+                    glue.W = 0.035f;
                     draw.AddRectFilled(min, new Vector2(max.X, min.Y + S(13)), C(glue));
-                    var edge = Brass; edge.W = 0.18f;
+                    var edge = Brass;
+                    edge.W = 0.18f;
                     draw.AddLine(min + V(1, 13), new Vector2(max.X - S(1), min.Y + S(13)), C(edge));
                 }
-                if (taped) UiStationery.Tape(new Vector2(min.X + (max.X - min.X) * 0.5f - S(25), min.Y + S(2)), S(50));
-                if (id == "make-card") UiStationery.Paperclip(new Vector2(max.X - S(22), min.Y + S(2)));
+                if (taped)
+                {
+                    UiStationery.Tape(new Vector2(min.X + (max.X - min.X) * 0.5f - S(25), min.Y + S(2)), S(50));
+                }
+
+                if (id == "make-card")
+                {
+                    UiStationery.Paperclip(new Vector2(max.X - S(22), min.Y + S(2)));
+                }
+
                 if (!attachedTabs)
                 {
                     var curl = note.HasValue ? Vector4.Lerp(surface, Inset, 0.4f) : Inset;
                     draw.AddTriangleFilled(max - V(12, 0), max - V(0, 12), max, C(curl));
                     draw.AddLine(max - V(12, 0), max - V(0, 12), C(Line));
                 }
-                if (note.HasValue && noteAngle != 0) UiStationery.TiltDecoration(draw, decorationStart, (min + max) / 2, noteAngle);
+                if (note.HasValue && noteAngle != 0)
+                {
+                    UiStationery.TiltDecoration(draw, decorationStart, (min + max) / 2, noteAngle);
+                }
+
                 draw.PopClipRect();
             }
         }

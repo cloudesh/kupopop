@@ -15,7 +15,10 @@ public sealed class AvatarTextures : IDisposable
             old.Preset == profile.AvatarPreset &&
             ((old.Source is null && profile.AvatarPixels is null) ||
              (old.Source is not null && profile.AvatarPixels is not null && old.Source.AsSpan().SequenceEqual(profile.AvatarPixels))))
+        {
             return old.Texture;
+        }
+
         var canvas = new PixelCanvas(64, 64, transparency: true);
         canvas.Load(AvatarPresets.Pixels(profile));
         byte[] rgba = canvas.Rgba();
@@ -25,10 +28,19 @@ public sealed class AvatarTextures : IDisposable
         if (cache.Count > 64)
         {
             var remove = cache.Keys.First(id => id != profile.Id);
-            cache[remove].Texture.Dispose(); cache.Remove(remove);
+            cache[remove].Texture.Dispose();
+            cache.Remove(remove);
         }
         return texture;
     }
 
-    public void Dispose() { foreach (var value in cache.Values) value.Texture.Dispose(); cache.Clear(); }
+    public void Dispose()
+    {
+        foreach (var value in cache.Values)
+        {
+            value.Texture.Dispose();
+        }
+
+        cache.Clear();
+    }
 }

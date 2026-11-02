@@ -9,8 +9,14 @@ public static class UiChrome
     {
         // Read-only sheets must not claim mouse input before their overlaid
         // vote buttons. Only the artist/editor needs an active drawing target.
-        if (writable) ImGui.InvisibleButton(id, size);
-        else ImGui.Dummy(size);
+        if (writable)
+        {
+            ImGui.InvisibleButton(id, size);
+        }
+        else
+        {
+            ImGui.Dummy(size);
+        }
     }
 
     public static void ResizeCorner(Vector2 min, Vector2 max, bool locked)
@@ -29,7 +35,11 @@ public static class UiChrome
         draw.PopClipRect();
         if (hovered)
         {
-            if (!locked) ImGui.SetMouseCursor(ImGuiMouseCursor.ResizeNwse);
+            if (!locked)
+            {
+                ImGui.SetMouseCursor(ImGuiMouseCursor.ResizeNwse);
+            }
+
             UiTheme.RegionTooltip("resize-corner", max - UiTheme.V(24, 24), max, locked ? "Unpin to resize." : "Drag to resize.");
         }
     }

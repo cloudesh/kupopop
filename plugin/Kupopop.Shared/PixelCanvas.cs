@@ -22,11 +22,26 @@ public static class Palette
 
 public sealed class PixelCanvas
 {
-    public int Width { get; }
-    public int Height { get; }
-    public byte[] Pixels { get; private set; }
-    public int Revision { get; private set; }
-    public bool Transparency { get; }
+    public int Width
+    {
+        get;
+    }
+    public int Height
+    {
+        get;
+    }
+    public byte[] Pixels
+    {
+        get; private set;
+    }
+    public int Revision
+    {
+        get; private set;
+    }
+    public bool Transparency
+    {
+        get;
+    }
 
     public PixelCanvas(int width = Protocol.CanvasWidth, int height = Protocol.CanvasHeight, bool transparency = false)
     {
@@ -34,18 +49,28 @@ public sealed class PixelCanvas
         Height = height;
         Pixels = new byte[width * height];
         Transparency = transparency;
-        if (transparency) Array.Fill(Pixels, Palette.Transparent);
+        if (transparency)
+        {
+            Array.Fill(Pixels, Palette.Transparent);
+        }
     }
 
     public void Load(byte[] pixels)
     {
         if (pixels.Length != Pixels.Length || pixels.Any(p => !Palette.Valid(p, Transparency)))
+        {
             throw new InvalidDataException("Invalid canvas.");
+        }
+
         Pixels = (byte[])pixels.Clone();
         Revision++;
     }
 
-    public void Clear() { Array.Fill(Pixels, Transparency ? Palette.Transparent : (byte)0); Revision++; }
+    public void Clear()
+    {
+        Array.Fill(Pixels, Transparency ? Palette.Transparent : (byte)0);
+        Revision++;
+    }
 
     public bool Valid(DrawOperation op) => DrawingTools.Valid(op.Tool)
         && Palette.Valid(op.Color, Transparency) && op.Size is >= 1 and <= 20
@@ -53,10 +78,17 @@ public sealed class PixelCanvas
 
     public bool Apply(DrawOperation op)
     {
-        if (!Valid(op)) return false;
+        if (!Valid(op))
+        {
+            return false;
+        }
+
         op = DrawingTools.Constrain(op);
         byte color = op.Tool == "eraser" ? (Transparency ? Palette.Transparent : (byte)0) : op.Color;
-        if (op.Tool == "fill") Fill(op.X2, op.Y2, color);
+        if (op.Tool == "fill")
+        {
+            Fill(op.X2, op.Y2, color);
+        }
         else if (op.Tool is "rectangle" or "square")
         {
             Stroke(op.X1, op.Y1, op.X2, op.Y1, color, op.Size);
@@ -64,8 +96,15 @@ public sealed class PixelCanvas
             Stroke(op.X2, op.Y2, op.X1, op.Y2, color, op.Size);
             Stroke(op.X1, op.Y2, op.X1, op.Y1, color, op.Size);
         }
-        else if (op.Tool is "ellipse" or "circle") Ellipse(op, color);
-        else Stroke(op.X1, op.Y1, op.X2, op.Y2, color, op.Size);
+        else if (op.Tool is "ellipse" or "circle")
+        {
+            Ellipse(op, color);
+        }
+        else
+        {
+            Stroke(op.X1, op.Y1, op.X2, op.Y2, color, op.Size);
+        }
+
         Revision++;
         return true;
     }
@@ -77,10 +116,22 @@ public sealed class PixelCanvas
         while (true)
         {
             Dot(x, y, color, size);
-            if (x == endX && y == endY) break;
+            if (x == endX && y == endY)
+            {
+                break;
+            }
+
             int twice = 2 * error;
-            if (twice >= dy) { error += dy; x += sx; }
-            if (twice <= dx) { error += dx; y += sy; }
+            if (twice >= dy)
+            {
+                error += dy;
+                x += sx;
+            }
+            if (twice <= dx)
+            {
+                error += dx;
+                y += sy;
+            }
         }
     }
 
@@ -90,22 +141,39 @@ public sealed class PixelCanvas
         int top = Math.Min(op.Y1, op.Y2), bottom = Math.Max(op.Y1, op.Y2);
         double rx = (right - left) / 2.0, ry = (bottom - top) / 2.0;
         double cx = (left + right) / 2.0, cy = (top + bottom) / 2.0;
-        if (rx == 0 || ry == 0) { Stroke(left, top, right, bottom, color, op.Size); return; }
+        if (rx == 0 || ry == 0)
+        {
+            Stroke(left, top, right, bottom, color, op.Size);
+            return;
+        }
         for (int x = left; x <= right; x++)
         {
             double distance = ry * Math.Sqrt(Math.Max(0, 1 - Math.Pow((x - cx) / rx, 2)));
-            Dot(x, (int)Math.Round(cy - distance), color, op.Size); Dot(x, (int)Math.Round(cy + distance), color, op.Size);
+            Dot(x, (int)Math.Round(cy - distance), color, op.Size);
+            Dot(x, (int)Math.Round(cy + distance), color, op.Size);
         }
         for (int y = top; y <= bottom; y++)
         {
             double distance = rx * Math.Sqrt(Math.Max(0, 1 - Math.Pow((y - cy) / ry, 2)));
-            Dot((int)Math.Round(cx - distance), y, color, op.Size); Dot((int)Math.Round(cx + distance), y, color, op.Size);
+            Dot((int)Math.Round(cx - distance), y, color, op.Size);
+            Dot((int)Math.Round(cx + distance), y, color, op.Size);
         }
     }
 
     public byte[] Rgba()
     {
         var result = new byte[Pixels.Length * 4];
+        WriteRgba(result);
+        return result;
+    }
+
+    public void WriteRgba(Span<byte> result)
+    {
+        if (result.Length != Pixels.Length * 4)
+        {
+            throw new ArgumentException("RGBA buffer has the wrong size.", nameof(result));
+        }
+
         for (int i = 0; i < Pixels.Length; i++)
         {
             uint c = Palette.Colors[Pixels[i]];
@@ -114,7 +182,6 @@ public sealed class PixelCanvas
             result[i * 4 + 2] = (byte)(c >> 16);
             result[i * 4 + 3] = (byte)(c >> 24);
         }
-        return result;
     }
 
     private bool Inside(int x, int y) => x >= 0 && y >= 0 && x < Width && y < Height;
@@ -122,30 +189,59 @@ public sealed class PixelCanvas
     {
         int r = size / 2;
         for (int yy = y - r; yy <= y + r; yy++)
+        {
             for (int xx = x - r; xx <= x + r; xx++)
+            {
                 if (Inside(xx, yy) && (xx - x) * (xx - x) + (yy - y) * (yy - y) <= r * r + 1)
+                {
                     Pixels[yy * Width + xx] = color;
+                }
+            }
+        }
     }
 
     private void Fill(int x, int y, byte color)
     {
         int start = y * Width + x;
         byte old = Pixels[start];
-        if (old == color) return;
+        if (old == color)
+        {
+            return;
+        }
+
         var queue = new Queue<int>();
         Pixels[start] = color;
         queue.Enqueue(start);
         while (queue.TryDequeue(out int p))
         {
             int px = p % Width, py = p / Width;
-            if (px > 0) Visit(p - 1);
-            if (px + 1 < Width) Visit(p + 1);
-            if (py > 0) Visit(p - Width);
-            if (py + 1 < Height) Visit(p + Width);
+            if (px > 0)
+            {
+                Visit(p - 1);
+            }
+
+            if (px + 1 < Width)
+            {
+                Visit(p + 1);
+            }
+
+            if (py > 0)
+            {
+                Visit(p - Width);
+            }
+
+            if (py + 1 < Height)
+            {
+                Visit(p + Width);
+            }
         }
         void Visit(int p)
         {
-            if (Pixels[p] != old) return;
+            if (Pixels[p] != old)
+            {
+                return;
+            }
+
             Pixels[p] = color;
             queue.Enqueue(p);
         }
@@ -164,7 +260,13 @@ public static class AvatarGenerator
         canvas.Load(Generate(seed, out var silhouette));
         byte[] rgba = canvas.Rgba();
         for (int p = 0; p < silhouette.Length; p++)
-            if (silhouette[p] == 0) rgba[p * 4 + 3] = 0;
+        {
+            if (silhouette[p] == 0)
+            {
+                rgba[p * 4 + 3] = 0;
+            }
+        }
+
         return rgba;
     }
 
@@ -194,18 +296,42 @@ public static class AvatarGenerator
         Ellipse(pomX - 2, 7, 2, 2, 0);
         if (expression == 0 || expression == 3)
         {
-            Line(17, eyeY + 2, 22, eyeY - 1, 1); Line(22, eyeY - 1, 26, eyeY + 2, 1);
+            Line(17, eyeY + 2, 22, eyeY - 1, 1);
+            Line(22, eyeY - 1, 26, eyeY + 2, 1);
         }
-        else Line(22, eyeY, 22, eyeY + 3, 1, 3);
+        else
+        {
+            Line(22, eyeY, 22, eyeY + 3, 1, 3);
+        }
+
         if (expression == 0 || expression == 2)
-        { Line(38, eyeY + 2, 42, eyeY - 1, 1); Line(42, eyeY - 1, 47, eyeY + 2, 1); }
-        else Line(42, eyeY, 42, eyeY + 3, 1, 3);
+        {
+            Line(38, eyeY + 2, 42, eyeY - 1, 1);
+            Line(42, eyeY - 1, 47, eyeY + 2, 1);
+        }
+        else
+        {
+            Line(42, eyeY, 42, eyeY + 3, 1, 3);
+        }
+
         Ellipse(32, 44, 4, 3, 15);
-        Line(32, 47, 28, 50, 2); Line(32, 47, 36, 50, 2);
-        Line(9, 42, 16, 44, 3); Line(48, 44, 55, 42, 3);
-        if (random.Next(2) == 0) { Ellipse(17, 46, 3, 1, 15); Ellipse(47, 46, 3, 1, 15); }
+        Line(32, 47, 28, 50, 2);
+        Line(32, 47, 36, 50, 2);
+        Line(9, 42, 16, 44, 3);
+        Line(48, 44, 55, 42, 3);
+        if (random.Next(2) == 0)
+        {
+            Ellipse(17, 46, 3, 1, 15);
+            Ellipse(47, 46, 3, 1, 15);
+        }
         for (int i = 0; i < canvas.Pixels.Length; i++)
-            if (mask.Pixels[i] == 0) canvas.Pixels[i] = Palette.Transparent;
+        {
+            if (mask.Pixels[i] == 0)
+            {
+                canvas.Pixels[i] = Palette.Transparent;
+            }
+        }
+
         silhouette = mask.Pixels;
         return canvas.Pixels;
 
@@ -217,20 +343,32 @@ public static class AvatarGenerator
         void Ellipse(int cx, int cy, int rx, int ry, byte color)
         {
             for (int y = Math.Max(0, cy - ry); y <= Math.Min(63, cy + ry); y++)
+            {
                 for (int x = Math.Max(0, cx - rx); x <= Math.Min(63, cx + rx); x++)
+                {
                     if ((x - cx) * (x - cx) * ry * ry + (y - cy) * (y - cy) * rx * rx <= rx * rx * ry * ry)
-                    { canvas.Pixels[y * 64 + x] = color; mask.Pixels[y * 64 + x] = 1; }
+                    {
+                        canvas.Pixels[y * 64 + x] = color;
+                        mask.Pixels[y * 64 + x] = 1;
+                    }
+                }
+            }
         }
         void Triangle(int ax, int ay, int bx, int by, int cx, int cy, byte color)
         {
             int Cross(int px, int py, int x1, int y1, int x2, int y2) => (px - x2) * (y1 - y2) - (x1 - x2) * (py - y2);
             for (int y = Math.Min(ay, Math.Min(by, cy)); y <= Math.Max(ay, Math.Max(by, cy)); y++)
+            {
                 for (int x = Math.Min(ax, Math.Min(bx, cx)); x <= Math.Max(ax, Math.Max(bx, cx)); x++)
                 {
                     int a = Cross(x, y, ax, ay, bx, by), b = Cross(x, y, bx, by, cx, cy), c = Cross(x, y, cx, cy, ax, ay);
                     if (!((a < 0 || b < 0 || c < 0) && (a > 0 || b > 0 || c > 0)))
-                    { canvas.Pixels[y * 64 + x] = color; mask.Pixels[y * 64 + x] = 1; }
+                    {
+                        canvas.Pixels[y * 64 + x] = color;
+                        mask.Pixels[y * 64 + x] = 1;
+                    }
                 }
+            }
         }
     }
 }

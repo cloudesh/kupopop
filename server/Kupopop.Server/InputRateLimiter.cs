@@ -19,13 +19,20 @@ public sealed class InputRateLimiter(TimeProvider? provider = null)
     public bool Allow(string type)
     {
         // The receive loop and engine can access the same account during a reconnect.
-        lock (gate) return AllowLocked(type);
+        lock (gate)
+        {
+            return AllowLocked(type);
+        }
     }
 
     private bool AllowLocked(string type)
     {
         long now = clock.GetTimestamp();
-        if (type == "profile" && profileAt is { } previous && clock.GetElapsedTime(previous, now).TotalSeconds < 5) return false;
+        if (type == "profile" && profileAt is { } previous && clock.GetElapsedTime(previous, now).TotalSeconds < 5)
+        {
+            return false;
+        }
+
         var (key, capacity, refill) = type switch
         {
             "transport" => ("transport", 384d, 160d),
@@ -39,12 +46,25 @@ public sealed class InputRateLimiter(TimeProvider? provider = null)
             "invite" => ("invitations", 5d, 0.2d),
             _ => ("commands", 8d, 8d),
         };
-        if (!buckets.TryGetValue(key, out var bucket)) buckets[key] = bucket = new(capacity, now);
+        if (!buckets.TryGetValue(key, out var bucket))
+        {
+            buckets[key] = bucket = new(capacity, now);
+        }
+
         double elapsed = Math.Max(0, clock.GetElapsedTime(bucket.At, now).TotalSeconds);
-        bucket.Tokens = Math.Min(capacity, bucket.Tokens + elapsed * refill); bucket.At = now;
-        if (bucket.Tokens < 1) return false;
+        bucket.Tokens = Math.Min(capacity, bucket.Tokens + elapsed * refill);
+        bucket.At = now;
+        if (bucket.Tokens < 1)
+        {
+            return false;
+        }
+
         bucket.Tokens--;
-        if (type == "profile") profileAt = now;
+        if (type == "profile")
+        {
+            profileAt = now;
+        }
+
         return true;
     }
 

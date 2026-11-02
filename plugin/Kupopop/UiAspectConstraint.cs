@@ -9,12 +9,16 @@ public sealed unsafe class UiAspectConstraint
     private readonly ImGuiSizeCallback callback;
     private Vector2 minimum, maximum;
 
-    public UiAspectConstraint() { callback = Resize; }
+    public UiAspectConstraint()
+    {
+        callback = Resize;
+    }
 
     public void Apply(Vector2 display, float scale)
     {
         var bounds = UiWindowGeometry.Bounds(display / scale);
-        minimum = bounds.Minimum * scale; maximum = bounds.Maximum * scale;
+        minimum = bounds.Minimum * scale;
+        maximum = bounds.Maximum * scale;
         ImGui.SetNextWindowSizeConstraints(minimum, maximum, callback);
     }
 

@@ -18,15 +18,27 @@ static class SocialChecks
         var b = accounts.Create("Another Artist");
         var c = accounts.Create("Unknown Artist");
         bool rejected = false;
-        try { accounts.Create("  MOG   ARTIST  "); } catch (DisplayNameTakenException) { rejected = true; }
+        try
+        {
+            accounts.Create("  MOG   ARTIST  ");
+        }
+        catch (DisplayNameTakenException) { rejected = true; }
         check(rejected && accounts.Count() == 4, "normalized names are unique without partially creating accounts");
         rejected = false;
-        try { accounts.Update(b.AccountId, "Ｍｏｇ Artist", null, false); } catch (DisplayNameTakenException) { rejected = true; }
+        try
+        {
+            accounts.Update(b.AccountId, "Ｍｏｇ Artist", null, false);
+        }
+        catch (DisplayNameTakenException) { rejected = true; }
         check(rejected && accounts.Get(b.AccountId)!.DisplayName == b.Profile.DisplayName, "compatibility-normalized rename conflicts preserve the prior profile");
         var clock = new TestClock();
         var game = new GameEngine(accounts, NullLogger<GameEngine>.Instance, clock);
-        var pa = new TestPeer(a.AccountId); var pb = new TestPeer(b.AccountId); var pc = new TestPeer(c.AccountId);
-        game.Attach(pa); game.Attach(pb); game.Attach(pc);
+        var pa = new TestPeer(a.AccountId);
+        var pb = new TestPeer(b.AccountId);
+        var pc = new TestPeer(c.AccountId);
+        game.Attach(pa);
+        game.Attach(pb);
+        game.Attach(pc);
         SocialView Social(TestPeer p) => p.Events.Last(e => e.Social is not null).Social!;
         game.Handle(pa, new("friend-request", TargetId: c.AccountId));
         check(pa.Events[^1].Type == "error" && accounts.Relationships(a.AccountId).Length == 0, "arbitrary account IDs cannot be used for player discovery or unsolicited requests");
@@ -47,7 +59,10 @@ static class SocialChecks
         check(accounts.Friends(a.AccountId, b.AccountId) && Social(pa).People.Single().Online,
             "recipient acceptance creates mutual friendship and scoped live presence");
         using (var secondStore = new AccountStore(Path.Combine(working, "social")))
+        {
             check(secondStore.Friends(a.AccountId, b.AccountId), "accepted friendships persist across store instances");
+        }
+
         game.Handle(pa, new("view-profile", TargetId: b.AccountId));
         check(pa.Events[^1].SharedProfile is { Visible: false, Stats: null }, "profiles and lifetime statistics default private and disabled");
         game.Handle(pb, new("profile-privacy", Enabled: true, Shared: true));
@@ -62,9 +77,11 @@ static class SocialChecks
         check(pc.RoomCode is null, "an invitation is bound to its authenticated recipient");
         game.Handle(pb, new("accept-invite", TargetId: invite.Id));
         check(pb.RoomCode == code && Social(pb).Invitations.Length == 0, "accepting an invitation joins exactly once through normal room validation");
-        game.Handle(pb, new("leave")); clock.Advance(4);
+        game.Handle(pb, new("leave"));
+        clock.Advance(4);
         game.Handle(pa, new("invite", TargetId: b.AccountId));
-        var expired = Social(pb).Invitations.Single(); clock.Advance(301);
+        var expired = Social(pb).Invitations.Single();
+        clock.Advance(301);
         game.Handle(pb, new("accept-invite", TargetId: expired.Id));
         check(pb.RoomCode is null && pb.Events[^1].Type == "error", "expired invitations cannot rejoin a room");
         game.Handle(pb, new("join", Text: code));
@@ -81,7 +98,10 @@ static class SocialChecks
         {
             var drawer = pa.State.DrawerId == pa.Id ? pa : pb;
             game.Handle(drawer, new("choose-word", Text: drawer.State.WordChoices![0], TurnId: drawer.State.TurnId));
-            clock.Advance(16); game.Tick(); clock.Advance(7); game.Tick();
+            clock.Advance(16);
+            game.Tick();
+            clock.Advance(7);
+            game.Tick();
         }
         check(accounts.Statistics(b.AccountId)?.Games == 1 && accounts.Statistics(a.AccountId) is null,
             "completed matches record opted-in lifetime totals without collecting opted-out players' totals");
@@ -94,7 +114,8 @@ static class SocialChecks
         game.Detach(pb, intentional: true);
         check(pa.State.Players.Length == 1 && game.GetStatus(TimeSpan.Zero).ConnectedUsers == 2,
             "intentional window closure immediately removes room membership and connection counts");
-        var reopened = new TestPeer(b.AccountId); game.Attach(reopened);
+        var reopened = new TestPeer(b.AccountId);
+        game.Attach(reopened);
         check(reopened.RoomCode is null && Social(reopened).People.All(p => p.Relationship != "recent"),
             "reopening starts outside the room and clears session-only recent players");
         game.Handle(reopened, new("friend-remove", TargetId: a.AccountId));
@@ -102,7 +123,8 @@ static class SocialChecks
             "removing friendship revokes presence for both parties");
         game.Handle(reopened, new("join", Text: code));
         game.Detach(reopened);
-        var resumed = new TestPeer(b.AccountId); game.Attach(resumed);
+        var resumed = new TestPeer(b.AccountId);
+        game.Attach(resumed);
         check(resumed.RoomCode == code, "unexpected network drops retain the bounded reconnect grace");
         game.Detach(reopened, intentional: true);
         check(resumed.RoomCode == code, "stale sockets cannot remove a newer connection's room membership");
@@ -145,15 +167,21 @@ static class SocialChecks
             backgroundInbox.Invitations[0].From.AvatarPixels is null && game.GetStatus(TimeSpan.Zero).ConnectedUsers == 2,
             "authenticated inbox polling returns compact metadata without attaching a game connection");
         rejected = false;
-        try { game.InvitationInbox(b.AccessToken); } catch (InboxRateLimitException) { rejected = true; }
+        try
+        {
+            game.InvitationInbox(b.AccessToken);
+        }
+        catch (InboxRateLimitException) { rejected = true; }
         check(rejected && game.InvitationInbox("invalid-token") is null,
             "inbox polling rejects invalid credentials and enforces per-account rate limits");
         clock.Advance(21);
         accounts.SetPreferences(b.AccountId, false, false, false, backgroundInvitations: false);
         check(game.InvitationInbox(b.AccessToken) is { Enabled: false, Invitations.Length: 0 },
             "opting out disables invitation polling without exposing queued invitations");
-        clock.Advance(301); game.Tick();
-        var returnPeer = new TestPeer(b.AccountId); game.Attach(returnPeer);
+        clock.Advance(301);
+        game.Tick();
+        var returnPeer = new TestPeer(b.AccountId);
+        game.Attach(returnPeer);
         check(Social(returnPeer).Invitations.Length == 0, "expired offline invitations are pruned before reconnect");
 
         string oldPreferences = Path.Combine(working, "schema-three-privacy");

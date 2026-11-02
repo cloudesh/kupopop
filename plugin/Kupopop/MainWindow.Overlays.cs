@@ -33,11 +33,14 @@ public sealed partial class MainWindow
             if (panel.Success)
             {
                 if (ToolAction(collapsed ? FontAwesomeIcon.ChevronRight : FontAwesomeIcon.ChevronLeft, collapsed ? "Expand tools" : "Collapse tools"))
-                { plugin.Config.CanvasToolsCollapsed = !collapsed; plugin.Save(); }
+                {
+                    plugin.Config.CanvasToolsCollapsed = !collapsed;
+                    plugin.Save();
+                }
                 if (!collapsed)
                 {
                     ImGui.SameLine();
-                    painting.Toolbar("game-tools", undo: () => { if (Send(new("undo", TurnId: state.TurnId))) undoPending = true; }, canUndo: canUndoDrawing && !undoPending, compact: true);
+                    painting.Toolbar("game-tools", undo: () => { if (Send(new("undo", TurnId: state.TurnId))) { undoPending = true; } }, canUndo: canUndoDrawing && !undoPending, compact: true);
                 }
             }
         }
@@ -57,7 +60,11 @@ public sealed partial class MainWindow
     {
         var saved = ImGui.GetCursorScreenPos();
         if (customWordTurn != state.TurnId)
-        { customWordTurn = state.TurnId; customWordInput = ""; enteringCustomWord = false; }
+        {
+            customWordTurn = state.TurnId;
+            customWordInput = "";
+            enteringCustomWord = false;
+        }
         var available = painting.RenderSize;
         int offerCount = (state.WordChoices?.Length ?? 0) + (state.CustomWordAvailable ? 1 : 0);
         float desiredHeight = enteringCustomWord ? 200 : 64 + ((offerCount + 1) / 2) * 60;
@@ -82,9 +89,22 @@ public sealed partial class MainWindow
                     ImGui.SetNextItemWidth(-1);
                     bool submitted = ImGui.InputTextWithHint("##custom-word", "Something everyone can draw and guess", ref customWordInput, 48, ImGuiInputTextFlags.EnterReturnsTrue);
                     using (ImRaii.Disabled(string.IsNullOrWhiteSpace(customWordInput)))
-                        if (UiTheme.Button("Draw this word", ImGui.GetContentRegionAvail().X, primary: true)) submitted = true;
-                    if (submitted && !string.IsNullOrWhiteSpace(customWordInput)) Send(new("choose-custom-word", Text: customWordInput, TurnId: state.TurnId));
-                    if (UiTheme.Button("Back to word choices", 0, quiet: true)) enteringCustomWord = false;
+                    {
+                        if (UiTheme.Button("Draw this word", ImGui.GetContentRegionAvail().X, primary: true))
+                        {
+                            submitted = true;
+                        }
+                    }
+
+                    if (submitted && !string.IsNullOrWhiteSpace(customWordInput))
+                    {
+                        Send(new("choose-custom-word", Text: customWordInput, TurnId: state.TurnId));
+                    }
+
+                    if (UiTheme.Button("Back to word choices", 0, quiet: true))
+                    {
+                        enteringCustomWord = false;
+                    }
                 }
                 else if (state.WordChoices is { Length: > 0 } choices)
                 {
@@ -98,9 +118,15 @@ public sealed partial class MainWindow
                             ImGui.TableNextColumn();
                             if (i < choices.Length)
                             {
-                                if (WordCard("word-" + i, choices[i], i, cardHeight)) Send(new("choose-word", Text: choices[i], TurnId: state.TurnId));
+                                if (WordCard("word-" + i, choices[i], i, cardHeight))
+                                {
+                                    Send(new("choose-word", Text: choices[i], TurnId: state.TurnId));
+                                }
                             }
-                            else if (WordCard("custom-word-offer", "Rare\nYour own word", 4, cardHeight)) enteringCustomWord = true;
+                            else if (WordCard("custom-word-offer", "Rare\nYour own word", 4, cardHeight))
+                            {
+                                enteringCustomWord = true;
+                            }
                         }
                         ImGui.EndTable();
                     }
@@ -136,21 +162,52 @@ public sealed partial class MainWindow
             (showSkip ? ImGui.CalcTextSize(skip).X + UiTheme.S(16) : 0) + (showKick && showSkip ? UiTheme.S(6) : 0);
         ImGui.SetCursorScreenPos(painting.RenderOrigin + new Vector2(Math.Max(UiTheme.S(4), painting.RenderSize.X - width - UiTheme.S(4)), painting.RenderSize.Y - UiTheme.S(32)));
         using (ImRaii.Disabled(state.YouLikedDrawing))
+        {
             if (ToolAction(FontAwesomeIcon.ThumbsUp, "Good drawing! One like per drawing; does not change match scores.", state.YouLikedDrawing))
+            {
                 Send(new("like-drawing", TurnId: state.TurnId));
-        if (showKick || showSkip) ImGui.SameLine();
+            }
+        }
+
+        if (showKick || showSkip)
+        {
+            ImGui.SameLine();
+        }
+
         if (showKick)
         {
             using (ImRaii.Disabled(!state.KickVoteAvailable || state.KickVote?.YouVoted == true))
-                if (UiPresentation.SoftButton(kick)) Send(new("vote-kick", TurnId: state.TurnId));
-            if (ImGui.IsItemHovered()) UiTheme.Tooltip("Vote to remove the drawer. Under 5: all other players; 5+: 70%, rounded up. Ballot lasts 30s.");
+            {
+                if (UiPresentation.SoftButton(kick))
+                {
+                    Send(new("vote-kick", TurnId: state.TurnId));
+                }
+            }
+
+            if (ImGui.IsItemHovered())
+            {
+                UiTheme.Tooltip("Vote to ban the drawer until this room closes. Under 5: all other players; 5+: 70%, rounded up. Ballot lasts 30s.");
+            }
         }
-        if (showKick && showSkip) ImGui.SameLine();
+        if (showKick && showSkip)
+        {
+            ImGui.SameLine();
+        }
+
         if (showSkip)
         {
             using (ImRaii.Disabled(!state.SkipVoteAvailable || state.SkipVote?.YouVoted == true))
-                if (UiPresentation.SoftButton(skip)) Send(new("vote-skip", TurnId: state.TurnId));
-            if (ImGui.IsItemHovered()) UiTheme.Tooltip("Vote to skip this turn without removing its drawer. Same threshold as a kick vote.");
+            {
+                if (UiPresentation.SoftButton(skip))
+                {
+                    Send(new("vote-skip", TurnId: state.TurnId));
+                }
+            }
+
+            if (ImGui.IsItemHovered())
+            {
+                UiTheme.Tooltip("Vote to skip this turn without removing its drawer. Same threshold as a kick vote.");
+            }
         }
         ImGui.SetCursorScreenPos(saved);
     }
@@ -194,7 +251,8 @@ public sealed partial class MainWindow
                     var measured = art.MeasureLarge(state.Word ?? "", inside);
                     ImGui.SetCursorScreenPos(new Vector2(contentOrigin.X + Math.Max(0, (inside - measured.X) / 2), ImGui.GetCursorScreenPos().Y));
                     ImGui.PushTextWrapPos(contentOrigin.X - ImGui.GetWindowPos().X + inside);
-                    art.LargeText(state.Word ?? "", wrap: true); ImGui.PopTextWrapPos();
+                    art.LargeText(state.Word ?? "", wrap: true);
+                    ImGui.PopTextWrapPos();
                 }
                 else if (winners.Length > 0)
                 {
@@ -205,18 +263,34 @@ public sealed partial class MainWindow
                 }
                 UiTheme.Gap(6);
                 ImGui.SetCursorPosX(contentOrigin.X - ImGui.GetWindowPos().X);
-                if (winners.Length > 0) UiPresentation.Podium(winners.Take(3).ToArray(), inside, totals: match,
+                if (winners.Length > 0)
+                {
+                    UiPresentation.Podium(winners.Take(3).ToArray(), inside, totals: match,
                     portrait: (winner, at, extent) =>
                     {
                         var player = state.Players.FirstOrDefault(p => p.Profile.Id == winner.PlayerId);
-                        if (player is not null) UiPortrait.DrawAt(avatars.Get(player.Profile).Handle, at, new Vector2(extent));
-                        else UiStationery.Moogle(at + new Vector2(extent / 2), extent * 0.35f);
+                        if (player is not null)
+                        {
+                            UiPortrait.DrawAt(avatars.Get(player.Profile).Handle, at, new Vector2(extent));
+                        }
+                        else
+                        {
+                            UiStationery.Moogle(at + new Vector2(extent / 2), extent * 0.35f);
+                        }
                     });
-                else UiPresentation.CenteredLabel("A fresh page is coming up.", inside, UiTheme.Muted);
+                }
+                else
+                {
+                    UiPresentation.CenteredLabel("A fresh page is coming up.", inside, UiTheme.Muted);
+                }
+
                 if (match)
                 {
                     ImGui.SetCursorPosX(contentOrigin.X - ImGui.GetWindowPos().X);
-                    if (UiTheme.Button("Back to the room", inside, quiet: true)) resultsDismissed = state.TurnId;
+                    if (UiTheme.Button("Back to the room", inside, quiet: true))
+                    {
+                        resultsDismissed = state.TurnId;
+                    }
                 }
                 ImGui.EndGroup();
             }
@@ -243,17 +317,29 @@ public sealed partial class MainWindow
                 if (child.Success)
                 {
                     var content = ImGui.GetCursorScreenPos();
-                    if (titled) ImGui.TextColored(UiTheme.Rose, toast.Title);
+                    if (titled)
+                    {
+                        ImGui.TextColored(UiTheme.Rose, toast.Title);
+                    }
+
                     ImGui.SetCursorScreenPos(new Vector2(content.X + width - UiTheme.S(48), content.Y));
                     if (ToolAction(FontAwesomeIcon.Times, "Dismiss notification"))
                     {
                         toasts.Dismiss(toast.Id);
                         if (toast.Id.StartsWith("update:", StringComparison.Ordinal))
-                        { plugin.Config.DismissedUpdate = toast.Id[7..]; plugin.Save(); }
+                        {
+                            plugin.Config.DismissedUpdate = toast.Id[7..];
+                            plugin.Save();
+                        }
                     }
-                    if (!titled) ImGui.SetCursorScreenPos(content);
+                    if (!titled)
+                    {
+                        ImGui.SetCursorScreenPos(content);
+                    }
+
                     ImGui.PushTextWrapPos(ImGui.GetCursorPosX() + width - UiTheme.S(titled ? 24 : 50));
-                    ImGui.TextUnformatted(toast.Message); ImGui.PopTextWrapPos();
+                    ImGui.TextUnformatted(toast.Message);
+                    ImGui.PopTextWrapPos();
                 }
             }
             size.Y -= height + UiTheme.S(6);

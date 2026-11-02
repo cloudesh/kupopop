@@ -12,7 +12,7 @@ function Invoke-Dotnet {
     if ($LASTEXITCODE -ne 0) { throw "dotnet command failed: $($Arguments[0])" }
 }
 if (-not $SkipPlugin) {
-    Invoke-Dotnet @('build','plugin/Kupopop/Kupopop.csproj','-c','Release','-p:UseSharedCompilation=false','-m:1')
+    Invoke-Dotnet @('build','plugin/Kupopop/Kupopop.csproj','-c','Release','-p:RestoreLockedMode=true','-p:UseSharedCompilation=false','-m:1')
     $taskPackaged = Join-Path $PSScriptRoot 'plugin/Kupopop/bin/Release/Kupopop/latest.zip'
     if (-not (Test-Path -LiteralPath $taskPackaged)) { throw 'DalamudPackager output was not found.' }
     Add-Type -AssemblyName System.IO.Compression.FileSystem

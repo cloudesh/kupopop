@@ -3,6 +3,25 @@
 Kupopop's own source is licensed under AGPL-3.0-only; see LICENSE.
 Dependencies keep their own licenses and notices below.
 
+## Game sounds
+
+The following sounds are used under [CC0 1.0](https://creativecommons.org/publicdomain/zero/1.0/).
+Source links were supplied by the maintainer and their CC0 listings checked on 2 November 2026.
+Bundled files are renamed PCM WAV copies; their format/duration may differ from the source upload.
+
+| Bundled file | Sound | Creator | Source |
+| --- | --- | --- | --- |
+| `top_3.wav` | yay.wav | Higgs01 | https://freesound.org/people/Higgs01/sounds/428156/ |
+| `no_guesses.wav` | negative_beeps.wav | themusicalnomad | https://freesound.org/people/themusicalnomad/sounds/253886/ |
+| `next_turn.wav` | Correct Answer / That's Right! | Beetlemuse | https://freesound.org/people/Beetlemuse/sounds/528957/ |
+| `clock.wav` | Short Ping! | unfa | https://freesound.org/people/unfa/sounds/215416/ |
+| `correct_guess.wav` | jingle_little_achievement4.wav | metalfortress | https://freesound.org/people/metalfortress/sounds/611792/ |
+
+CC0 permits copying, modification and redistribution, including commercial use.
+These sounds retain their CC0 dedication independently of the project's source-code license.
+
+## Runtime components
+
 - The plugin references Dalamud and its ImGui bindings supplied by the user's
   Dalamud installation. These binaries are not included in the plugin ZIP.
   https://github.com/goatcorp/Dalamud

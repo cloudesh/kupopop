@@ -15,7 +15,10 @@ public sealed class UiAssets : IDisposable
     private static bool paperUnavailable;
     private static bool paperReady;
     private static DiagnosticLog? paperLog;
-    public UiAssets(DiagnosticLog log) { paperLog = log; }
+    public UiAssets(DiagnosticLog log)
+    {
+        paperLog = log;
+    }
 
     public void Heading(string text)
     {
@@ -26,7 +29,14 @@ public sealed class UiAssets : IDisposable
     public void LargeText(string text, bool wrap = false)
     {
         using var font = large.Push();
-        if (wrap) ImGui.TextWrapped(text); else ImGui.TextUnformatted(text);
+        if (wrap)
+        {
+            ImGui.TextWrapped(text);
+        }
+        else
+        {
+            ImGui.TextUnformatted(text);
+        }
     }
     public void DrawLarge(string text, Vector2 position, Vector4 color)
     {
@@ -38,7 +48,11 @@ public sealed class UiAssets : IDisposable
         using var font = large.Push();
         return ImGui.CalcTextSize(text, false, width);
     }
-    public void Hint(string hint, float width = 0) { using var font = title.Push(); UiPresentation.Hint(hint, width); }
+    public void Hint(string hint, float width = 0)
+    {
+        using var font = title.Push();
+        UiPresentation.Hint(hint, width);
+    }
     public Vector2 MeasureWord(string? word, string hint, float width)
     {
         using var font = title.Push();
@@ -47,23 +61,40 @@ public sealed class UiAssets : IDisposable
     public void WordHeading(string word, float width)
     {
         using var font = title.Push();
-        ImGui.PushTextWrapPos(ImGui.GetCursorPosX() + width); ImGui.TextWrapped(word); ImGui.PopTextWrapPos();
+        ImGui.PushTextWrapPos(ImGui.GetCursorPosX() + width);
+        ImGui.TextWrapped(word);
+        ImGui.PopTextWrapPos();
     }
     public void CenteredHeading(string text, float width)
-    { using var font = title.Push(); UiPresentation.CenteredLabel(text, width, UiTheme.Ink); }
+    {
+        using var font = title.Push();
+        UiPresentation.CenteredLabel(text, width, UiTheme.Ink);
+    }
 
     public static bool PaperTexture(Vector2 min, Vector2 max, Vector4? tint = null)
     {
-        if (paperUnavailable) return false;
+        if (paperUnavailable)
+        {
+            return false;
+        }
+
         try
         {
             var shared = Plugin.TextureProvider.GetFromGame("ui/uld/MoogleColectionlWindow_hr1.tex");
             if (!shared.TryGetWrap(out var texture, out var error))
             {
-                if (error is not null) { paperUnavailable = true; paperLog?.Write("ui.paper_unavailable", error); }
+                if (error is not null)
+                {
+                    paperUnavailable = true;
+                    paperLog?.Write("ui.paper_unavailable", error);
+                }
                 return false;
             }
-            if (!paperReady) { paperReady = true; paperLog?.Write($"ui.paper_ready size={texture.Width}x{texture.Height}"); }
+            if (!paperReady)
+            {
+                paperReady = true;
+                paperLog?.Write($"ui.paper_ready size={texture.Width}x{texture.Height}");
+            }
             // Use one continuous, flat interior below the game's divider.
             // Repeating a shaded patch produced visible horizontal color bands.
             UiStationery.PaperMaterial(texture.Handle, min, max, tint);
@@ -78,5 +109,9 @@ public sealed class UiAssets : IDisposable
         ImGui.TextColored(color ?? UiTheme.Muted, icon.ToIconString());
     }
 
-    public void Dispose() { title.Dispose(); large.Dispose(); }
+    public void Dispose()
+    {
+        title.Dispose();
+        large.Dispose();
+    }
 }

@@ -21,6 +21,9 @@ public static class UiPortrait
 
     private static void Backdrop(Vector2 origin, Vector2 size)
     {
-        if (UiTheme.DarkMode) ImGui.GetWindowDrawList().AddRectFilled(origin, origin + size, 0xFFFFFFFF);
+        if (UiTheme.DarkMode)
+        {
+            ImGui.GetWindowDrawList().AddRectFilled(origin, origin + size, 0xFFFFFFFF);
+        }
     }
 }

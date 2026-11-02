@@ -16,5 +16,10 @@ public sealed class UpdateChecker : IDisposable
         byte[] body = await BoundedHttp.ReadAsync(response, 65536, timeout.Token).ConfigureAwait(false);
         return UpdateFeed.NewerVersion(body, current);
     }
-    public void Dispose() { stop.Cancel(); http.Dispose(); stop.Dispose(); }
+    public void Dispose()
+    {
+        stop.Cancel();
+        http.Dispose();
+        stop.Dispose();
+    }
 }

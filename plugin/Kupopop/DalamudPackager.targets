@@ -7,7 +7,7 @@
     </PropertyGroup>
     <DalamudPackager ProjectDir="$(ProjectDir)" OutputPath="$(OutputPath)"
       AssemblyName="$(AssemblyName)" MakeZip="$(KupoMakeZip)" HandleImages="false"
-      Include="$(AssemblyName).dll;$(AssemblyName).deps.json;$(AssemblyName).json;Kupopop.Shared.dll;images/icon.png"
+      Include="$(AssemblyName).dll;$(AssemblyName).deps.json;$(AssemblyName).json;Kupopop.Shared.dll;images/icon.png;LICENSE;THIRD_PARTY_NOTICES.md"
       Author="$(Author)" Name="$(Name)" Punchline="$(Punchline)" Description="$(Description)"
       ApplicableVersion="$(ApplicableVersion)" RepoUrl="$(RepoUrl)" Tags="$(Tags)"
       DalamudApiLevel="$(DalamudApiLevel)" IconUrl="$(IconUrl)" />

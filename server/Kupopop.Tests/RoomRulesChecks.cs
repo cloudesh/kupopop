@@ -14,10 +14,22 @@ static class RoomRulesChecks
         {
             var game = new GameEngine(accounts, NullLogger<GameEngine>.Instance, TimeProvider.System, bank);
             var peers = ids.Select(c => new Peer(c.AccountId)).ToArray();
-            foreach (var peer in peers) game.Attach(peer);
+            foreach (var peer in peers)
+            {
+                game.Attach(peer);
+            }
+
             game.Handle(peers[0], new("create", Options: options));
-            for (int i = 1; i < peers.Length; i++) game.Handle(peers[i], new("join", Text: peers[0].State.Code));
-            if (start) game.Handle(peers[0], new("start"));
+            for (int i = 1; i < peers.Length; i++)
+            {
+                game.Handle(peers[i], new("join", Text: peers[0].State.Code));
+            }
+
+            if (start)
+            {
+                game.Handle(peers[0], new("start"));
+            }
+
             return (game, peers);
         }
         foreach (int count in new[] { 1, 3, 8 })
@@ -35,12 +47,18 @@ static class RoomRulesChecks
         foreach (int invalid in new[] { 0, 9 })
         {
             var game = new GameEngine(accounts, NullLogger<GameEngine>.Instance, TimeProvider.System, bank);
-            var peer = new Peer(ids[0].AccountId); game.Attach(peer);
+            var peer = new Peer(ids[0].AccountId);
+            game.Attach(peer);
             game.Handle(peer, new("create", Options: new("Invalid choices", WordChoiceCount: invalid)));
             check(peer.RoomCode is null && peer.Events.Last().Type == "error", "out-of-range word-choice count is rejected on the server");
         }
         bool smallRejected = false;
-        try { WordBank.Starter().Choices(null, "", 8); } catch (ArgumentException) { smallRejected = true; }
+        var smallBank = new WordBank([new("small", "Small test", true, false, ["Moogle", "Chocobo"])]);
+        try
+        {
+            smallBank.Choices(null, "", 8);
+        }
+        catch (ArgumentException) { smallRejected = true; }
         check(smallRejected, "insufficient word pools cannot silently reduce the requested offers");
 
         var disabled = Room(new("No voting", VoteKickEnabled: false, VoteSkipEnabled: false));
@@ -49,7 +67,11 @@ static class RoomRulesChecks
         check(disabled.peers.All(p => !p.State.KickVoteAvailable && !p.State.SkipVoteAvailable), "disabled room votes are unavailable in every client snapshot");
         foreach (string kind in new[] { "vote-kick", "vote-skip" })
         {
-            foreach (var p in disabled.peers) p.Events.RemoveAll(e => e.Room is null);
+            foreach (var p in disabled.peers)
+            {
+                p.Events.RemoveAll(e => e.Room is null);
+            }
+
             disabled.game.Handle(disabled.peers[1], new(kind, TurnId: lead.State.TurnId));
             check(disabled.peers[1].Events.Last().Type == "error" && disabled.peers.All(p => !p.Events.Any(e => e.Chat is not null)) && lead.State.Phase == "drawing",
                 $"disabled {kind} cannot be bypassed by a direct network command");
@@ -67,14 +89,19 @@ static class RoomRulesChecks
         var near = Room(new("Near guesses", WordChoiceCount: 8));
         // Nine entries and eight offers: use a test-selected answer, then create
         // typo variants from it rather than assuming random offer contents.
-        var chooser = near.peers[0]; string answer = chooser.State.WordChoices![0];
+        var chooser = near.peers[0];
+        string answer = chooser.State.WordChoices![0];
         near.game.Handle(chooser, new("choose-word", Text: answer, TurnId: chooser.State.TurnId));
         string normalized = GuessMatching.Normalize(answer);
         string substitute = (normalized[0] == 'Z' ? "X" : "Z") + normalized[1..];
         string transpose = normalized[1] + normalized[0].ToString() + normalized[2..];
         foreach (string typo in new[] { substitute, normalized + "Z", normalized[1..], transpose })
         {
-            foreach (var p in near.peers) p.Events.RemoveAll(e => e.Room is null);
+            foreach (var p in near.peers)
+            {
+                p.Events.RemoveAll(e => e.Room is null);
+            }
+
             near.game.Handle(near.peers[1], new("chat", Text: typo));
             check(near.peers[1].Events.Last().Chat is { System: true, Text: "So close! Try again." } &&
                 near.peers[0].Events.All(e => e.Chat is null) && near.peers[2].Events.All(e => e.Chat is null) &&
@@ -86,7 +113,11 @@ static class RoomRulesChecks
         near.game.Handle(near.peers[1], new("chat", Text: answer.ToLowerInvariant() + "!"));
         check(near.peers[1].State.Players.Single(p => p.Profile.Id == near.peers[1].Id) is { Solved: true, Score: 1000 },
             "normalized exact answers still solve and score normally");
-        foreach (var p in near.peers) p.Events.RemoveAll(e => e.Room is null);
+        foreach (var p in near.peers)
+        {
+            p.Events.RemoveAll(e => e.Room is null);
+        }
+
         near.game.Handle(near.peers[0], new("chat", Text: substitute));
         check(near.peers[1].Events.Last().Chat is { Done: true, System: false } && near.peers[2].Events.All(e => e.Chat is null),
             "near-miss matching does not alter done-mode privacy or drawer conversation");
@@ -98,6 +129,7 @@ static class RoomRulesChecks
             square.Pixels[^1] == 4 && !square.Apply(new("pencil", 384, 383, 384, 383, 4)),
             "square protocol canvas accepts its bottom-right pixel and rejects coordinates beyond it");
         foreach (float scale in new[] { 1f, 1.5f, 2f })
+        {
             foreach (var viewport in new[] { new System.Numerics.Vector2(752, 310), new System.Numerics.Vector2(912, 450), new System.Numerics.Vector2(1332, 600) })
             {
                 var available = viewport * scale;
@@ -105,11 +137,15 @@ static class RoomRulesChecks
                 check(layout.Canvas > 0 && layout.Width + layout.Inset * 2 <= available.X + 0.01f && layout.Canvas + 10 * scale <= available.Y + 0.01f,
                     "square canvas and matching-height fixed side panels fit minimum/default/large room sizes at UI scale");
             }
+        }
+
         foreach (float scale in new[] { 1f, 1.5f, 2f })
+        {
             foreach (var display in new[] { new System.Numerics.Vector2(1280, 720), new System.Numerics.Vector2(1920, 1080), new System.Numerics.Vector2(2560, 1440) })
             {
                 var bounds = Kupopop.UiWindowGeometry.Bounds(display / scale);
-                var minimum = bounds.Minimum * scale; var maximum = bounds.Maximum * scale;
+                var minimum = bounds.Minimum * scale;
+                var maximum = bounds.Maximum * scale;
                 var current = Kupopop.UiWindowGeometry.DefaultSize * scale;
                 var requests = new[] { current + new System.Numerics.Vector2(120, 0), current + new System.Numerics.Vector2(0, 120), new System.Numerics.Vector2(1), display * 4 };
                 check(requests.Select(request => Kupopop.UiWindowGeometry.Constrain(request, current, minimum, maximum)).All(size =>
@@ -118,16 +154,22 @@ static class RoomRulesChecks
                     size.X < display.X && size.Y < display.Y),
                     "locked window ratio handles width/height resizing and bounds without double-applying UI scale");
             }
+        }
     }
 
     private sealed class Peer(Guid id) : IGamePeer
     {
         public Guid Id { get; } = id;
-        public string? RoomCode { get; set; }
+        public string? RoomCode
+        {
+            get; set;
+        }
         public List<ServerEvent> Events = [];
         public RoomView State => Events.Last(e => e.Room is not null).Room!;
         public void Send(ServerEvent message) => Events.Add(message);
         public bool Allow(string type) => true;
-        public void Close() { }
+        public void Close()
+        {
+        }
     }
 }

@@ -22,14 +22,21 @@ public static class ServerMonitor
         string temporary = path + ".tmp";
         File.WriteAllBytes(temporary, JsonSerializer.SerializeToUtf8Bytes(status));
         if (!OperatingSystem.IsWindows())
+        {
             File.SetUnixFileMode(temporary, UnixFileMode.UserRead | UnixFileMode.UserWrite);
+        }
+
         File.Move(temporary, path, overwrite: true);
     }
 
     public static ServerStatus Read(string path)
     {
         using var stream = new FileStream(path, FileMode.Open, FileAccess.Read, FileShare.ReadWrite | FileShare.Delete);
-        if (stream.Length > MaximumBytes) throw new InvalidDataException("Status file is too large.");
+        if (stream.Length > MaximumBytes)
+        {
+            throw new InvalidDataException("Status file is too large.");
+        }
+
         return JsonSerializer.Deserialize<ServerStatus>(stream) ?? throw new InvalidDataException("Status file is empty.");
     }
 
@@ -39,10 +46,17 @@ public static class ServerMonitor
         long nextWarning = 0;
         void Publish(bool running)
         {
-            try { Write(path, game.GetStatus(uptime.Elapsed, running)); }
+            try
+            {
+                Write(path, game.GetStatus(uptime.Elapsed, running));
+            }
             catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
             {
-                if (Environment.TickCount64 < nextWarning) return;
+                if (Environment.TickCount64 < nextWarning)
+                {
+                    return;
+                }
+
                 nextWarning = Environment.TickCount64 + 60000;
                 log.LogWarning("Local monitor snapshot unavailable. Category={Category}", ex.GetType().Name);
             }
@@ -51,7 +65,10 @@ public static class ServerMonitor
         {
             using var timer = new PeriodicTimer(TimeSpan.FromSeconds(2));
             Publish(true);
-            while (await timer.WaitForNextTickAsync(stop)) Publish(true);
+            while (await timer.WaitForNextTickAsync(stop))
+            {
+                Publish(true);
+            }
         }
         catch (OperationCanceledException) when (stop.IsCancellationRequested) { }
         finally { Publish(false); }
@@ -66,7 +83,11 @@ public static class ServerMonitor
         {
             do
             {
-                if (!Console.IsOutputRedirected) Console.Clear();
+                if (!Console.IsOutputRedirected)
+                {
+                    Console.Clear();
+                }
+
                 Console.WriteLine("Kupo Skribbl | live server monitor | Ctrl+C to exit");
                 try
                 {
@@ -77,12 +98,23 @@ public static class ServerMonitor
                     Console.WriteLine();
                     Console.WriteLine("Room     Visibility  Phase          Online  Members  Capacity  Round");
                     foreach (var room in status.Rooms)
+                    {
                         Console.WriteLine($"{room.Number,-8} {(room.Public ? "Public" : "Private"),-11} {room.Phase,-14} {room.Connected,6} {room.Members,8} {room.Capacity,9}  {room.Round}/{room.Rounds}");
-                    if (status.Rooms.Length == 0) Console.WriteLine("No live rooms.");
+                    }
+
+                    if (status.Rooms.Length == 0)
+                    {
+                        Console.WriteLine("No live rooms.");
+                    }
                 }
                 catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or JsonException)
-                { Console.WriteLine("Waiting for a readable server snapshot..."); }
-                if (!once) await Task.Delay(TimeSpan.FromSeconds(2), stop.Token);
+                {
+                    Console.WriteLine("Waiting for a readable server snapshot...");
+                }
+                if (!once)
+                {
+                    await Task.Delay(TimeSpan.FromSeconds(2), stop.Token);
+                }
             } while (!once);
         }
         catch (OperationCanceledException) when (stop.IsCancellationRequested) { }

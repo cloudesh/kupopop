@@ -34,7 +34,11 @@ internal static class UiBrand
         for (int index = 0; index < Name.Length; index++)
         {
             char character = Name[index];
-            if (character == ' ') { x += 6; continue; }
+            if (character == ' ')
+            {
+                x += 6;
+                continue;
+            }
             var letter = Letters[character];
             float tilt = (index % 3 - 1) * 0.045f;
             float offset = (index % 4 == 1 ? 0.6f : 0) + 1;
@@ -48,22 +52,31 @@ internal static class UiBrand
                 {
                     for (int i = 1; i < path.Length; i++)
                     {
-                        if (!letter.Rounded || path.Length == 2) draw.AddLine(Point(path[i - 1]), Point(path[i]), UiTheme.C(ink), thickness);
+                        if (!letter.Rounded || path.Length == 2)
+                        {
+                            draw.AddLine(Point(path[i - 1]), Point(path[i]), UiTheme.C(ink), thickness);
+                        }
                         else
                         {
-                            var a = path[i - 1]; var b = path[i];
-                            var before = path[Math.Max(0, i - 2)]; var after = path[Math.Min(path.Length - 1, i + 1)];
+                            var a = path[i - 1];
+                            var b = path[i];
+                            var before = path[Math.Max(0, i - 2)];
+                            var after = path[Math.Min(path.Length - 1, i + 1)];
                             draw.AddBezierCubic(Point(a), Point(a + (b - before) / 6), Point(b - (after - a) / 6), Point(b), UiTheme.C(ink), thickness);
                         }
                     }
-                    foreach (var point in path) draw.AddCircleFilled(Point(point), thickness / 2, UiTheme.C(ink), 8);
+                    foreach (var point in path)
+                    {
+                        draw.AddCircleFilled(Point(point), thickness / 2, UiTheme.C(ink), 8);
+                    }
                 }
             }
             x += letter.Width + 3;
         }
         if (cover)
         {
-            var color = UiTheme.Rose; color.W = 0.35f;
+            var color = UiTheme.Rose;
+            color.W = 0.35f;
             var start = origin + new Vector2(0, 21) * unit;
             draw.AddBezierCubic(start, start + new Vector2(bounds.X * 0.3f, -2 * unit),
                 start + new Vector2(bounds.X * 0.7f, unit), start + new Vector2(x * unit, -unit), UiTheme.C(color), unit * 0.7f);

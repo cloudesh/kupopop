@@ -18,10 +18,16 @@ Directory.CreateDirectory(working);
 
 void Check(bool condition, string description)
 {
-    if (!condition) throw new Exception("FAILED: " + description);
-    passed++; Console.WriteLine("PASS " + description);
+    if (!condition)
+    {
+        throw new Exception("FAILED: " + description);
+    }
+
+    passed++;
+    Console.WriteLine("PASS " + description);
 }
 
+await ReviewPreparationChecks.RunAsync(working, Check);
 SoundEventChecks.Run(Check);
 var canvas = new PixelCanvas(64, 64);
 canvas.Apply(new("pencil", 10, 10, 50, 10, 1, 1));
@@ -46,7 +52,7 @@ canvas.Load(new byte[64 * 64]);
 byte[] customPortrait = canvas.Rgba();
 Check(Enumerable.Range(0, 64 * 64).All(i => customPortrait[i * 4 + 3] == 255),
     "editable/custom portrait conversion retains every background pixel and its opacity");
-var retrySchedule = new ConnectionRetry();
+var retrySchedule = new ConnectionRetry(_ => 0);
 bool delaysBounded = retrySchedule.Due(0);
 long retryTime = 0;
 for (int i = 0; i < 100; i++)
@@ -72,17 +78,26 @@ for (int i = 0; i < 1200; i++)
     boundedPom &= float.IsFinite(pom.Angle) && MathF.Abs(pom.Angle) <= 0.62f;
 }
 Check(boundedPom, "pom remains finite and bounded during abrupt movement and uneven frame times");
-for (int i = 0; i < 600; i++) pom.Step(10000, 1f / 60, true);
+for (int i = 0; i < 600; i++)
+{
+    pom.Step(10000, 1f / 60, true);
+}
+
 Check(pom.Angle == 0, "pom settles fully after movement stops");
-pom.Step(100, 1f / 60, true); pom.Step(100, 1f / 60, false);
+pom.Step(100, 1f / 60, true);
+pom.Step(100, 1f / 60, false);
 bool reducedPom = pom.Angle == 0;
-pom.Step(200, 1f / 60, true); pom.Step(200, 1, true);
+pom.Step(200, 1f / 60, true);
+pom.Step(200, 1, true);
 Check(reducedPom && pom.Angle == 0, "reduced motion and long frame pauses reset decorative movement");
-pom.Step(0, 1f / 60, true); pom.Nudge(); pom.Step(0, 1f / 60, true);
+pom.Step(0, 1f / 60, true);
+pom.Nudge();
+pom.Step(0, 1f / 60, true);
 Check(pom.Angle > 0 && pom.Angle <= 0.62f, "cover moogle taps give a bounded spring impulse without changing window position");
 for (int i = 0; i < 1000; i++) { pom.Nudge(1000); pom.Step(0, 1f / 144, true); }
 Check(float.IsFinite(pom.Angle) && MathF.Abs(pom.Angle) <= 0.62f, "repeated cover taps cannot produce an unbounded pom animation");
-pom.Nudge(float.NaN); pom.Step(0, 1f / 60, false);
+pom.Nudge(float.NaN);
+pom.Step(0, 1f / 60, false);
 Check(pom.Angle == 0, "reduced motion still clears tapped pom movement and ignores invalid impulses");
 if (OperatingSystem.IsWindows())
 {
@@ -98,7 +113,11 @@ if (OperatingSystem.IsWindows())
 foreach (string bad in new[] { "http://example.com", "https://127.0.0.1", "https://user:secret@example.com", "https://example.com/path", "https://example.com/?secret=value" })
 {
     bool rejected = false;
-    try { using var _ = new RemoteClient(new Uri(bad)); } catch (ArgumentException) { rejected = true; }
+    try
+    {
+        using var _ = new RemoteClient(new Uri(bad));
+    }
+    catch (ArgumentException) { rejected = true; }
     Check(rejected, "unsafe endpoint rejected: " + new Uri(bad).GetLeftPart(UriPartial.Path).Replace("user:secret@", ""));
 }
 Check(await RejectHealthResponse("{\"protocol\":999}"), "connection gate rejects an incompatible service protocol");
@@ -128,12 +147,20 @@ Check(recovered.AccountId == credentials[17].AccountId && accounts.Authenticate(
 var time = new TestClock();
 var engine = new GameEngine(accounts, NullLogger<GameEngine>.Instance, time);
 var peers = credentials.Take(17).Select(c => new TestPeer(c.AccountId)).ToArray();
-foreach (var peer in peers) engine.Attach(peer);
+foreach (var peer in peers)
+{
+    engine.Attach(peer);
+}
+
 engine.Handle(peers[0], new("create", Options: new("Private room")));
 string code = peers[0].State.Code;
 engine.Handle(peers[16], new("list"));
 Check(peers[16].Events.Last(e => e.Type == "rooms").Rooms!.Length == 0, "private rooms do not appear in public discovery");
-for (int i = 1; i < 16; i++) engine.Handle(peers[i], new("join", Text: code));
+for (int i = 1; i < 16; i++)
+{
+    engine.Handle(peers[i], new("join", Text: code));
+}
+
 Check(peers[0].State.Players.Length == 16, "a room supports sixteen players including the drawer");
 engine.Handle(peers[16], new("join", Text: code));
 Check(peers[16].Events.Last().Type == "error", "seventeenth player rejected");
@@ -164,10 +191,12 @@ Check(peers[3].Events.Count == unsolvedBefore && peers[2].Events.Any(e => e.Chat
     peers[2].Events.Any(e => e.Chat?.Text == "drawer-private"), "done-mode and drawer messages are never delivered to remaining guessers");
 engine.Handle(peers[1], new("chat", Text: word));
 Check(peers[1].State.Players.Single(p => p.Profile.Id == peers[1].Id).Score == 1000, "repeated correct guesses cannot award duplicate points");
-time.Advance(31); engine.Tick();
+time.Advance(31);
+engine.Tick();
 Check(peers[3].State.Hint.Any(char.IsLetter), "server reveals hints on the configured schedule");
 var returning = new TestPeer(peers[2].Id);
-engine.Detach(peers[2]); engine.Attach(returning);
+engine.Detach(peers[2]);
+engine.Attach(returning);
 Check(returning.State.YouAreDone && returning.State.Canvas is not null &&
     returning.State.Players.Single(p => p.Profile.Id == returning.Id).Score == 940, "reconnection restores solved status, score, and canvas");
 engine.Revoke(returning.Id);
@@ -177,8 +206,10 @@ Check(returning.Closed && returning.Events.Count == revokedEvents, "revocation i
 
 var matchTime = new TestClock();
 var match = new GameEngine(accounts, NullLogger<GameEngine>.Instance, matchTime);
-var a = new TestPeer(credentials[0].AccountId); var b = new TestPeer(credentials[1].AccountId);
-match.Attach(a); match.Attach(b);
+var a = new TestPeer(credentials[0].AccountId);
+var b = new TestPeer(credentials[1].AccountId);
+match.Attach(a);
+match.Attach(b);
 match.Handle(a, new("create", Options: new("Full match", IsPublic: true)));
 match.Handle(b, new("join", Text: a.State.Code));
 match.Handle(a, new("start"));
@@ -191,7 +222,8 @@ for (int turn = 0; turn < 4; turn++)
     drawers.Add(drawer.Id);
     match.Handle(solver, new("chat", Text: drawer.State.Word));
     Check(a.State.Phase == "intermission", "all solved ends drawing early, turn " + (turn + 1));
-    matchTime.Advance(6.1); match.Tick();
+    matchTime.Advance(6.1);
+    match.Tick();
     if (a.State.Phase == "choosing")
     {
         var chooser = a.State.DrawerId == a.Id ? a : b;
@@ -213,11 +245,14 @@ match.Handle(expiredSolver, new("chat", Text: expiredDrawer.State.Word));
 Check(a.State.Phase == "intermission" && a.State.Players.All(p => p.Score == 0), "late guesses cannot score after the server deadline");
 
 // Real HTTP/WebSocket integration, with HTTP restricted to this isolated loopback test.
-var listener = new TcpListener(IPAddress.Loopback, 0); listener.Start();
-int port = ((IPEndPoint)listener.LocalEndpoint).Port; listener.Stop();
+var listener = new TcpListener(IPAddress.Loopback, 0);
+listener.Start();
+int port = ((IPEndPoint)listener.LocalEndpoint).Port;
+listener.Stop();
 string serverDll = Path.Combine(root, "server", "Kupopop.Server", "bin", "Release", "net10.0", "Kupopop.Server.dll");
 var start = new ProcessStartInfo("dotnet") { UseShellExecute = false, RedirectStandardOutput = true, RedirectStandardError = true, CreateNoWindow = true };
-start.ArgumentList.Add(serverDll); start.ArgumentList.Add("--test-http");
+start.ArgumentList.Add(serverDll);
+start.ArgumentList.Add("--test-http");
 string liveDirectory = Path.Combine(working, "live");
 var loadStore = new AccountStore(Path.Combine(liveDirectory, "data"));
 var loadAccounts = Enumerable.Range(0, 16).Select(i => loadStore.Create("Network Artist " + i)).ToArray();
@@ -226,19 +261,32 @@ start.Environment["KUPOPOP_PORT"] = port.ToString();
 start.Environment["DOTNET_CLI_TELEMETRY_OPTOUT"] = "1";
 using var process = Process.Start(start)!;
 var output = new StringBuilder();
-process.OutputDataReceived += (_, e) => { if (e.Data is not null) lock (output) output.AppendLine(e.Data); };
-process.ErrorDataReceived += (_, e) => { if (e.Data is not null) lock (output) output.AppendLine(e.Data); };
-process.BeginOutputReadLine(); process.BeginErrorReadLine();
+process.OutputDataReceived += (_, e) => { if (e.Data is not null) { lock (output) { output.AppendLine(e.Data); } } };
+process.ErrorDataReceived += (_, e) => { if (e.Data is not null) { lock (output) { output.AppendLine(e.Data); } } };
+process.BeginOutputReadLine();
+process.BeginErrorReadLine();
 try
 {
     using var http = new HttpClient { BaseAddress = new Uri($"http://localhost:{port}") };
     bool ready = false;
     for (int i = 0; i < 100 && !process.HasExited; i++)
     {
-        try { ready = (await http.GetAsync("/health")).IsSuccessStatusCode; if (ready) break; } catch (HttpRequestException) { }
+        try
+        {
+            ready = (await http.GetAsync("/health")).IsSuccessStatusCode;
+            if (ready)
+            {
+                break;
+            }
+        }
+        catch (HttpRequestException) { }
         await Task.Delay(100);
     }
-    if (!ready) throw new Exception("Integration server did not start: " + output);
+    if (!ready)
+    {
+        throw new Exception("Integration server did not start: " + output);
+    }
+
     using var first = new RemoteClient(http.BaseAddress!, allowTestHttp: true);
     await first.CheckHealthAsync();
     Check(true, "automatic connection validates the live service protocol before account setup or sign-in");
@@ -247,7 +295,9 @@ try
     var one = await first.CreateAsync("Live One");
     var two = await second.CreateAsync("Live Two");
     var three = await third.CreateAsync("Live Three");
-    await first.ConnectAsync(one.AccessToken); await second.ConnectAsync(two.AccessToken); await third.ConnectAsync(three.AccessToken);
+    await first.ConnectAsync(one.AccessToken);
+    await second.ConnectAsync(two.AccessToken);
+    await third.ConnectAsync(three.AccessToken);
     first.Send(new("create", Options: new("Live private")));
     var firstState = await WaitEvent(first, e => e.Room is not null);
     second.Send(new("join", Text: firstState.Room!.Code));
@@ -270,42 +320,72 @@ try
         "real network done-mode message reaches drawer");
     await Task.Delay(100);
     var thirdEvents = new List<ServerEvent>();
-    while (third.TryRead(out var evt)) if (evt is not null) thirdEvents.Add(evt);
+    while (third.TryRead(out var evt))
+    {
+        if (evt is not null)
+        {
+            thirdEvents.Add(evt);
+        }
+    }
+
     Check(thirdEvents.All(e => e.Chat?.Text != "integration-private-message" && e.Room?.Word is null),
         "real network unsolved client receives neither done-mode content nor answer");
     third.Send(new("vote-kick", TurnId: drawing.Room.TurnId));
     Check((await WaitEvent(third, e => e.Type == "error", allowError: true)).Error == "The room leader cannot be vote-kicked.", "a forged vote-kick cannot remove the room leader");
-    first.Send(new("leave")); await WaitEvent(first, e => e.Type == "left");
+    first.Send(new("leave"));
+    await WaitEvent(first, e => e.Type == "left");
     using var wrongVersion = new ClientWebSocket();
     wrongVersion.Options.SetRequestHeader("Authorization", "Bearer " + one.AccessToken);
     wrongVersion.Options.SetRequestHeader("X-Kupopop-Protocol", "999");
     bool mismatch = false;
-    try { await wrongVersion.ConnectAsync(new Uri($"ws://localhost:{port}/ws"), CancellationToken.None); }
+    try
+    {
+        await wrongVersion.ConnectAsync(new Uri($"ws://localhost:{port}/ws"), CancellationToken.None);
+    }
     catch (WebSocketException) { mismatch = true; }
     Check(mismatch, "server rejects incompatible protocol handshakes");
     using var anonymous = new ClientWebSocket();
     anonymous.Options.SetRequestHeader("X-Kupopop-Protocol", "1");
     bool unauthorized = false;
-    try { await anonymous.ConnectAsync(new Uri($"ws://localhost:{port}/ws"), CancellationToken.None); }
+    try
+    {
+        await anonymous.ConnectAsync(new Uri($"ws://localhost:{port}/ws"), CancellationToken.None);
+    }
     catch (WebSocketException) { unauthorized = true; }
     Check(unauthorized, "server rejects unauthenticated WebSocket connections");
     var oversized = await http.PostAsync("/api/accounts", new StringContent("{\"displayName\":\"" + new string('a', 15000) + "\"}", Encoding.UTF8, "application/json"));
     Check(!oversized.IsSuccessStatusCode, "HTTP request size bound rejects oversized registration");
-    await first.DisconnectAsync(); await second.DisconnectAsync(); await third.DisconnectAsync();
+    await first.DisconnectAsync();
+    await second.DisconnectAsync();
+    await third.DisconnectAsync();
     var loadClients = loadAccounts.Select(_ => new RemoteClient(http.BaseAddress!, allowTestHttp: true)).ToArray();
     try
     {
-        for (int i = 0; i < 16; i++) await loadClients[i].ConnectAsync(loadAccounts[i].AccessToken);
+        for (int i = 0; i < 16; i++)
+        {
+            await loadClients[i].ConnectAsync(loadAccounts[i].AccessToken);
+        }
+
         loadClients[0].Send(new("create", Options: new("Sixteen-client drawing test")));
         var loadRoom = await WaitEvent(loadClients[0], e => e.Room is not null);
-        for (int i = 1; i < 16; i++) loadClients[i].Send(new("join", Text: loadRoom.Room!.Code));
+        for (int i = 1; i < 16; i++)
+        {
+            loadClients[i].Send(new("join", Text: loadRoom.Room!.Code));
+        }
+
         await WaitEvent(loadClients[0], e => e.Room?.Players.Length == 16);
         loadClients[0].Send(new("start"));
         var loadTurn = await WaitEvent(loadClients[0], e => e.Room?.Phase == "drawing");
         for (int i = 0; i < 120; i++)
+        {
             loadClients[0].Send(new("draw", Draw: new("pencil", i, 10, i + 1, 10, 5), TurnId: loadTurn.Room!.TurnId));
+        }
+
         for (int i = 1; i < 16; i++)
+        {
             await WaitEvent(loadClients[i], e => e.Draw?.X2 == 120);
+        }
+
         Check(true, "sixteen real WebSocket clients join and all fifteen viewers receive a 120-operation drawing burst");
     }
     finally { foreach (var c in loadClients) { await c.DisconnectAsync(); c.Dispose(); } }
@@ -336,7 +416,11 @@ try
     Check((await WaitEvent(reopened, e => e.Room is not null)).Room!.Options.Title == "Reopened room",
         "a reopened client can create a fresh room instead of silently rejoining its old one");
     bool cannotReconnect = false;
-    try { await second.ConnectAsync(two.AccessToken); } catch (ObjectDisposedException) { cannotReconnect = true; }
+    try
+    {
+        await second.ConnectAsync(two.AccessToken);
+    }
+    catch (ObjectDisposedException) { cannotReconnect = true; }
     Check(cannotReconnect, "a closed client cannot reconnect from stale asynchronous work");
     await reopened.CloseAsync();
     Check((await http.GetAsync("/status")).StatusCode == HttpStatusCode.NotFound,
@@ -344,7 +428,11 @@ try
 }
 finally
 {
-    if (!process.HasExited) process.Kill(entireProcessTree: true);
+    if (!process.HasExited)
+    {
+        process.Kill(entireProcessTree: true);
+    }
+
     await process.WaitForExitAsync();
 }
 
@@ -353,24 +441,39 @@ string packagedExe = Path.Combine(root, "artifacts", "server-win-x64", "Kupopop.
 if (OperatingSystem.IsWindows() && File.Exists(packagedExe))
 {
     using var tlsListener = new TcpListener(IPAddress.Loopback, 0);
-    tlsListener.Start(); int tlsPort = ((IPEndPoint)tlsListener.LocalEndpoint).Port; tlsListener.Stop();
+    tlsListener.Start();
+    int tlsPort = ((IPEndPoint)tlsListener.LocalEndpoint).Port;
+    tlsListener.Stop();
     string tlsRoot = Path.Combine(working, "packaged-tls");
     var tlsStart = new ProcessStartInfo(packagedExe) { UseShellExecute = false, CreateNoWindow = true, RedirectStandardOutput = true, RedirectStandardError = true };
     tlsStart.ArgumentList.Add("--local");
     tlsStart.Environment["KUPOPOP_ROOT"] = tlsRoot;
     tlsStart.Environment["KUPOPOP_PORT"] = tlsPort.ToString();
     using var tlsProcess = Process.Start(tlsStart)!;
-    tlsProcess.BeginOutputReadLine(); tlsProcess.BeginErrorReadLine();
+    tlsProcess.BeginOutputReadLine();
+    tlsProcess.BeginErrorReadLine();
     try
     {
         string certPath = Path.Combine(tlsRoot, "data", "localhost.cer");
-        for (int i = 0; i < 100 && !File.Exists(certPath) && !tlsProcess.HasExited; i++) await Task.Delay(100);
-        if (!File.Exists(certPath)) throw new Exception("Published TLS server did not generate its certificate.");
+        for (int i = 0; i < 100 && !File.Exists(certPath) && !tlsProcess.HasExited; i++)
+        {
+            await Task.Delay(100);
+        }
+
+        if (!File.Exists(certPath))
+        {
+            throw new Exception("Published TLS server did not generate its certificate.");
+        }
+
         using var cert = X509CertificateLoader.LoadCertificateFromFile(certPath);
         using var handler = new HttpClientHandler();
         handler.ServerCertificateCustomValidationCallback = (_, presented, _, errors) =>
         {
-            if (presented is null || (errors & System.Net.Security.SslPolicyErrors.RemoteCertificateNameMismatch) != 0) return false;
+            if (presented is null || (errors & System.Net.Security.SslPolicyErrors.RemoteCertificateNameMismatch) != 0)
+            {
+                return false;
+            }
+
             using var chain = new X509Chain();
             chain.ChainPolicy.TrustMode = X509ChainTrustMode.CustomRootTrust;
             chain.ChainPolicy.CustomTrustStore.Add(cert);
@@ -381,17 +484,28 @@ if (OperatingSystem.IsWindows() && File.Exists(packagedExe))
         bool ready = false;
         for (int i = 0; i < 100 && !tlsProcess.HasExited; i++)
         {
-            try { ready = (await tlsHttp.GetAsync($"https://localhost:{tlsPort}/health")).IsSuccessStatusCode; if (ready) break; }
+            try
+            {
+                ready = (await tlsHttp.GetAsync($"https://localhost:{tlsPort}/health")).IsSuccessStatusCode;
+                if (ready)
+                {
+                    break;
+                }
+            }
             catch (HttpRequestException) { }
             await Task.Delay(100);
         }
         Check(ready, "self-contained Windows server starts and serves verified localhost TLS without an installed runtime dependency");
         using var ordinary = new HttpClient();
         bool rejected = false;
-        try { await ordinary.GetAsync($"https://localhost:{tlsPort}/health"); } catch (HttpRequestException) { rejected = true; }
+        try
+        {
+            await ordinary.GetAsync($"https://localhost:{tlsPort}/health");
+        }
+        catch (HttpRequestException) { rejected = true; }
         Check(rejected, "ordinary clients reject the development certificate until explicitly trusted");
     }
-    finally { if (!tlsProcess.HasExited) tlsProcess.Kill(entireProcessTree: true); await tlsProcess.WaitForExitAsync(); }
+    finally { if (!tlsProcess.HasExited) { tlsProcess.Kill(entireProcessTree: true); } await tlsProcess.WaitForExitAsync(); }
 }
 Console.WriteLine($"SUCCESS: {passed} checks passed. Test artifacts: {working}");
 
@@ -402,10 +516,20 @@ static async Task<ServerEvent> WaitEvent(RemoteClient client, Func<ServerEvent, 
     {
         while (client.TryRead(out var message))
         {
-            if (!allowError && message?.Type == "error") throw new Exception("Integration command rejected: " + message.Error);
+            if (!allowError && message?.Type == "error")
+            {
+                throw new Exception("Integration command rejected: " + message.Error);
+            }
+
             if (message?.Room is { Phase: "choosing", WordChoices: { Length: > 0 } choices } choosing)
+            {
                 client.Send(new("choose-word", Text: choices[0], TurnId: choosing.TurnId));
-            if (message is not null && predicate(message)) return message;
+            }
+
+            if (message is not null && predicate(message))
+            {
+                return message;
+            }
         }
         await Task.Delay(10);
     }
@@ -422,12 +546,18 @@ static async Task<bool> RejectHealthResponse(string body)
         using var peer = await listener.AcceptTcpClientAsync();
         using var stream = peer.GetStream();
         using var reader = new StreamReader(stream, Encoding.ASCII, leaveOpen: true);
-        while (await reader.ReadLineAsync() is { Length: > 0 }) { }
+        while (await reader.ReadLineAsync() is { Length: > 0 })
+        {
+        }
         byte[] response = Encoding.UTF8.GetBytes($"HTTP/1.1 200 OK\r\nContent-Type: application/json\r\nContent-Length: {Encoding.UTF8.GetByteCount(body)}\r\nConnection: close\r\n\r\n{body}");
         await stream.WriteAsync(response);
     });
     using var client = new RemoteClient(new Uri($"http://localhost:{port}"), allowTestHttp: true);
-    try { await client.CheckHealthAsync(); return false; }
+    try
+    {
+        await client.CheckHealthAsync();
+        return false;
+    }
     catch (InvalidDataException) { return true; }
     finally { await serve; }
 }
@@ -449,7 +579,10 @@ sealed class TestClock : TimeProvider
 sealed class TestPeer(Guid id) : IGamePeer
 {
     public Guid Id { get; } = id;
-    public string? RoomCode { get; set; }
+    public string? RoomCode
+    {
+        get; set;
+    }
     public bool Closed;
     public List<ServerEvent> Events = [];
     public RoomView State => Events.Last(e => e.Room is not null).Room!;

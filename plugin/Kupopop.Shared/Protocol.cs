@@ -17,18 +17,31 @@ public static class Protocol
 
     public static byte[] Encode<T>(T value) => JsonSerializer.SerializeToUtf8Bytes(value, Json);
 
-    public static async Task<byte[]?> ReceiveAsync(WebSocket socket, int maximumBytes, CancellationToken cancel)
+    public static async Task<byte[]?> ReceiveAsync(WebSocket socket, int maximumBytes, CancellationToken cancel, TimeSpan? timeout = null)
     {
+        using var deadline = CancellationTokenSource.CreateLinkedTokenSource(cancel);
+        if (timeout is { } limit)
+        {
+            deadline.CancelAfter(limit);
+        }
+
         using var buffer = new MemoryStream();
         var chunk = new byte[8192];
         WebSocketReceiveResult part;
         int fragments = 0;
         do
         {
-            part = await socket.ReceiveAsync(chunk, cancel);
-            if (part.MessageType == WebSocketMessageType.Close) return null;
+            part = await socket.ReceiveAsync(chunk, deadline.Token);
+            if (part.MessageType == WebSocketMessageType.Close)
+            {
+                return null;
+            }
+
             if (++fragments > 256 || part.MessageType != WebSocketMessageType.Text || buffer.Length + part.Count > maximumBytes)
+            {
                 throw new InvalidDataException("Message format or size rejected.");
+            }
+
             buffer.Write(chunk, 0, part.Count);
         } while (!part.EndOfMessage);
         return buffer.ToArray();
@@ -57,17 +70,49 @@ public static class Protocol
 
         if (!Text(message.Type, 40) || (message.Error is not null && !Text(message.Error, 300)) ||
             !Board(message.Canvas) || !Cursor(message.Cursor) ||
-            (message.Profile is not null && !ValidProfile(message.Profile))) return false;
-        if (message.Chat is { } chat && (!ValidName(chat.Name) || !Text(chat.Text, 300))) return false;
+            (message.Profile is not null && !ValidProfile(message.Profile)))
+        {
+            return false;
+        }
+
+        if (message.Chat is { } chat && (!ValidName(chat.Name) || !Text(chat.Text, 300)))
+        {
+            return false;
+        }
+
         if (message.Draw is { } draw && (!DrawingTools.Valid(draw.Tool) || !Palette.Valid(draw.Color, false) ||
             draw.Size is < 1 or > 20 || draw.X1 is < 0 or >= CanvasWidth || draw.Y1 is < 0 or >= CanvasHeight ||
-            draw.X2 is < 0 or >= CanvasWidth || draw.Y2 is < 0 or >= CanvasHeight)) return false;
-        if (message.Rooms is { } rooms && (rooms.Length > 100 || rooms.Any(r => r is null || !ValidName(r.Title) || !Text(r.Code, 8)))) return false;
+            draw.X2 is < 0 or >= CanvasWidth || draw.Y2 is < 0 or >= CanvasHeight))
+        {
+            return false;
+        }
+
+        if (message.Rooms is { } rooms && (rooms.Length > 100 || rooms.Any(r => r is null || !ValidName(r.Title) || !Text(r.Code, 8))))
+        {
+            return false;
+        }
+
         if (message.WordLists is { } lists && (lists.Length > 64 || lists.Any(l => l is null ||
-            !Text(l.Id, 40) || !ValidName(l.Name) || !ValidName(l.Category) || l.Count is < 2 or > 2000))) return false;
-        if (!SocialValidation.Valid(message)) return false;
-        if (message.HostWords is { } hostWords && (hostWords.Length > CustomWordLists.MaximumWords || hostWords.Any(w => !CustomWordLists.ValidWord(w)))) return false;
-        if (message.Room is not { } room) return true;
+            !Text(l.Id, 40) || !ValidName(l.Name) || !ValidName(l.Category) || l.Count is < 2 or > 2000)))
+        {
+            return false;
+        }
+
+        if (!SocialValidation.Valid(message))
+        {
+            return false;
+        }
+
+        if (message.HostWords is { } hostWords && (hostWords.Length > CustomWordLists.MaximumWords || hostWords.Any(w => !CustomWordLists.ValidWord(w))))
+        {
+            return false;
+        }
+
+        if (message.Room is not { } room)
+        {
+            return true;
+        }
+
         return room.Options is not null && room.Options.CustomWordCount is >= 0 and <= CustomWordLists.MaximumWords && ValidName(room.Options.Title) && Text(room.Code, 8) &&
             room.Phase is "waiting" or "choosing" or "drawing" or "intermission" or "results" &&
             room.Players is { Length: >= 1 and <= MaximumPlayers } && room.Players.All(p => p is not null &&

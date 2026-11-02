@@ -7,6 +7,9 @@ internal sealed class GameAudio(DiagnosticLog log) : IDisposable
 {
     private readonly Dictionary<string, Clip> clips = [];
     private readonly Queue<string> pending = [];
+    // Embedded resource reads run once off the render thread. Native waveform
+    // ownership stays on the UI thread, including stop/unprepare on unload.
+    private readonly Task<Dictionary<string, byte[]>> resources = Task.Run(ReadResources);
     private Clip? active;
     private bool unavailable;
     private static readonly uint HeaderSize = (uint)Marshal.SizeOf<WaveHeader>();
@@ -15,19 +18,47 @@ internal sealed class GameAudio(DiagnosticLog log) : IDisposable
     {
         // Countdown ticks are disposable: never queue them behind celebration sounds.
         if (cue == "clock" && (pending.Count != 0 || active is not null &&
-            (Marshal.PtrToStructure<WaveHeader>(active.Header).Flags & 1) == 0)) return;
-        if (!unavailable && pending.Count < 4) pending.Enqueue(cue);
+            (Marshal.PtrToStructure<WaveHeader>(active.Header).Flags & 1) == 0))
+        {
+            return;
+        }
+
+        if (!unavailable && pending.Count < 4)
+        {
+            pending.Enqueue(cue);
+        }
     }
 
     public void Tick()
     {
-        if (unavailable) return;
+        if (unavailable)
+        {
+            return;
+        }
+
         try
         {
-            if (active is not null && (Marshal.PtrToStructure<WaveHeader>(active.Header).Flags & 1) == 0) return;
+            if (!resources.IsCompleted)
+            {
+                return;
+            }
+
+            if (active is not null && (Marshal.PtrToStructure<WaveHeader>(active.Header).Flags & 1) == 0)
+            {
+                return;
+            }
+
             active = null;
-            if (!pending.TryDequeue(out string? cue)) return;
-            if (!clips.TryGetValue(cue, out var clip)) clips.Add(cue, clip = Load(cue));
+            if (!pending.TryDequeue(out string? cue))
+            {
+                return;
+            }
+
+            if (!clips.TryGetValue(cue, out var clip))
+            {
+                clips.Add(cue, clip = Load(resources.GetAwaiter().GetResult()[cue]));
+            }
+
             Check(waveOutWrite(clip.Device, clip.Header, HeaderSize));
             active = clip;
         }
@@ -39,21 +70,41 @@ internal sealed class GameAudio(DiagnosticLog log) : IDisposable
         }
     }
 
-    private static Clip Load(string cue)
+    private static Dictionary<string, byte[]> ReadResources()
     {
-        using var stream = typeof(GameAudio).Assembly.GetManifestResourceStream($"Kupopop.Audio.{cue}.wav")
-            ?? throw new InvalidDataException("Bundled game sound missing.");
-        if (stream.Length is < 44 or > 1_000_000) throw new InvalidDataException("Invalid game sound size.");
-        byte[] bytes = new byte[checked((int)stream.Length)];
-        stream.ReadExactly(bytes);
+        var loaded = new Dictionary<string, byte[]>();
+        foreach (string cue in new[] { "clock", "correct_guess", "next_turn", "no_guesses", "top_3" })
+        {
+            using var stream = typeof(GameAudio).Assembly.GetManifestResourceStream($"Kupopop.Audio.{cue}.wav")
+                ?? throw new InvalidDataException("Bundled game sound missing.");
+            if (stream.Length is < 44 or > 1_000_000)
+            {
+                throw new InvalidDataException("Invalid game sound size.");
+            }
+
+            byte[] bytes = new byte[checked((int)stream.Length)];
+            stream.ReadExactly(bytes);
+            loaded.Add(cue, bytes);
+        }
+        return loaded;
+    }
+
+    private static Clip Load(byte[] bytes)
+    {
         // Assets are canonical PCM WAVs; each clip owns its format/device.
         if (!bytes.AsSpan(0, 4).SequenceEqual("RIFF"u8) || !bytes.AsSpan(36, 4).SequenceEqual("data"u8) ||
             BitConverter.ToUInt16(bytes, 20) != 1 || BitConverter.ToUInt32(bytes, 40) != bytes.Length - 44)
+        {
             throw new InvalidDataException("Invalid game sound format.");
+        }
+
         var format = new WaveFormat
         {
-            Tag = 1, Channels = BitConverter.ToUInt16(bytes, 22), SamplesPerSecond = BitConverter.ToUInt32(bytes, 24),
-            BytesPerSecond = BitConverter.ToUInt32(bytes, 28), BlockAlign = BitConverter.ToUInt16(bytes, 32),
+            Tag = 1,
+            Channels = BitConverter.ToUInt16(bytes, 22),
+            SamplesPerSecond = BitConverter.ToUInt32(bytes, 24),
+            BytesPerSecond = BitConverter.ToUInt32(bytes, 28),
+            BlockAlign = BitConverter.ToUInt16(bytes, 32),
             BitsPerSample = BitConverter.ToUInt16(bytes, 34),
         };
         Check(waveOutOpen(out nint device, uint.MaxValue, ref format, 0, 0, 0));
@@ -69,8 +120,16 @@ internal sealed class GameAudio(DiagnosticLog log) : IDisposable
         }
         catch
         {
-            if (header != 0) Marshal.FreeHGlobal(header);
-            if (data != 0) Marshal.FreeHGlobal(data);
+            if (header != 0)
+            {
+                Marshal.FreeHGlobal(header);
+            }
+
+            if (data != 0)
+            {
+                Marshal.FreeHGlobal(data);
+            }
+
             waveOutClose(device);
             throw;
         }
@@ -82,8 +141,15 @@ internal sealed class GameAudio(DiagnosticLog log) : IDisposable
         if (active is not null)
         {
             uint result = waveOutReset(active.Device);
-            if (result != 0) { unavailable = true; log.Write("audio.stop_failed"); }
-            else active = null;
+            if (result != 0)
+            {
+                unavailable = true;
+                log.Write("audio.stop_failed");
+            }
+            else
+            {
+                active = null;
+            }
         }
     }
 
@@ -94,17 +160,25 @@ internal sealed class GameAudio(DiagnosticLog log) : IDisposable
         {
             // Reset returns buffers before unprepare/free. Never free native-owned memory on failure.
             if (waveOutReset(clip.Device) != 0 || waveOutUnprepareHeader(clip.Device, clip.Header, HeaderSize) != 0)
-            { log.Write("audio.cleanup_failed"); continue; }
+            {
+                log.Write("audio.cleanup_failed");
+                continue;
+            }
             waveOutClose(clip.Device);
             Marshal.FreeHGlobal(clip.Header);
             Marshal.FreeHGlobal(clip.Data);
         }
-        clips.Clear(); active = null; unavailable = true;
+        clips.Clear();
+        active = null;
+        unavailable = true;
     }
 
     private static void Check(uint result)
     {
-        if (result != 0) throw new InvalidOperationException($"Native waveform audio failed ({result}).");
+        if (result != 0)
+        {
+            throw new InvalidOperationException($"Native waveform audio failed ({result}).");
+        }
     }
 
     private sealed record Clip(nint Device, nint Data, nint Header);

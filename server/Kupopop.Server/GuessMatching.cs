@@ -10,7 +10,13 @@ public static class GuessMatching
     {
         var result = new StringBuilder();
         foreach (char c in value.Normalize(NormalizationForm.FormD))
-            if (char.IsLetterOrDigit(c)) result.Append(char.ToUpperInvariant(c));
+        {
+            if (char.IsLetterOrDigit(c))
+            {
+                result.Append(char.ToUpperInvariant(c));
+            }
+        }
+
         return result.ToString();
     }
 
@@ -18,13 +24,29 @@ public static class GuessMatching
     // substitution or adjacent transposition; never accept it as a solve.
     public static bool IsNear(string guess, string answer)
     {
-        if (Math.Min(guess.Length, answer.Length) < 3 || Math.Abs(guess.Length - answer.Length) > 1) return false;
+        if (Math.Min(guess.Length, answer.Length) < 3 || Math.Abs(guess.Length - answer.Length) > 1)
+        {
+            return false;
+        }
+
         int first = 0, limit = Math.Min(guess.Length, answer.Length);
-        while (first < limit && guess[first] == answer[first]) first++;
+        while (first < limit && guess[first] == answer[first])
+        {
+            first++;
+        }
+
         if (guess.Length == answer.Length)
         {
-            if (first == limit) return false;
-            if (guess.AsSpan(first + 1).SequenceEqual(answer.AsSpan(first + 1))) return true;
+            if (first == limit)
+            {
+                return false;
+            }
+
+            if (guess.AsSpan(first + 1).SequenceEqual(answer.AsSpan(first + 1)))
+            {
+                return true;
+            }
+
             return first + 1 < limit && guess[first] == answer[first + 1] && guess[first + 1] == answer[first] &&
                 guess.AsSpan(first + 2).SequenceEqual(answer.AsSpan(first + 2));
         }

@@ -17,6 +17,8 @@ public sealed partial class AccountStore : IDisposable
     private const string ProfileColumns = "id, display_name, avatar_seed, avatar_pixels, avatar_preset";
     private readonly object gate = new();
     private readonly SqliteConnection database;
+    private readonly Dictionary<Guid, PlayerProfile> profiles = [];
+    private long profilesDataVersion = -1;
 
     public AccountStore(string directory)
     {
@@ -51,7 +53,11 @@ public sealed partial class AccountStore : IDisposable
         lock (gate)
         {
             using var transaction = database.BeginTransaction();
-            if (Count(transaction) >= MaximumAccounts) throw new InvalidOperationException("Account capacity reached.");
+            if (Count(transaction) >= MaximumAccounts)
+            {
+                throw new InvalidOperationException("Account capacity reached.");
+            }
+
             string access = Secret(), recovery = Secret();
             var profile = new PlayerProfile(Guid.NewGuid(), displayName.Trim(), RandomNumberGenerator.GetInt32(int.MaxValue));
             EnsureNameAvailable(profile.DisplayName, profile.Id, transaction);
@@ -59,8 +65,11 @@ public sealed partial class AccountStore : IDisposable
             SetNameKey(profile, transaction);
             using (var preferences = Command("INSERT INTO preferences(id,track,share,invite_checks) VALUES($id,$track,$share,$invites)", transaction))
             {
-                preferences.Parameters.AddWithValue("$id", profile.Id.ToString()); preferences.Parameters.AddWithValue("$share", shareProfile);
-                preferences.Parameters.AddWithValue("$track", trackStats); preferences.Parameters.AddWithValue("$invites", backgroundInvitations); preferences.ExecuteNonQuery();
+                preferences.Parameters.AddWithValue("$id", profile.Id.ToString());
+                preferences.Parameters.AddWithValue("$share", shareProfile);
+                preferences.Parameters.AddWithValue("$track", trackStats);
+                preferences.Parameters.AddWithValue("$invites", backgroundInvitations);
+                preferences.ExecuteNonQuery();
             }
             transaction.Commit();
             return new(profile.Id, access, recovery, profile);
@@ -69,23 +78,66 @@ public sealed partial class AccountStore : IDisposable
 
     public PlayerProfile? Authenticate(string? token)
     {
-        if (token is not { Length: >= 40 and <= 100 }) return null;
-        lock (gate) return Find("access_hash", Hash(token));
+        if (token is not { Length: >= 40 and <= 100 })
+        {
+            return null;
+        }
+
+        lock (gate)
+        {
+            return Find("access_hash", Hash(token));
+        }
     }
 
     public PlayerProfile? Get(Guid id)
     {
-        lock (gate) return Find("id", id.ToString());
+        lock (gate)
+        {
+            // An operator or another store instance may commit using a separate
+            // connection. SQLite's data_version changes only for external commits.
+            using var versionQuery = Command("PRAGMA data_version");
+            long version = Convert.ToInt64(versionQuery.ExecuteScalar());
+            if (version != profilesDataVersion)
+            {
+                profiles.Clear();
+                profilesDataVersion = version;
+            }
+            if (!profiles.TryGetValue(id, out var profile))
+            {
+                profile = Find("id", id.ToString());
+                if (profile is null)
+                {
+                    return null;
+                }
+
+                profiles[id] = profile;
+            }
+            // Callers own mutable pixel arrays. Never expose the cached copy.
+            return CopyProfile(profile);
+        }
     }
+
+    private static PlayerProfile CopyProfile(PlayerProfile profile) => profile with
+    {
+        AvatarPixels = profile.AvatarPixels is { } pixels ? (byte[])pixels.Clone() : null,
+    };
 
     public AccountCredentials? Recover(string code)
     {
-        if (code is not { Length: >= 40 and <= 100 }) return null;
+        if (code is not { Length: >= 40 and <= 100 })
+        {
+            return null;
+        }
+
         lock (gate)
         {
             using var transaction = database.BeginTransaction();
             var profile = Find("recovery_hash", Hash(code.Trim()), transaction);
-            if (profile is null) return null;
+            if (profile is null)
+            {
+                return null;
+            }
+
             return Rotate(profile, transaction);
         }
     }
@@ -102,7 +154,11 @@ public sealed partial class AccountStore : IDisposable
 
     public AccountCredentials? RotateAuthenticated(string? accessToken)
     {
-        if (accessToken is not { Length: >= 40 and <= 100 }) return null;
+        if (accessToken is not { Length: >= 40 and <= 100 })
+        {
+            return null;
+        }
+
         lock (gate)
         {
             using var transaction = database.BeginTransaction();
@@ -125,10 +181,26 @@ public sealed partial class AccountStore : IDisposable
 
     public PlayerProfile Update(Guid id, string? name, byte[]? avatar, bool reset, string? preset = null)
     {
-        if (name is not null) ValidateName(name);
-        if (!Protocol.ValidAvatar(avatar)) throw new ArgumentException("Avatar format rejected.");
-        if (preset is not null && AvatarPresets.Find(preset) is null) throw new ArgumentException("Avatar preset rejected.");
-        if (avatar is not null && preset is not null) throw new ArgumentException("Choose a drawn avatar or a preset.");
+        if (name is not null)
+        {
+            ValidateName(name);
+        }
+
+        if (!Protocol.ValidAvatar(avatar))
+        {
+            throw new ArgumentException("Avatar format rejected.");
+        }
+
+        if (preset is not null && AvatarPresets.Find(preset) is null)
+        {
+            throw new ArgumentException("Avatar preset rejected.");
+        }
+
+        if (avatar is not null && preset is not null)
+        {
+            throw new ArgumentException("Choose a drawn avatar or a preset.");
+        }
+
         lock (gate)
         {
             using var transaction = database.BeginTransaction();
@@ -148,6 +220,7 @@ public sealed partial class AccountStore : IDisposable
             command.Parameters.AddWithValue("$preset", (object?)profile.AvatarPreset ?? DBNull.Value);
             command.ExecuteNonQuery();
             transaction.Commit();
+            profiles[id] = CopyProfile(profile);
             return profile;
         }
     }
@@ -169,8 +242,14 @@ public sealed partial class AccountStore : IDisposable
         {
             using var command = Command("PRAGMA quick_check");
             if (!string.Equals(command.ExecuteScalar()?.ToString(), "ok", StringComparison.Ordinal))
+            {
                 throw new InvalidDataException("Account database integrity check failed.");
-            if (Count() > MaximumAccounts) throw new InvalidDataException("Account capacity exceeded.");
+            }
+
+            if (Count() > MaximumAccounts)
+            {
+                throw new InvalidDataException("Account capacity exceeded.");
+            }
         }
     }
 
@@ -179,10 +258,16 @@ public sealed partial class AccountStore : IDisposable
         lock (gate)
         {
             // CreateNew prevents accidentally overwriting the live DB or an older backup.
-            using (File.Open(destination, FileMode.CreateNew, FileAccess.Write, FileShare.None)) { }
+            using (File.Open(destination, FileMode.CreateNew, FileAccess.Write, FileShare.None))
+            {
+            }
             Restrict(destination);
             using var backup = new SqliteConnection(new SqliteConnectionStringBuilder
-            { DataSource = destination, Mode = SqliteOpenMode.ReadWrite, Pooling = false }.ToString());
+            {
+                DataSource = destination,
+                Mode = SqliteOpenMode.ReadWrite,
+                Pooling = false
+            }.ToString());
             backup.Open();
             database.BackupDatabase(backup);
         }
@@ -192,7 +277,11 @@ public sealed partial class AccountStore : IDisposable
     {
         using var versionQuery = Command("PRAGMA user_version");
         int version = Convert.ToInt32(versionQuery.ExecuteScalar());
-        if (version is 2 or 3 or 4 or 5 or SchemaVersion) return;
+        if (version is 2 or 3 or 4 or 5 or SchemaVersion)
+        {
+            return;
+        }
+
         if (version == 1)
         {
             // SQLite counts Unicode scalars; .NET string limits count UTF-16
@@ -204,11 +293,18 @@ public sealed partial class AccountStore : IDisposable
             upgrade.Commit();
             return;
         }
-        if (version != 0) throw new InvalidDataException("Unsupported account database version. Use a compatible server release.");
+        if (version != 0)
+        {
+            throw new InvalidDataException("Unsupported account database version. Use a compatible server release.");
+        }
 
         using var transaction = database.BeginTransaction();
         CreateTable("accounts", transaction, ifMissing: true);
-        if (Count(transaction) != 0) throw new InvalidDataException("Unversioned account database contains data; automatic import refused.");
+        if (Count(transaction) != 0)
+        {
+            throw new InvalidDataException("Unversioned account database contains data; automatic import refused.");
+        }
+
         ImportLegacy(Path.Combine(directory, "accounts.json"), transaction);
         Execute($"PRAGMA user_version=2", transaction);
         transaction.Commit();
@@ -233,8 +329,16 @@ public sealed partial class AccountStore : IDisposable
 
     private void ImportLegacy(string path, SqliteTransaction transaction)
     {
-        if (!File.Exists(path)) return;
-        if (new FileInfo(path).Length > 64 * 1024 * 1024) throw new InvalidDataException("Legacy account file exceeds the migration limit.");
+        if (!File.Exists(path))
+        {
+            return;
+        }
+
+        if (new FileInfo(path).Length > 64 * 1024 * 1024)
+        {
+            throw new InvalidDataException("Legacy account file exceeds the migration limit.");
+        }
+
         Dictionary<Guid, StoredAccount> source;
         try
         {
@@ -242,16 +346,29 @@ public sealed partial class AccountStore : IDisposable
                 ?? throw new InvalidDataException("Legacy account file is empty.");
         }
         catch (JsonException) { throw new InvalidDataException("Legacy account file is invalid; import refused."); }
-        if (source.Count > MaximumAccounts) throw new InvalidDataException("Legacy account capacity exceeded.");
+        if (source.Count > MaximumAccounts)
+        {
+            throw new InvalidDataException("Legacy account capacity exceeded.");
+        }
+
         foreach (var (id, account) in source)
         {
             var imported = account?.Profile?.AvatarPreset?.StartsWith("job-", StringComparison.Ordinal) == true
-                ? account with { Profile = account.Profile with { AvatarPreset = null } } : account;
+                ? account with
+                {
+                    Profile = account.Profile with
+                    {
+                        AvatarPreset = null
+                    }
+                } : account;
             if (imported?.Profile is not { } profile || id == Guid.Empty || id != profile.Id ||
                 !Protocol.ValidName(profile.DisplayName) || !Protocol.ValidAvatar(profile.AvatarPixels) ||
                 (profile.AvatarPreset is not null && AvatarPresets.Find(profile.AvatarPreset) is null) ||
                 !ValidHash(imported.AccessHash) || !ValidHash(imported.RecoveryHash))
+            {
                 throw new InvalidDataException("Legacy account validation failed; import refused.");
+            }
+
             Insert(imported, transaction);
         }
         // The original file remains untouched as the rollback copy. Schema version
@@ -301,7 +418,10 @@ public sealed partial class AccountStore : IDisposable
 
     private static void ValidateName(string name)
     {
-        if (!Protocol.ValidName(name?.Trim())) throw new ArgumentException("Use a display name of 2–40 characters.");
+        if (!Protocol.ValidName(name?.Trim()))
+        {
+            throw new ArgumentException("Use a display name of 2–40 characters.");
+        }
     }
 
     private static bool ValidHash(string? value) => value is { Length: 64 } && value.All(Uri.IsHexDigit);
@@ -311,9 +431,18 @@ public sealed partial class AccountStore : IDisposable
 
     private static void Restrict(string path, bool directory = false)
     {
-        if (!OperatingSystem.IsWindows()) File.SetUnixFileMode(path,
+        if (!OperatingSystem.IsWindows())
+        {
+            File.SetUnixFileMode(path,
             UnixFileMode.UserRead | UnixFileMode.UserWrite | (directory ? UnixFileMode.UserExecute : 0));
+        }
     }
 
-    public void Dispose() { lock (gate) database.Dispose(); }
+    public void Dispose()
+    {
+        lock (gate)
+        {
+            database.Dispose();
+        }
+    }
 }

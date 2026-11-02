@@ -16,9 +16,20 @@ public static class UiPalette
     public static void Button(ref byte selected, bool transparency)
     {
         if (ImGui.ColorButton("Color", Colour(selected), ImGuiColorEditFlags.NoTooltip | ImGuiColorEditFlags.NoDragDrop, UiTheme.V(28, 28)))
+        {
             ImGui.OpenPopup("colour-palette");
-        if (ImGui.IsItemHovered()) UiTheme.Tooltip("Color: " + Names[selected] + ". Click to open the palette.");
-        if (selected == Palette.Transparent) TransparentGlyph();
+        }
+
+        if (ImGui.IsItemHovered())
+        {
+            UiTheme.Tooltip("Color: " + Names[selected] + ". Click to open the palette.");
+        }
+
+        if (selected == Palette.Transparent)
+        {
+            TransparentGlyph();
+        }
+
         if (ImGui.BeginPopup("colour-palette"))
         {
             Grid(ref selected, transparency);
@@ -31,18 +42,36 @@ public static class UiPalette
         for (int i = 0; i < Palette.Opaque.Length; i++)
         {
             byte index = Palette.Opaque[i];
-            if (i % 8 != 0) ImGui.SameLine(0, UiTheme.S(4));
+            if (i % 8 != 0)
+            {
+                ImGui.SameLine(0, UiTheme.S(4));
+            }
+
             if (ImGui.ColorButton(Names[index], Colour(index), ImGuiColorEditFlags.NoTooltip | ImGuiColorEditFlags.NoDragDrop, UiTheme.V(26, 26)))
-            { selected = index; ImGui.CloseCurrentPopup(); }
-            if (ImGui.IsItemHovered()) UiTheme.Tooltip(Names[index]);
-            if (selected == index) ImGui.GetWindowDrawList().AddRect(ImGui.GetItemRectMin() - Vector2.One, ImGui.GetItemRectMax() + Vector2.One, UiTheme.C(UiTheme.Rose), 0, 0, UiTheme.S(2));
+            {
+                selected = index;
+                ImGui.CloseCurrentPopup();
+            }
+            if (ImGui.IsItemHovered())
+            {
+                UiTheme.Tooltip(Names[index]);
+            }
+
+            if (selected == index)
+            {
+                ImGui.GetWindowDrawList().AddRect(ImGui.GetItemRectMin() - Vector2.One, ImGui.GetItemRectMax() + Vector2.One, UiTheme.C(UiTheme.Rose), 0, 0, UiTheme.S(2));
+            }
         }
         if (transparency)
         {
             if (ImGui.ColorButton("Transparent", Colour(Palette.Transparent), ImGuiColorEditFlags.NoTooltip | ImGuiColorEditFlags.NoDragDrop, UiTheme.V(26, 26)))
-            { selected = Palette.Transparent; ImGui.CloseCurrentPopup(); }
+            {
+                selected = Palette.Transparent;
+                ImGui.CloseCurrentPopup();
+            }
             TransparentGlyph();
-            ImGui.SameLine(); UiTheme.Caption("Transparent / erase background");
+            ImGui.SameLine();
+            UiTheme.Caption("Transparent / erase background");
         }
     }
     private static void TransparentGlyph()

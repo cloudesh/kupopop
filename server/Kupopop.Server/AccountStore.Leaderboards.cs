@@ -7,7 +7,11 @@ public sealed partial class AccountStore
     private void InitializeLeaderboards()
     {
         using var version = Command("PRAGMA user_version");
-        if (Convert.ToInt32(version.ExecuteScalar()) >= 5) return;
+        if (Convert.ToInt32(version.ExecuteScalar()) >= 5)
+        {
+            return;
+        }
+
         using var transaction = database.BeginTransaction();
         Execute("""
             CREATE TABLE IF NOT EXISTS leaderboard_preferences (id TEXT PRIMARY KEY, named INTEGER NOT NULL DEFAULT 0,
@@ -21,11 +25,18 @@ public sealed partial class AccountStore
 
     public void SetLeaderboardPreference(Guid id, string preference, bool enabled)
     {
-        string column = preference switch { "name" => "named", "hidden" => "hidden", "portrait" => "portrait", _ => throw new ArgumentException("Invalid preference.") };
+        string column = preference switch
+        {
+            "name" => "named",
+            "hidden" => "hidden",
+            "portrait" => "portrait",
+            _ => throw new ArgumentException("Invalid preference.")
+        };
         lock (gate)
         {
             using var command = Command($"INSERT INTO leaderboard_preferences(id,{column}) VALUES($id,$enabled) ON CONFLICT(id) DO UPDATE SET {column}=$enabled");
-            command.Parameters.AddWithValue("$id", id.ToString()); command.Parameters.AddWithValue("$enabled", enabled);
+            command.Parameters.AddWithValue("$id", id.ToString());
+            command.Parameters.AddWithValue("$enabled", enabled);
             command.ExecuteNonQuery();
         }
     }
@@ -34,9 +45,14 @@ public sealed partial class AccountStore
     {
         lock (gate)
         {
-            if (!Preferences(drawer).TrackStats) return;
+            if (!Preferences(drawer).TrackStats)
+            {
+                return;
+            }
+
             using var command = Command("INSERT INTO drawing_likes VALUES($id,1) ON CONFLICT(id) DO UPDATE SET total=total+1");
-            command.Parameters.AddWithValue("$id", drawer.ToString()); command.ExecuteNonQuery();
+            command.Parameters.AddWithValue("$id", drawer.ToString());
+            command.ExecuteNonQuery();
         }
     }
 
@@ -44,10 +60,17 @@ public sealed partial class AccountStore
     {
         string column = metric switch
         {
-            "best" => "best", "points" => "points", "games" => "games", "likes" => "likes",
+            "best" => "best",
+            "points" => "points",
+            "games" => "games",
+            "likes" => "likes",
             _ => throw new ArgumentException("Unknown leaderboard."),
         };
-        if (page is < 0 or > 199) throw new ArgumentException("Invalid leaderboard page.");
+        if (page is < 0 or > 199)
+        {
+            throw new ArgumentException("Invalid leaderboard page.");
+        }
+
         lock (gate)
         {
             using var command = Command($"""
@@ -65,8 +88,12 @@ public sealed partial class AccountStore
             command.Parameters.AddWithValue("$offset", page * 50);
             using var reader = command.ExecuteReader();
             var rows = new List<LeaderboardEntry>();
-            while (reader.Read()) rows.Add(new(reader.GetString(0), reader.GetInt32(1), reader.IsDBNull(2) ? null : reader.GetString(2),
+            while (reader.Read())
+            {
+                rows.Add(new(reader.GetString(0), reader.GetInt32(1), reader.IsDBNull(2) ? null : reader.GetString(2),
                 reader.GetInt32(3), reader.GetInt64(4), reader.GetInt64(5), reader.GetInt64(6), reader.IsDBNull(7) ? null : (byte[])reader.GetValue(7)));
+            }
+
             reader.Close();
             using var preferences = Command("SELECT named,hidden,portrait FROM leaderboard_preferences WHERE id=$id");
             preferences.Parameters.AddWithValue("$id", viewer.ToString());

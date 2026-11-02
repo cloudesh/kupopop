@@ -43,7 +43,8 @@ public static class UiStationery
         UiTheme.PaperGrain(min, pageMax);
         PencilEdges(min, pageMax);
         draw.AddLine(min + UiTheme.V(8, 4), new Vector2(min.X + UiTheme.S(8), pageMax.Y - UiTheme.S(4)), UiTheme.C(UiTheme.Line));
-        var margin = UiTheme.Rose; margin.W = 0.15f;
+        var margin = UiTheme.Rose;
+        margin.W = 0.15f;
         draw.AddLine(min + UiTheme.V(10, 6), new Vector2(min.X + UiTheme.S(10), pageMax.Y - UiTheme.S(6)), UiTheme.C(margin));
         for (float y = min.Y + UiTheme.S(38); y < pageMax.Y - UiTheme.S(18); y += UiTheme.S(52))
         {
@@ -57,7 +58,8 @@ public static class UiStationery
     private static void PencilEdges(Vector2 min, Vector2 max)
     {
         var draw = ImGui.GetWindowDrawList();
-        var ink = UiTheme.Ink; ink.W = 0.12f;
+        var ink = UiTheme.Ink;
+        ink.W = 0.12f;
         // Stationary, slightly uneven pencil marks sit inside the paper margin.
         // They never alter the rectangular controls or precise drawing surface.
         for (int side = 0; side < 2; side++)
@@ -71,7 +73,8 @@ public static class UiStationery
             }
         }
         var corner = max - UiTheme.V(6, 6);
-        var crease = UiTheme.Brass; crease.W = 0.16f;
+        var crease = UiTheme.Brass;
+        crease.W = 0.16f;
         draw.AddTriangleFilled(corner, corner - UiTheme.V(13, 0), corner - UiTheme.V(0, 13), UiTheme.C(crease));
         draw.AddLine(corner - UiTheme.V(13, 0), corner - UiTheme.V(0, 13), UiTheme.C(ink), UiTheme.S(0.8f));
     }
@@ -85,10 +88,13 @@ public static class UiStationery
             var p = point - center;
             return center + new Vector2(p.X * cosine - p.Y * sine, p.X * sine + p.Y * cosine) + offset;
         }
-        var a = Rotate(min); var b = Rotate(new Vector2(max.X, min.Y));
-        var c = Rotate(max); var d = Rotate(new Vector2(min.X, max.Y));
+        var a = Rotate(min);
+        var b = Rotate(new Vector2(max.X, min.Y));
+        var c = Rotate(max);
+        var d = Rotate(new Vector2(min.X, max.Y));
         var draw = ImGui.GetWindowDrawList();
-        var shadow = UiTheme.Shadow; shadow.W = 0.12f;
+        var shadow = UiTheme.Shadow;
+        shadow.W = 0.12f;
         var drop = UiTheme.V(1, 2);
         draw.AddQuadFilled(a + drop, b + drop, c + drop, d + drop, UiTheme.C(shadow));
         draw.AddQuadFilled(a, b, c, d, UiTheme.C(color));
@@ -105,9 +111,12 @@ public static class UiStationery
         var c = b + UiTheme.V(-2, 12);
         var d = a + UiTheme.V(2, 12);
         draw.AddQuadFilled(a, b, c, d, UiTheme.C(tint));
-        var ink = UiTheme.Brass; ink.W = 0.22f;
+        var ink = UiTheme.Brass;
+        ink.W = 0.22f;
         for (float x = UiTheme.S(6); x < width - UiTheme.S(3); x += UiTheme.S(9))
+        {
             draw.AddLine(top + new Vector2(x, UiTheme.S(3)), top + new Vector2(x - UiTheme.S(2), UiTheme.S(11)), UiTheme.C(ink));
+        }
     }
 
     public static void PageMark(string label)
@@ -122,7 +131,8 @@ public static class UiStationery
     public static void SketchNote(Vector2 min, Vector2 max)
     {
         var draw = ImGui.GetWindowDrawList();
-        var ink = UiTheme.Ink; ink.W = UiTheme.DarkMode ? 0.12f : 0.17f;
+        var ink = UiTheme.Ink;
+        ink.W = UiTheme.DarkMode ? 0.12f : 0.17f;
         uint color = UiTheme.C(ink);
         // Short, imperfect graphite strokes stay at the edges, clear of text.
         for (int side = 0; side < 2; side++)
@@ -166,7 +176,8 @@ public static class UiStationery
         Vector2 P(float x, float y) => center + new Vector2(x, y) * radius;
         float stroke = Math.Max(UiTheme.S(1), radius * 0.06f);
         uint ink = UiTheme.C(UiTheme.CanvasInk);
-        var blush = UiTheme.RoseHover; blush.W = 0.45f;
+        var blush = UiTheme.RoseHover;
+        blush.W = 0.45f;
         draw.AddCircleFilled(P(-0.58f, 0.23f), radius * 0.13f, UiTheme.C(blush), 16);
         draw.AddCircleFilled(P(0.58f, 0.23f), radius * 0.13f, UiTheme.C(blush), 16);
         // A little pencil tucked under one paw makes the drawing-game purpose clear.
@@ -223,7 +234,13 @@ public static class UiStationery
             float angle = i * (MathF.Tau / 32);
             draw.PathLineTo(center + new Vector2(MathF.Cos(angle), MathF.Sin(angle)) * radii);
         }
-        if (fill) draw.PathFillConvex(color);
-        else draw.PathStroke(color, ImDrawFlags.Closed, Math.Max(UiTheme.S(1.1f), radii.X * 0.04f));
+        if (fill)
+        {
+            draw.PathFillConvex(color);
+        }
+        else
+        {
+            draw.PathStroke(color, ImDrawFlags.Closed, Math.Max(UiTheme.S(1.1f), radii.X * 0.04f));
+        }
     }
 }

@@ -4,7 +4,8 @@ static class RateLimitChecks
 {
     public static void Run(Action<bool, string> check)
     {
-        var clock = new Clock(); var limits = new InputRateLimiter(clock);
+        var clock = new Clock();
+        var limits = new InputRateLimiter(clock);
         check(Enumerable.Range(0, 120).All(_ => limits.Allow("draw")), "normal drawing delivery bursts above the old one-second count are accepted");
         check(Enumerable.Range(0, 60).All(_ => limits.Allow("draw")) && !limits.Allow("draw"), "drawing bursts remain bounded instead of disabling flood protection");
         clock.Advance(0.5);
@@ -29,7 +30,7 @@ static class RateLimitChecks
             "transport permits normal sustained drawing plus cursor and control traffic");
         var concurrent = new InputRateLimiter(clock);
         int accepted = 0;
-        Parallel.For(0, 1000, _ => { if (concurrent.Allow("transport")) Interlocked.Increment(ref accepted); });
+        Parallel.For(0, 1000, _ => { if (concurrent.Allow("transport")) { Interlocked.Increment(ref accepted); } });
         check(accepted == 384, "concurrent receive loops cannot overspend the shared account transport budget");
     }
 

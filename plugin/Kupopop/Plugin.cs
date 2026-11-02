@@ -21,7 +21,10 @@ public sealed class Plugin : IDalamudPlugin
     private readonly List<IActiveNotification> invitationNotices = [];
     private bool disposed;
     private long lastFrameFailure;
-    internal Configuration Config { get; }
+    internal Configuration Config
+    {
+        get;
+    }
 
     public Plugin()
     {
@@ -30,14 +33,22 @@ public sealed class Plugin : IDalamudPlugin
         diagnostic = new(directory);
         backgroundInvitations = new(directory, diagnostic);
         diagnostic.Write($"plugin.start version={typeof(Plugin).Assembly.GetName().Version} api=15 runtime={Environment.Version}");
-        main = new(this, directory, diagnostic) { IsOpen = false };
+        main = new(this, directory, diagnostic)
+        {
+            IsOpen = false
+        };
         windows.AddWindow(main);
         var openCommand = new CommandInfo((_, args) =>
         {
             main.IsOpen = true;
-            if (args.Trim().Equals("debug", StringComparison.OrdinalIgnoreCase)) main.ShowDebug = !main.ShowDebug;
+            if (args.Trim().Equals("debug", StringComparison.OrdinalIgnoreCase))
+            {
+                main.ShowDebug = !main.ShowDebug;
+            }
         })
-        { HelpMessage = "Open Kupo Skribbl. Use /kuposkribbl debug for appearance preferences and file diagnostics." };
+        {
+            HelpMessage = "Open Kupo Skribbl. Use /kuposkribbl debug for appearance preferences and file diagnostics."
+        };
         CommandManager.AddHandler("/kuposkribbl", openCommand);
         CommandManager.AddHandler("/kupopop", openCommand);
         CommandManager.AddHandler("/kupo", openCommand);
@@ -52,9 +63,15 @@ public sealed class Plugin : IDalamudPlugin
     {
         try
         {
+            diagnostic.Verbose = main.ShowDebug;
             backgroundInvitations.Tick(Config.BackgroundInvitations, main.IsOpen, ShowInvitation,
                 () => { Config.BackgroundInvitations = false; Save(); });
             main.PollNetwork();
+            if (!main.IsOpen)
+            {
+                windows.Draw();
+                return;
+            }
             using var style = UiTheme.Apply(main.IsDrawingRoom, Config.DarkMode);
             windows.Draw();
             main.SynchronizeVisibility();
@@ -62,7 +79,10 @@ public sealed class Plugin : IDalamudPlugin
         catch (Exception ex)
         {
             if (Environment.TickCount64 - lastFrameFailure > 5000)
-            { diagnostic.Write("plugin.frame_failed", ex); lastFrameFailure = Environment.TickCount64; }
+            {
+                diagnostic.Write("plugin.frame_failed", ex);
+                lastFrameFailure = Environment.TickCount64;
+            }
         }
     }
     private void Open() => main.IsOpen = true;
@@ -77,16 +97,24 @@ public sealed class Plugin : IDalamudPlugin
             InitialDuration = TimeSpan.FromSeconds(12),
             HardExpiry = DateTime.UtcNow.AddMinutes(1),
         });
-        notice.Click += args => { if (!disposed) Open(); args.Notification.DismissNow(); };
+        notice.Click += args => { if (!disposed) { Open(); } args.Notification.DismissNow(); };
         invitationNotices.Add(notice);
     }
-    private void OpenSettings() { main.IsOpen = true; main.ShowDebug = true; }
+    private void OpenSettings()
+    {
+        main.IsOpen = true;
+        main.ShowDebug = true;
+    }
 
     public void Dispose()
     {
         disposed = true;
         backgroundInvitations.Dispose();
-        foreach (var notice in invitationNotices) notice.DismissNow();
+        foreach (var notice in invitationNotices)
+        {
+            notice.DismissNow();
+        }
+
         PluginInterface.UiBuilder.Draw -= Draw;
         PluginInterface.UiBuilder.OpenMainUi -= Open;
         PluginInterface.UiBuilder.OpenConfigUi -= OpenSettings;
@@ -96,5 +124,6 @@ public sealed class Plugin : IDalamudPlugin
         windows.RemoveAllWindows();
         main.Dispose();
         diagnostic.Write("plugin.stop");
+        diagnostic.Dispose();
     }
 }

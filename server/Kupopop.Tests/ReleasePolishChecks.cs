@@ -10,16 +10,24 @@ static class ReleasePolishChecks
         using var accounts = new AccountStore(Path.Combine(working, "release-polish"));
         var a = accounts.Create("Custom host", trackStats: true);
         var b = accounts.Create("Custom viewer", trackStats: true);
-        var clock = new Clock(); var game = new GameEngine(accounts, NullLogger<GameEngine>.Instance, clock);
-        var host = new Peer(a.AccountId); var viewer = new Peer(b.AccountId);
-        game.Attach(host); game.Attach(viewer);
+        var clock = new Clock();
+        var game = new GameEngine(accounts, NullLogger<GameEngine>.Instance, clock);
+        var host = new Peer(a.AccountId);
+        var viewer = new Peer(b.AccountId);
+        game.Attach(host);
+        game.Attach(viewer);
         game.Handle(host, new(null!));
         check(host.Events[^1].Type == "error", "malformed command names are rejected before dispatch or rate-budget lookup");
         check(CustomWordLists.Parse("Apple, apple, Pear, , Peach").SequenceEqual(new[] { "Apple", "Pear", "Peach" }),
             "room lists trim and deduplicate entries without counting empty separators");
         foreach (string bad in new[] { "x", "a\u001bb", new string('a', 49), new string('a', 1601), string.Join(',', Enumerable.Range(0, 65).Select(i => "Word " + i)) })
         {
-            bool rejected = false; try { CustomWordLists.Parse(bad); } catch (ArgumentException) { rejected = true; }
+            bool rejected = false;
+            try
+            {
+                CustomWordLists.Parse(bad);
+            }
+            catch (ArgumentException) { rejected = true; }
             check(rejected, "malformed or oversized room word lists are rejected");
         }
         const string custom = "Private apple, Private pear, Private peach, Private melon, Private berry, Private plum";
@@ -41,10 +49,12 @@ static class ReleasePolishChecks
         check(host.State.DrawingLikes == 1 && accounts.Leaderboard(a.AccountId, "likes", 0).Entries.All(e => e.Likes == 0),
             "custom-list drawing likes remain in-room and cannot farm lifetime rankings");
         game.Handle(viewer, new("chat", Text: host.State.Word));
-        clock.Advance(7); game.Tick();
+        clock.Advance(7);
+        game.Tick();
         game.Handle(viewer, new("choose-word", Text: viewer.State.WordChoices![0], TurnId: viewer.State.TurnId));
         game.Handle(host, new("chat", Text: viewer.State.Word));
-        clock.Advance(7); game.Tick();
+        clock.Advance(7);
+        game.Tick();
         check(host.State.Phase == "results" && host.State.MatchResults!.All(r => r.Points == 1100) && accounts.Statistics(a.AccountId)?.Games == 0,
             "completed custom-list games preserve normal room awards without adding lifetime scores or games");
         game.Handle(host, new("suggest", Kind: "word", Category: "FFXIV", Text: "Suggested flower"));
@@ -52,8 +62,13 @@ static class ReleasePolishChecks
             "authenticated word submissions enter only the private operator inbox");
         game.Handle(host, new("suggest", Kind: "suggestion", Text: "A second suggestion"));
         check(host.Events[^1].Type == "error" && accounts.ReadSuggestions().Length == 1, "suggestion cooldown is authoritative and persists in SQLite");
-        for (int i = 0; i < 4; i++) { clock.Advance(61); game.Handle(host, new("suggest", Kind: "suggestion", Text: "A useful improvement " + i)); }
-        clock.Advance(61); game.Handle(host, new("suggest", Kind: "suggestion", Text: "Quota overflow check"));
+        for (int i = 0; i < 4; i++)
+        {
+            clock.Advance(61);
+            game.Handle(host, new("suggest", Kind: "suggestion", Text: "A useful improvement " + i));
+        }
+        clock.Advance(61);
+        game.Handle(host, new("suggest", Kind: "suggestion", Text: "Quota overflow check"));
         check(host.Events[^1].Type == "error" && accounts.ReadSuggestions().Length == 5, "the five-per-day suggestion quota cannot be bypassed with new sessions");
         game.Handle(viewer, new("suggest", Kind: "word", Category: "Unknown category", Text: "Another flower"));
         check(viewer.Events[^1].Type == "suggestion-sent" && accounts.ReadSuggestions().Any(s => s.Category == "Unknown category"),
@@ -81,11 +96,16 @@ static class ReleasePolishChecks
     private sealed class Peer(Guid id) : IGamePeer
     {
         public Guid Id { get; } = id;
-        public string? RoomCode { get; set; }
+        public string? RoomCode
+        {
+            get; set;
+        }
         public List<ServerEvent> Events { get; } = [];
         public RoomView State => Events.Last(e => e.Room is not null).Room!;
         public void Send(ServerEvent message) => Events.Add(message);
         public bool Allow(string type) => true;
-        public void Close() { }
+        public void Close()
+        {
+        }
     }
 }

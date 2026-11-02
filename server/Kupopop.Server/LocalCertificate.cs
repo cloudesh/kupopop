@@ -10,7 +10,10 @@ public static class LocalCertificate
         Directory.CreateDirectory(directory);
         string path = Path.Combine(directory, "localhost.pfx");
         X509Certificate2 cert;
-        if (File.Exists(path)) cert = X509CertificateLoader.LoadPkcs12FromFile(path, null);
+        if (File.Exists(path))
+        {
+            cert = X509CertificateLoader.LoadPkcs12FromFile(path, null);
+        }
         else
         {
             using var key = RSA.Create(2048);
@@ -23,11 +26,19 @@ public static class LocalCertificate
             request.CertificateExtensions.Add(new X509KeyUsageExtension(X509KeyUsageFlags.DigitalSignature | X509KeyUsageFlags.KeyEncipherment, true));
             using var generated = request.CreateSelfSigned(DateTimeOffset.UtcNow.AddMinutes(-5), DateTimeOffset.UtcNow.AddYears(1));
             File.WriteAllBytes(path, generated.Export(X509ContentType.Pfx));
-            if (!OperatingSystem.IsWindows()) File.SetUnixFileMode(path, UnixFileMode.UserRead | UnixFileMode.UserWrite);
+            if (!OperatingSystem.IsWindows())
+            {
+                File.SetUnixFileMode(path, UnixFileMode.UserRead | UnixFileMode.UserWrite);
+            }
+
             cert = X509CertificateLoader.LoadPkcs12FromFile(path, null);
         }
         File.WriteAllText(Path.Combine(directory, "localhost.cer"), cert.ExportCertificatePem());
-        if (DateTime.UtcNow >= cert.NotAfter.ToUniversalTime()) throw new InvalidOperationException("Local certificate expired. Stop the server and remove data/localhost.pfx to generate a new one.");
+        if (DateTime.UtcNow >= cert.NotAfter.ToUniversalTime())
+        {
+            throw new InvalidOperationException("Local certificate expired. Stop the server and remove data/localhost.pfx to generate a new one.");
+        }
+
         if (requestTrust && OperatingSystem.IsWindows())
         {
             using var store = new X509Store(StoreName.Root, StoreLocation.CurrentUser);
@@ -38,7 +49,10 @@ public static class LocalCertificate
                 Console.WriteLine($"SHA-256: {Convert.ToHexString(SHA256.HashData(cert.RawData))}");
                 Console.Write("Type TRUST to install it, or press Enter to cancel: ");
                 if (!string.Equals(Console.ReadLine(), "TRUST", StringComparison.Ordinal))
+                {
                     throw new InvalidOperationException("Local trust setup cancelled. No certificate was installed.");
+                }
+
                 store.Add(X509CertificateLoader.LoadCertificate(cert.RawData));
             }
         }

@@ -19,4 +19,8 @@ Open with /kupo, /kupopop or /kuposkribbl.</Description>
   <ItemGroup><ProjectReference Include="../Kupopop.Shared/Kupopop.Shared.csproj" /></ItemGroup>
   <ItemGroup><EmbeddedResource Include="Audio/*.wav" /></ItemGroup>
   <ItemGroup><Content Include="../images/icon.png" Link="images/icon.png" CopyToOutputDirectory="PreserveNewest" /></ItemGroup>
+  <ItemGroup>
+    <Content Include="../../LICENSE" Link="LICENSE" CopyToOutputDirectory="PreserveNewest" />
+    <Content Include="../../THIRD_PARTY_NOTICES.md" Link="THIRD_PARTY_NOTICES.md" CopyToOutputDirectory="PreserveNewest" />
+  </ItemGroup>
 </Project>

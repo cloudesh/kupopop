@@ -2,6 +2,7 @@
   <PropertyGroup><TargetFramework>net10.0</TargetFramework><OutputType>Exe</OutputType></PropertyGroup>
   <ItemGroup><ProjectReference Include="../Kupopop.Server/Kupopop.Server.csproj" /></ItemGroup>
   <ItemGroup><Compile Include="../../plugin/Kupopop/CredentialVault.cs" Link="CredentialVault.cs" /></ItemGroup>
+  <ItemGroup><Compile Include="../../plugin/Kupopop/DiagnosticLog.cs" Link="DiagnosticLog.cs" /></ItemGroup>
   <ItemGroup><Compile Include="../../plugin/Kupopop/PomMotion.cs" Link="PomMotion.cs" /></ItemGroup>
   <ItemGroup><Compile Include="../../plugin/Kupopop/UiGameLayout.cs" Link="UiGameLayout.cs" /></ItemGroup>
   <ItemGroup><Compile Include="../../plugin/Kupopop/UiWindowGeometry.cs" Link="UiWindowGeometry.cs" /></ItemGroup>
